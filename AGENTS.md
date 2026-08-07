@@ -95,6 +95,8 @@ Supported runtime states include `RUNNING`, `WAITING_MODEL`, `WAITING_APPROVAL`,
 
 Read-only independent tool calls may run concurrently. Writes, commands, approvals, artifact integration, and overlapping file changes must remain ordered.
 
+Do not hard-code a five-turn product limit. Interactive runs continue until an objective terminal condition, user action, or configured safety budget. Support separate limits for per-agent turns, total model calls, wall-clock time, and provider cost. Unattended and CI runs must configure at least one finite model-call or cost budget. Deterministic tests may use a five-turn budget to exercise exhaustion behavior.
+
 ## Feedback Loop Rules
 
 Treat feedback classification as the primary contribution. At minimum support:
