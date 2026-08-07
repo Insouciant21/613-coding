@@ -8,9 +8,9 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | --- | --- | --- | --- |
 | Approved design | complete | `docs/superpowers/specs/2026-08-07-613-coding-design.md`; commits `6ad0eec`, `c4fd219`, `ba03b70` | none |
 | `AGENTS.md` workflow rules | complete | `AGENTS.md`; commit `ba03b70` | keep updated per task |
-| `SPEC.md` | draft | `SPEC.md` | user review |
+| `SPEC.md` | draft | `SPEC.md`; commit `a2909c7` | user review |
 | `SPEC_PROCESS.md` | in progress | `SPEC_PROCESS.md` | add cold-start evidence |
-| `PLAN.md` | draft | `PLAN.md` and `docs/superpowers/plans/` | user review and cold-start |
+| `PLAN.md` | draft | `PLAN.md`, `docs/superpowers/plans/`; commit `a2909c7` | user review and cold-start |
 | `AGENT_LOG.md` | active | `AGENT_LOG.md` | append every significant task |
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
 | Source implementation | not started | no source package yet | complete approved plan tasks |
@@ -29,5 +29,5 @@ Every completed plan task must link a commit and fresh verification output here.
 
 ## Plan Evidence
 
-- `2026-08-08`: `writing-plans` produced four subsystem plans and the root dependency index.
+- `2026-08-08`: `writing-plans` produced four subsystem plans and the root dependency index in commit `a2909c7`.
 - No implementation task has started. No test, lint, type-check, Docker, or CI result is being marked as pass.
