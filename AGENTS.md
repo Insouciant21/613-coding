@@ -233,6 +233,19 @@ The deterministic mechanism demo must reproduce wrong patch, failed validation, 
 
 Do not use destructive Git commands unless the user explicitly requests them.
 
+## Automatic Delivery Evidence
+
+Treat delivery records as part of every task, not as end-of-project paperwork. After each significant action, update the appropriate record file with evidence from the current session:
+
+- `AGENT_LOG.md`: append a timestamp in `Asia/Shanghai`, task ID, triggered skill, important prompt/context configuration, subagent output or commit hash, human intervention, and lesson learned.
+- `PLAN.md`: when a task finishes, update its status, verification command and result, and commit hash. Do not mark a task complete from a plan or model report alone.
+- `SPEC_PROCESS.md`: after brainstorming, cold-start validation, or a spec revision, record the question, decision, uncertainty exposed, and the meaningful before/after diff.
+- `DELIVERY_STATUS.md`: update the delivery checklist, current status, last verification timestamp, responsible actor, and links to source evidence. Include the latest CI/CD pipeline and job result here.
+
+Record failures, pauses, rejected approvals, user edits, and workflow deviations as well as successful actions. Do not fabricate evidence, paraphrase an unrun command as passing, or replace a required source record with `DELIVERY_STATUS.md`; the summary file is an index, not the source of truth.
+
+When a task changes code, documentation, configuration, tests, CI, distribution, credentials, or deployment, update the relevant record in the same task before handing it off for review. A reviewer must be able to trace every completed PLAN task to a commit and fresh verification output.
+
 ## CI And Distribution
 
 GitLab CI must include a job named `unit-test`. CI must run the offline unit suite and deterministic mechanism demo. It must also build the selected distribution artifact.
@@ -252,6 +265,7 @@ Maintain these files as first-class deliverables:
 - `PLAN.md`
 - `SPEC_PROCESS.md`
 - `AGENT_LOG.md`
+- `DELIVERY_STATUS.md`
 - `README.md`
 - `REFLECTION.md`
 - `.gitlab-ci.yml`

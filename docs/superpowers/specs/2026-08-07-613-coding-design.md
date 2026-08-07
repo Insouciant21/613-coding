@@ -394,7 +394,18 @@ mock 场景固定复现：
 - CI 运行离线测试、确定性机制演示和镜像构建。
 - README 说明获取、运行、钥匙串配置、Docker 前提、平台限制和安全边界。
 
-## 19. 验收标准
+## 19. 开发过程与交付证据自动记录
+
+交付记录不是项目结束时补写的材料，而是每个开发 task 的状态输出。开发 agent 必须在同一 task 内维护以下文件：
+
+- `AGENT_LOG.md`：按 Asia/Shanghai 时间顺序追加 task、Superpowers 技能、关键 prompt/context、subagent 结果、commit hash、人工干预和经验。
+- `PLAN.md`：task 完成时写入状态、实际验证命令、结果和 commit hash；没有新鲜验证证据不得标记完成。
+- `SPEC_PROCESS.md`：记录 brainstorming、陌生 agent 冷启动和 spec/plan 修订，包括暴露的问题和关键 diff。
+- `DELIVERY_STATUS.md`：汇总课程交付清单、当前状态、最后验证时间、负责人和证据链接，并记录最新 CI/CD pipeline/job 的结果。
+
+失败、暂停、审批拒绝、用户修改、流程偏离和外部依赖故障都必须记录。`DELIVERY_STATUS.md` 只是索引，不能替代 `AGENT_LOG.md`、`PLAN.md` 或 `SPEC_PROCESS.md` 的原始证据。任何命令只有实际执行并读取结果后才能被记录为通过。
+
+## 20. 验收标准
 
 - 自研 agent loop 可以在 mock LLM 下完成闭环。
 - 失败分类能改变下一轮预设动作。
@@ -407,8 +418,9 @@ mock 场景固定复现：
 - API Key 不进入仓库、数据库、日志或容器。
 - `uv` 测试命令和 GitLab CI 的 `unit-test` job 通过。
 - Docker 镜像可以启动演示 WebUI。
+- `AGENT_LOG.md`、`PLAN.md`、`SPEC_PROCESS.md` 和 `DELIVERY_STATUS.md` 能将每个完成 task 追溯到 commit 与验证证据。
 
-## 20. 非目标
+## 21. 非目标
 
 - 不使用现成 agent 框架的高层循环；
 - 不自动创建远程 PR 或执行发布；
@@ -417,7 +429,7 @@ mock 场景固定复现：
 - 第一版不为所有语言提供专用语法分析器；
 - 第一版不实现层级式 supervisor 树。
 
-## 21. 风险与对策
+## 22. 风险与对策
 
 - 真实模型输出差异：统一内部 tool-call schema，非法响应不执行。
 - 通用命令风险：结构化 argv、白名单、审批、超时和容器隔离。
