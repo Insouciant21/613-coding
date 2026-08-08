@@ -1,6 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-08 (Asia/Shanghai)
+Last updated: 2026-08-08 15:11:30 (Asia/Shanghai)
+Responsible actor: `/root` controller; implementation commit `4d51108` by `core01_implementer`; review repair is pending commit.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -13,7 +14,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | `PLAN.md` | approved with bootstrap revision | `PLAN.md`, `docs/superpowers/plans/`; commits `a2909c7`, `fc7bf53`; user selected Subagent-Driven on 2026-08-08 | begin CORE-01 |
 | `AGENT_LOG.md` | active | `AGENT_LOG.md` | append every significant task |
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
-| Source implementation | CORE-01 complete | focused unittest and py_compile evidence in `AGENT_LOG.md`; task commit recorded below | proceed to CORE-02 only after provisioning |
+| Source implementation | CORE-01 complete | focused unittest, py_compile, complete `uv.lock`, and review repair in `AGENT_LOG.md`; scaffold commit `4d51108` plus repair commit | proceed to CORE-02 after bootstrap verification |
 | Mock-LLM mechanism tests | not started | no test suite yet | implement before real LLM integration |
 | Container sandbox | not started | no Docker runtime yet | run lifecycle/security tests |
 | Multi-agent orchestration | not started | no Supervisor yet | run task-graph/worker tests |
@@ -42,3 +43,11 @@ Every completed plan task must link a commit and fresh verification output here.
 - Focused test: `PYTHONPATH=src python3 -m unittest tests.test_package.PackageTests.test_package_exposes_version` passed.
 - Baseline compile: `python3 -m py_compile scripts/bootstrap_dev.py src/coding_harness/.../__init__.py` passed.
 - Provisioning: `DEPENDENCY_PROVISIONING_BLOCKED`; third-party checks were not run.
+
+## CORE-01 Review Repair Evidence
+
+- Verification timestamp: `2026-08-08 15:11:30 Asia/Shanghai`.
+- `uv lock`: passed with 54 resolved packages after registry access was approved.
+- Bootstrap command: `uv run python scripts/bootstrap_dev.py` is now the documented probe so imports and commands resolve from the managed environment.
+- Review status: important findings addressed; generated Python bytecode is ignored and removed from the repair commit.
+- Provisioning remains blocked: `uv sync --all-extras --frozen --offline` failed because `lancedb==0.36.0` was not cached; no third-party check is marked as passing.

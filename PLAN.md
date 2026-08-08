@@ -25,7 +25,7 @@
 
 | Plan | Scope | Depends on | Status |
 | --- | --- | --- | --- |
-| `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | pending |
+| `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | CORE-01 complete; CORE-02 blocked on provisioning |
 | `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
@@ -53,3 +53,10 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - `DELIVERY-01` through `DELIVERY-07`: CLI, API, WebUI, distribution, CI, documentation, and delivery-record automation.
 
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
+
+## CORE-01 Task Evidence
+
+- Status: complete after task review and bootstrap repair.
+- Commit: `4d51108` scaffold; repair commit is recorded in the task ledger and delivery status.
+- Verification: focused standard-library unittest and `py_compile` passed; `uv lock --check` passed for 54 packages; `uv sync --all-extras --frozen --offline` is blocked by the uncached `lancedb==0.36.0` wheel, so canonical third-party checks remain unrun.
+- Gate: CORE-02 remains blocked until `uv run python scripts/bootstrap_dev.py` reports `DEPENDENCIES_PROVISIONED`.

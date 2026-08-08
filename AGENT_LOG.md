@@ -65,3 +65,17 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - GREEN evidence: the same focused unittest passed; `python3 -m py_compile` passed for scaffold modules.
 - Provisioning evidence: `python3 scripts/bootstrap_dev.py` returned `DEPENDENCY_PROVISIONING_BLOCKED` with missing imports `pydantic, pytest` and commands `ruff, mypy`; online lock retry with `UV_CACHE_DIR=/tmp/613-uv-cache uv lock` failed after DNS retries, and offline lock failed because FastAPI was not cached.
 - Human intervention: none. Worktree creation remained blocked by read-only Git ref locks, so changes were made in the current workspace per fallback.
+
+### 2026-08-08 15:11:30 Asia/Shanghai — CORE-01 review repair
+
+- Task: CORE-01 package and test scaffold; triggered skills `subagent-driven-development`, `test-driven-development`, and `verification-before-completion`.
+- Review input: task reviewer found an incomplete `uv.lock`, a host-environment bootstrap invocation, and missing post-commit delivery fields.
+- Action: generated a complete lock with `uv lock` (54 packages) using approved registry access; changed the documented probe to `uv run python scripts/bootstrap_dev.py`; added bytecode ignores; updated `PLAN.md` and `DELIVERY_STATUS.md` with commit, timestamp, actor, and verification evidence.
+- Human intervention: registry access was approved for `uv lock`; no source secrets or unrelated user files were changed.
+- Lesson: bootstrap probes must execute inside the provisioned `uv` environment, and delivery records require timestamped evidence after the task commit.
+
+### 2026-08-08 18:05:00 Asia/Shanghai — CORE-01 provisioning gate
+
+- `uv lock --check`: passed against the 54-package lockfile.
+- `uv sync --all-extras --frozen --offline`: failed with `lancedb==0.36.0` missing from the local cache.
+- Decision: retain `DEPENDENCY_PROVISIONING_BLOCKED`; do not start CORE-02 or claim pytest/Ruff/mypy results until a cache or wheelhouse is supplied.

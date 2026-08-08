@@ -20,7 +20,7 @@ then run:
 uv sync --all-extras --frozen --offline
 ```
 
-Run `python3 scripts/bootstrap_dev.py` to verify provisioning. If it reports
+Run `uv run python scripts/bootstrap_dev.py` to verify provisioning. If it reports
 `DEPENDENCY_PROVISIONING_BLOCKED`, install dependencies using one of the
 commands above before running the canonical checks:
 
