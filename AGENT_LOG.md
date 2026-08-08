@@ -327,3 +327,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation: added stable ready-node scheduling, asyncio dependency waves, per-node retry transitions, total-call budget exhaustion, failure propagation, and pause/resume/cancel state gates with event records.
 - Verification: focused scheduler/Supervisor tests passed 7; full suite passed 188; Ruff, mypy across 61 source files, `uv lock --check`, and `git diff --check` passed.
 - Commit: `43f51fc`; proceed to MULTI-04 artifact integration.
+
+### 2026-08-09 05:40:00 Asia/Shanghai — MULTI-04 artifact integration and conflict feedback
+
+- TDD RED: focused collection failed because integration workspace/integrator modules were absent.
+- Implementation: added controlled `git apply --check` integration, declared write-set enforcement, patch-header/metadata agreement, one replay marker, merge-conflict/policy-blocked feedback, and validation handoff.
+- Hardening RED/GREEN: a patch with a secret path header but an allowed `changed_files` metadata entry initially applied; path agreement validation now rejects it before Git.
+- Verification: focused integration tests passed 5; full suite passed 193; Ruff, mypy across 64 source files, `uv lock --check`, and `git diff --check` passed.
+- Commit: `11eaef8`; proceed to MULTI-05 deterministic demonstration.

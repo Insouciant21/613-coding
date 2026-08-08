@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 05:25:00 (Asia/Shanghai)
-Responsible actor: `/root`; MULTI-03 complete through `43f51fc`; proceed to MULTI-04.
+Last updated: 2026-08-09 05:40:00 (Asia/Shanghai)
+Responsible actor: `/root`; MULTI-04 complete through `11eaef8`; proceed to MULTI-05.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -17,7 +17,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Source implementation | Core complete after final-review repair | task evidence in `PLAN.md` and `AGENT_LOG.md`; final-review implementation/evidence commit `9af4f03`; final-fix report under `.superpowers/sdd/2026-08-08-613-coding-core/` | begin sandbox subsystem |
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
 | Container sandbox | complete | SANDBOX-01 `9df471d`; SANDBOX-02 `aa3600a`; SANDBOX-03 `3ec6ac1`; SANDBOX-04 `439540f`; SANDBOX-05 `fb1c222`; reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | retain regression gate |
-| Multi-agent orchestration | in progress | MULTI-01 `9744339`; MULTI-02 `5910d7b`; MULTI-03 `43f51fc`; task reports under `.superpowers/sdd/2026-08-08-613-coding-multi-agent/` | implement MULTI-04 integration |
+| Multi-agent orchestration | in progress | MULTI-01 `9744339`; MULTI-02 `5910d7b`; MULTI-03 `43f51fc`; MULTI-04 `11eaef8`; task reports under `.superpowers/sdd/2026-08-08-613-coding-multi-agent/` | implement MULTI-05 demo |
 | README and distribution | not started | no package or Dockerfile yet | verify `uv tool install` and Docker demo |
 | GitLab CI `unit-test` job | not started | no `.gitlab-ci.yml` yet | last pipeline must pass |
 | Public WebUI URL | not started | no deployment yet | deploy isolated demonstration |
@@ -175,6 +175,14 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - GREEN: 7 focused scheduler/Supervisor tests and the full 188-test suite passed.
 - Boundary: dependency order is explicit, independent ready nodes share a wave, retries and total-call budgets are bounded, failures do not run dependents, and pause/resume/cancel are explicit states.
 - Detailed source evidence: `.superpowers/sdd/2026-08-08-613-coding-multi-agent/task-3-report.md`.
+
+## MULTI-04 Evidence
+
+- Verification timestamp: `2026-08-09 05:40:00 Asia/Shanghai`.
+- Status: complete through `11eaef8`.
+- GREEN: 5 focused integration tests and the full 193-test suite passed.
+- Boundary: integration checks patch paths against artifact metadata and declared writes before applying; conflicts produce `merge_conflict`, policy violations produce `policy_blocked`, and replay is limited to one marker.
+- Detailed source evidence: `.superpowers/sdd/2026-08-08-613-coding-multi-agent/task-4-report.md`.
 
 ## Recording Rules
 

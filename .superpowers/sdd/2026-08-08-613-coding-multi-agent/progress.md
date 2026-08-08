@@ -5,5 +5,5 @@ Execution environment: current-workspace fallback remains authorized because iso
 Task 1: complete (`9744339`)
 Task 2: complete (`5910d7b`)
 Task 3: complete (`43f51fc`)
-Task 4: pending
+Task 4: complete (`11eaef8`)
 Task 5: pending
