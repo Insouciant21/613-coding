@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import Field, model_validator
 
-from coding_harness.domain.models import StopReason
+from coding_harness.domain.models import ResourceUsage, StopReason
 from coding_harness.domain.models_base import DomainModel
 
 
@@ -29,12 +29,22 @@ class BudgetDecision(DomainModel):
 
 
 class BudgetTracker:
-    def __init__(self, limits: BudgetLimits) -> None:
+    def __init__(self, limits: BudgetLimits, usage: ResourceUsage | None = None) -> None:
         self.limits = limits
-        self.turns = 0
-        self.calls = 0
-        self.seconds = 0.0
-        self.cost = 0.0
+        restored = usage or ResourceUsage()
+        self.turns = restored.agent_turns
+        self.calls = restored.model_calls
+        self.seconds = restored.wall_time_seconds
+        self.cost = restored.provider_cost
+
+    @property
+    def usage(self) -> ResourceUsage:
+        return ResourceUsage(
+            agent_turns=self.turns,
+            model_calls=self.calls,
+            wall_time_seconds=self.seconds,
+            provider_cost=self.cost,
+        )
 
     def consume(self, turns: int, calls: int, seconds: float, cost: float) -> BudgetDecision:
         if turns < 0 or calls < 0 or seconds < 0 or cost < 0:

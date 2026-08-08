@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 from pydantic import Field, field_validator, model_validator
@@ -61,6 +61,7 @@ class StopReason(StrEnum):
     NO_PROGRESS = "no_progress"
     INVALID_ACTION = "invalid_action"
     PROVIDER_ERROR = "provider_error"
+    DEPENDENCY_ERROR = "dependency_error"
 
 
 class Feedback(DomainModel):
@@ -76,6 +77,7 @@ class ApprovalStatus(StrEnum):
     APPROVED = "approved"
     REJECTED = "rejected"
     EXPIRED = "expired"
+    CONSUMED = "consumed"
 
 
 class ApprovalRequest(DomainModel):
@@ -96,6 +98,18 @@ class ApprovalRequest(DomainModel):
         return value
 
 
+class SchemaValidationEvidence(DomainModel):
+    valid: bool
+    target: Literal["model_response", "tool_call", "finish"]
+    error_type: str | None = None
+
+
+class PolicyDecisionEvidence(DomainModel):
+    effect: Literal["allow", "ask", "deny"]
+    rule_id: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
+
 class IterationRecord(DomainModel):
     id: UUID = Field(default_factory=uuid4)
     run_id: UUID
@@ -105,6 +119,8 @@ class IterationRecord(DomainModel):
     context_summary: str = ""
     model_response: dict[str, Any] | None = None
     action: ActionEnvelope | None = None
+    schema_validation: SchemaValidationEvidence | None = None
+    policy_decision: PolicyDecisionEvidence | None = None
     tool_results: list[dict[str, Any]] = Field(default_factory=list)
     validation: dict[str, Any] | None = None
     feedback: Feedback | None = None
@@ -125,6 +141,32 @@ class IterationRecord(DomainModel):
         if not self.state_after.is_terminal and self.stop_reason is not None:
             raise ValueError("non-terminal state cannot have stop_reason")
         return self
+
+
+class ResourceUsage(DomainModel):
+    agent_turns: int = Field(default=0, ge=0)
+    model_calls: int = Field(default=0, ge=0)
+    wall_time_seconds: float = Field(default=0, ge=0)
+    provider_cost: float = Field(default=0, ge=0)
+
+
+class LoopSession(DomainModel):
+    run_id: UUID
+    state: RunState = RunState.RUNNING
+    stop_reason: StopReason | None = None
+    iteration: int = Field(default=0, ge=0)
+    pending_call: ToolCall | None = None
+    pending_request: UUID | None = None
+    validation_result: dict[str, Any] | None = None
+    validation_revision: str | None = None
+    validation_evidence: tuple[dict[str, Any], ...] = ()
+    approvals: tuple[UUID, ...] = ()
+    unresolved_risks: tuple[str, ...] = ()
+    completion_blockers: tuple[FeedbackKind, ...] = ()
+    resource_usage: ResourceUsage = Field(default_factory=ResourceUsage)
+    budget_limits: dict[str, Any] | None = None
+    changed_files: tuple[str, ...] = ()
+    context_summary: str = ""
 
 
 class Run(DomainModel):
@@ -223,3 +265,5 @@ class RunSummary(DomainModel):
     validation_evidence: tuple[dict[str, Any], ...] = ()
     approvals: tuple[UUID, ...] = ()
     unresolved_risks: tuple[str, ...] = ()
+    completion_blockers: tuple[FeedbackKind, ...] = ()
+    resource_usage: ResourceUsage = Field(default_factory=ResourceUsage)

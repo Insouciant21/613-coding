@@ -13,6 +13,7 @@ from coding_harness.application.approvals import (
 )
 from coding_harness.application.loop import AgentLoop, LoopDependencies
 from coding_harness.domain.models import (
+    ApprovalRequest,
     PermissionMode,
     Run,
     RunSummary,
@@ -33,6 +34,8 @@ class RunStore(Protocol):
 
     def update_run(self, run: Run) -> None: ...
 
+    def get_approval(self, request_id: UUID) -> ApprovalRequest | None: ...
+
 
 class RunService:
     def __init__(
@@ -45,8 +48,6 @@ class RunService:
         self._loop = loop
         self._dependency_factory = dependencies
         self._dependencies: dict[UUID, LoopDependencies] = {}
-        self._summaries: dict[UUID, RunSummary] = {}
-        self._approval_runs: dict[UUID, UUID] = {}
 
     def create_run(self, request: RunRequest) -> Run:
         run = Run(
@@ -59,14 +60,8 @@ class RunService:
 
     def resume(self, run_id: UUID) -> RunSummary:
         run = self._require_run(run_id)
-        dependencies = self._dependencies.get(run_id)
-        if dependencies is None:
-            dependencies = self._dependency_factory(run)
-            self._dependencies[run_id] = dependencies
+        dependencies = self._get_dependencies(run)
         summary = self._loop.run(run_id, run.task, dependencies)
-        self._summaries[run_id] = summary
-        for request_id in summary.approvals:
-            self._approval_runs[request_id] = run_id
         self._persist_status(run, summary)
         return summary
 
@@ -77,24 +72,34 @@ class RunService:
         return self._resolve(request_id, ApprovalDecision.REJECT)
 
     def cancel(self, run_id: UUID) -> RunSummary:
-        self._loop.cancel(run_id)
-        return self.resume(run_id)
+        run = self._require_run(run_id)
+        dependencies = self._get_dependencies(run)
+        if run.state.is_terminal:
+            return self._loop.get_summary(run_id, dependencies)
+        summary = self._loop.cancel(run_id, run.task, dependencies)
+        self._persist_status(run, summary)
+        return summary
 
     def get_summary(self, run_id: UUID) -> RunSummary:
-        try:
-            return self._summaries[run_id]
-        except KeyError as error:
-            raise KeyError(f"run has no summary: {run_id}") from error
+        run = self._require_run(run_id)
+        return self._loop.get_summary(run_id, self._get_dependencies(run))
 
     def _resolve(
         self, request_id: UUID, decision: ApprovalDecision
     ) -> ApprovalResolution:
-        try:
-            run_id = self._approval_runs[request_id]
-            dependencies = self._dependencies[run_id]
-        except KeyError as error:
-            raise KeyError(f"unknown approval: {request_id}") from error
+        request = self._store.get_approval(request_id)
+        if request is None or request.run_id is None:
+            raise KeyError(f"unknown approval: {request_id}")
+        run = self._require_run(request.run_id)
+        dependencies = self._get_dependencies(run)
         return dependencies.approvals.resolve(request_id, decision)
+
+    def _get_dependencies(self, run: Run) -> LoopDependencies:
+        dependencies = self._dependencies.get(run.id)
+        if dependencies is None:
+            dependencies = self._dependency_factory(run)
+            self._dependencies[run.id] = dependencies
+        return dependencies
 
     def _require_run(self, run_id: UUID) -> Run:
         run = self._store.get_run(run_id)

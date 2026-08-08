@@ -18,6 +18,7 @@ from coding_harness.application.context import ContextAssembler
 from coding_harness.application.feedback import FeedbackClassifier
 from coding_harness.application.loop import AgentLoop, LoopDependencies
 from coding_harness.application.policy import PolicyEngine, RepositoryPolicyConfig
+from coding_harness.application.run_service import RunRequest, RunService
 from coding_harness.application.tool_registry import ToolRegistry
 from coding_harness.application.validation import ValidationKind, ValidationResult
 from coding_harness.domain.actions import ActionEnvelope, FinishAction, ToolCall
@@ -98,8 +99,6 @@ def run_core_feedback_demo(workspace: Path) -> CoreFeedbackDemoResult:
     store = SqliteEventStore(database_path)
     project = Project(canonical_root=workspace)
     store.create_project(project)
-    run = Run(project_id=project.id, task="make answer return 2")
-    store.create_run(run)
 
     memory_repository = MemoryRepository(database_path)
     memory = MemoryEntry(
@@ -162,24 +161,35 @@ def run_core_feedback_demo(workspace: Path) -> CoreFeedbackDemoResult:
         policy_config,
         PermissionMode.AUTONOMOUS,
     )
-    dependencies = LoopDependencies(
-        context_builder=context,
-        provider=provider,
-        tools=registry,
-        policy=policy,
-        policy_config=policy_config,
-        permission_mode=PermissionMode.BALANCED,
-        approvals=ApprovalService(run_id=run.id),
-        events=store,
-        iterations=store,
-        validator=_Validator(target),
-        classifier=FeedbackClassifier(),
-        budget_limits=BudgetLimits(total_model_calls=5),
-        revision=lambda: _revision(target),
-        changed_files=lambda: tuple(executor.changed_files),
-        clock=lambda: datetime.now(UTC),
+    def dependency_factory(run: Run) -> LoopDependencies:
+        return LoopDependencies(
+            context_builder=context,
+            provider=provider,
+            tools=registry,
+            policy=policy,
+            policy_config=policy_config,
+            permission_mode=run.permission_mode,
+            approvals=ApprovalService(run_id=run.id, store=store),
+            events=store,
+            iterations=store,
+            sessions=store,
+            validator=_Validator(target),
+            classifier=FeedbackClassifier(),
+            budget_limits=BudgetLimits(total_model_calls=5),
+            revision=lambda: _revision(target),
+            changed_files=lambda: tuple(executor.changed_files),
+            clock=lambda: datetime.now(UTC),
+        )
+
+    service = RunService(store, AgentLoop(), dependency_factory)
+    run = service.create_run(
+        RunRequest(
+            task="make answer return 2",
+            project_id=project.id,
+            permission_mode=PermissionMode.BALANCED,
+        )
     )
-    summary = AgentLoop().run(run.id, run.task, dependencies)
+    summary = service.resume(run.id)
     return CoreFeedbackDemoResult(
         summary=summary,
         feedback_observed=(

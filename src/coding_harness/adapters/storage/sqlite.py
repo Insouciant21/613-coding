@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
 from coding_harness.domain.events import Event, redact_payload
 from coding_harness.domain.models import (
+    ApprovalRequest,
     IterationRecord,
+    LoopSession,
     PermissionMode,
     Project,
     Run,
@@ -155,6 +157,84 @@ class SqliteEventStore:
                     iteration.timestamp.isoformat(),
                 ),
             )
+
+    def list_iterations(self, run_id: UUID) -> list[IterationRecord]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT record_json FROM iterations WHERE run_id = ? ORDER BY iteration_number",
+                (str(run_id),),
+            ).fetchall()
+        return [IterationRecord.model_validate_json(row["record_json"]) for row in rows]
+
+    def save_loop_session(self, session: LoopSession) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO loop_sessions (run_id, session_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(run_id) DO UPDATE SET
+                    session_json = excluded.session_json,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    str(session.run_id),
+                    session.model_dump_json(),
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+
+    def get_loop_session(self, run_id: UUID) -> LoopSession | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT session_json FROM loop_sessions WHERE run_id = ?",
+                (str(run_id),),
+            ).fetchone()
+        if row is None:
+            return None
+        return LoopSession.model_validate_json(row["session_json"])
+
+    def save_approval(self, request: ApprovalRequest) -> None:
+        if request.run_id is None:
+            raise ValueError("approval request requires a run_id")
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO approvals (
+                    id, run_id, request_json, created_at, resolved_at
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    request_json = excluded.request_json,
+                    resolved_at = excluded.resolved_at
+                """,
+                (
+                    str(request.id),
+                    str(request.run_id),
+                    request.model_dump_json(),
+                    request.created_at.isoformat(),
+                    request.resolved_at.isoformat() if request.resolved_at else None,
+                ),
+            )
+
+    def get_approval(self, request_id: UUID) -> ApprovalRequest | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT request_json FROM approvals WHERE id = ?",
+                (str(request_id),),
+            ).fetchone()
+        if row is None:
+            return None
+        return ApprovalRequest.model_validate_json(row["request_json"])
+
+    def list_approvals(self, run_id: UUID) -> list[ApprovalRequest]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT request_json FROM approvals
+                WHERE run_id = ? ORDER BY created_at, id
+                """,
+                (str(run_id),),
+            ).fetchall()
+        return [ApprovalRequest.model_validate_json(row["request_json"]) for row in rows]
 
     @staticmethod
     def _parse_datetime(value: str) -> datetime:

@@ -57,9 +57,13 @@ class ValidationResult(DomainModel):
 
 
 class ValidationTracker:
-    def __init__(self) -> None:
-        self._result: ValidationResult | None = None
-        self._revision: str | None = None
+    def __init__(
+        self,
+        result: ValidationResult | None = None,
+        revision: str | None = None,
+    ) -> None:
+        self._result = result
+        self._revision = revision
 
     def record(self, result: ValidationResult, revision: str) -> None:
         if not revision:
@@ -69,3 +73,11 @@ class ValidationTracker:
 
     def is_fresh_and_passing(self, revision: str) -> bool:
         return self._revision == revision and self._result is not None and self._result.passed
+
+    @property
+    def result(self) -> ValidationResult | None:
+        return self._result
+
+    @property
+    def revision(self) -> str | None:
+        return self._revision

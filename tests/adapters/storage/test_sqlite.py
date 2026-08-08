@@ -27,6 +27,7 @@ def test_store_creates_required_schema(tmp_path: Path) -> None:
         "projects",
         "runs",
         "iterations",
+        "loop_sessions",
         "events",
         "approvals",
         "task_graphs",

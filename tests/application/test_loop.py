@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
+import pytest
+
+from coding_harness.adapters.storage.sqlite import SqliteEventStore
 from coding_harness.application.approvals import ApprovalDecision, ApprovalService
 from coding_harness.application.budgets import BudgetLimits
 from coding_harness.application.feedback import FeedbackClassifier
@@ -19,13 +22,22 @@ from coding_harness.application.validation import ValidationKind, ValidationResu
 from coding_harness.domain.actions import ActionEnvelope, FinishAction, ToolCall
 from coding_harness.domain.events import Event
 from coding_harness.domain.models import (
+    ApprovalRequest,
+    ApprovalStatus,
+    FeedbackKind,
     IterationRecord,
+    LoopSession,
     PermissionMode,
     Run,
     RunState,
     StopReason,
 )
-from coding_harness.ports.llm import LLMResponse, ModelContext, ToolDefinition
+from coding_harness.ports.llm import (
+    LLMResponse,
+    ModelContext,
+    ModelMessage,
+    ToolDefinition,
+)
 from coding_harness.ports.tools import ToolContext, ToolResult
 
 
@@ -39,11 +51,17 @@ class Provider:
         return self.responses.popleft()
 
 
+class RaisingProvider:
+    def complete(self, context: ModelContext, tools: Sequence[ToolDefinition]) -> Any:
+        raise RuntimeError("provider unavailable")
+
+
 class ContextBuilder:
     def build(self, run_id: UUID, task: str, events: Sequence[Event]) -> ModelContext:
         return ModelContext(
             run_id=run_id,
             task=task,
+            messages=(ModelMessage(role="user", content=task),),
             metadata={"event_types": [event.event_type for event in events]},
         )
 
@@ -52,6 +70,8 @@ class EventRecords:
     def __init__(self) -> None:
         self.events: list[Event] = []
         self.iterations: list[IterationRecord] = []
+        self.sessions: dict[UUID, LoopSession] = {}
+        self.approval_requests: dict[UUID, ApprovalRequest] = {}
 
     def append(self, event: Event) -> None:
         self.events.append(event)
@@ -61,6 +81,25 @@ class EventRecords:
 
     def save_iteration(self, iteration: IterationRecord) -> None:
         self.iterations.append(iteration)
+
+    def save_loop_session(self, session: LoopSession) -> None:
+        self.sessions[session.run_id] = session
+
+    def get_loop_session(self, run_id: UUID) -> LoopSession | None:
+        return self.sessions.get(run_id)
+
+    def save_approval(self, request: ApprovalRequest) -> None:
+        self.approval_requests[request.id] = request
+
+    def get_approval(self, request_id: UUID) -> ApprovalRequest | None:
+        return self.approval_requests.get(request_id)
+
+    def list_approvals(self, run_id: UUID) -> list[ApprovalRequest]:
+        return [
+            request
+            for request in self.approval_requests.values()
+            if request.run_id == run_id
+        ]
 
 
 class RunRecords(EventRecords):
@@ -142,7 +181,7 @@ def dependencies(
         ),
         executor,
     )
-    approvals = ApprovalService(run_id=uuid4())
+    approvals = ApprovalService(run_id=uuid4(), store=records)
     deps = LoopDependencies(
         context_builder=ContextBuilder(),
         provider=provider,
@@ -153,6 +192,7 @@ def dependencies(
         approvals=approvals,
         events=records,
         iterations=records,
+        sessions=records,
         validator=validator,
         classifier=FeedbackClassifier(),
         budget_limits=budget or BudgetLimits(total_model_calls=10),
@@ -195,6 +235,34 @@ def test_invalid_response_and_premature_finish_are_repaired(tmp_path: Path) -> N
     summary = AgentLoop().run(uuid4(), "fix", deps)
     assert summary.status is RunState.COMPLETED
     assert [event.event_type for event in records.events].count("feedback.invalid_action") == 2
+    assert records.iterations[0].schema_validation is not None
+    assert not records.iterations[0].schema_validation.valid
+    assert records.iterations[0].policy_decision is None
+
+
+def test_invalid_tool_arguments_are_rejected_before_policy(tmp_path: Path) -> None:
+    provider = Provider(
+        (
+            response(ToolCall(name="edit_file", arguments={"path": "a.py"})),
+        )
+    )
+    deps, records, executor, _ = dependencies(
+        tmp_path,
+        provider,
+        Validator(()),
+        budget=BudgetLimits(total_model_calls=1),
+    )
+
+    summary = AgentLoop().run(uuid4(), "invalid schema", deps)
+
+    invalid = records.iterations[0]
+    assert summary.stop_reason is StopReason.BUDGET_EXHAUSTED
+    assert invalid.feedback is not None
+    assert invalid.feedback.kind is FeedbackKind.INVALID_ACTION
+    assert invalid.schema_validation is not None
+    assert not invalid.schema_validation.valid
+    assert invalid.policy_decision is None
+    assert not executor.calls
 
 
 def test_strict_approval_pauses_then_resumes_exact_action(tmp_path: Path) -> None:
@@ -266,8 +334,7 @@ def test_no_progress_and_cancel_are_terminal(tmp_path: Path) -> None:
     assert no_progress.stop_reason is StopReason.NO_PROGRESS
 
     cancelled_id = uuid4()
-    loop.cancel(cancelled_id)
-    cancelled = loop.run(cancelled_id, "cancelled", deps)
+    cancelled = loop.cancel(cancelled_id, "cancelled", deps)
     assert cancelled.status is RunState.CANCELLED
     assert cancelled.stop_reason is StopReason.CANCELLED
 
@@ -291,14 +358,20 @@ def test_run_service_creates_approves_resumes_and_cancels(tmp_path: Path) -> Non
                 response(FinishAction(summary="done")),
             )
         )
-        deps, _, _, approvals = dependencies(
+        deps, _, _, _ = dependencies(
             tmp_path,
             provider,
             Validator((validation(0),)),
             mode=PermissionMode.STRICT,
         )
-        approvals.run_id = run.id
-        deps = replace(deps, events=records, iterations=records)
+        approvals = ApprovalService(run_id=run.id, store=records)
+        deps = replace(
+            deps,
+            approvals=approvals,
+            events=records,
+            iterations=records,
+            sessions=records,
+        )
         dependency_map[run.id] = deps
         return deps
 
@@ -349,13 +422,14 @@ def test_expired_approval_terminates_instead_of_waiting_forever(tmp_path: Path) 
             mode=PermissionMode.STRICT,
         )
         approvals = ApprovalService(
-            run_id=run.id, clock=now, ttl=timedelta(seconds=1)
+            run_id=run.id, store=records, clock=now, ttl=timedelta(seconds=1)
         )
         return replace(
             deps,
             approvals=approvals,
             events=records,
             iterations=records,
+            sessions=records,
         )
 
     service = RunService(records, loop, factory)
@@ -368,3 +442,315 @@ def test_expired_approval_terminates_instead_of_waiting_forever(tmp_path: Path) 
     assert expired.status is RunState.FAILED
     assert expired.stop_reason is StopReason.TIMEOUT
     assert "approval.expired" in [event.event_type for event in records.events]
+
+
+def test_sqlite_reconstruction_approves_and_resumes_exact_pending_action(
+    tmp_path: Path,
+) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+    executed: list[ToolCall] = []
+
+    def service_with(
+        responses: Sequence[Any], total_model_calls: int = 1
+    ) -> RunService:
+        def factory(run: Run) -> LoopDependencies:
+            deps, _, executor, _ = dependencies(
+                tmp_path,
+                Provider(responses),
+                Validator((validation(0),)),
+                mode=run.permission_mode,
+                budget=BudgetLimits(total_model_calls=total_model_calls),
+            )
+            original_execute = executor.execute
+
+            def execute(call: ToolCall, context: ToolContext) -> ToolResult:
+                executed.append(call)
+                return original_execute(call, context)
+
+            executor.execute = execute  # type: ignore[method-assign]
+            approvals = ApprovalService(run_id=run.id, store=store)
+            return replace(
+                deps,
+                approvals=approvals,
+                events=store,
+                iterations=store,
+                sessions=store,
+            )
+
+        return RunService(store, AgentLoop(), factory)
+
+    initial = service_with(
+        (
+            response(
+                ToolCall(
+                    name="edit_file", arguments={"path": "a.py", "content": "approved"}
+                )
+            ),
+        ),
+        total_model_calls=5,
+    )
+    run = initial.create_run(
+        RunRequest(task="fix", permission_mode=PermissionMode.STRICT)
+    )
+    paused = initial.resume(run.id)
+    request_id = paused.approvals[-1]
+
+    resolver = service_with(())
+    resolver.approve(request_id)
+    assert resolver.get_summary(run.id).status is RunState.WAITING_APPROVAL
+
+    resumed = service_with((response(FinishAction(summary="done")),))
+    completed = resumed.resume(run.id)
+
+    assert completed.status is RunState.COMPLETED
+    assert [call.arguments["content"] for call in executed] == ["approved"]
+    assert completed.validation_evidence
+    assert completed.resource_usage.model_calls == 2
+    assert completed.resource_usage.agent_turns == 2
+    assert completed.changed_files == ("a.py",)
+    assert resumed.get_summary(run.id) == completed
+    assert store.get_run(run.id).state is RunState.COMPLETED  # type: ignore[union-attr]
+    persisted_approval = store.get_approval(request_id)
+    assert persisted_approval is not None
+    assert persisted_approval.status is ApprovalStatus.CONSUMED
+    assert [record.iteration for record in store.list_iterations(run.id)] == [1, 2, 3]
+    snapshot = store.get_loop_session(run.id)
+    assert snapshot is not None
+    assert snapshot.pending_call is None
+    assert snapshot.pending_request is None
+    assert snapshot.validation_result is not None
+    assert snapshot.validation_revision == "a.py"
+    assert snapshot.iteration == 3
+
+
+def test_sqlite_reconstruction_rejects_pending_action(tmp_path: Path) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+
+    def make_service(responses: Sequence[Any]) -> RunService:
+        def factory(run: Run) -> LoopDependencies:
+            deps, _, _, _ = dependencies(
+                tmp_path,
+                Provider(responses),
+                Validator(()),
+                mode=run.permission_mode,
+            )
+            return replace(
+                deps,
+                approvals=ApprovalService(run_id=run.id, store=store),
+                events=store,
+                iterations=store,
+                sessions=store,
+            )
+
+        return RunService(store, AgentLoop(), factory)
+
+    first = make_service(
+        (
+            response(
+                ToolCall(name="edit_file", arguments={"path": "a.py", "content": "x"})
+            ),
+        )
+    )
+    run = first.create_run(RunRequest(task="reject", permission_mode=PermissionMode.STRICT))
+    request_id = first.resume(run.id).approvals[-1]
+
+    make_service(()).reject(request_id)
+    rejected = make_service(()).resume(run.id)
+
+    assert rejected.status is RunState.FAILED
+    assert rejected.stop_reason is StopReason.APPROVAL_REJECTED
+
+
+def test_terminal_iterations_capture_schema_policy_and_real_transitions(
+    tmp_path: Path,
+) -> None:
+    provider = Provider(
+        (
+            response(
+                ToolCall(name="edit_file", arguments={"path": "", "content": "same"})
+            ),
+        )
+    )
+    deps, records, _, _ = dependencies(
+        tmp_path, provider, Validator((validation(0),)), changed_files=[]
+    )
+
+    summary = AgentLoop().run(uuid4(), "edit", deps)
+
+    terminal = records.iterations[-1]
+    assert summary.stop_reason is StopReason.NO_PROGRESS
+    assert terminal.state_before is RunState.RUNNING
+    assert terminal.state_after is RunState.FAILED
+    assert terminal.stop_reason is StopReason.NO_PROGRESS
+    assert terminal.schema_validation is not None
+    assert terminal.schema_validation.valid
+    assert terminal.policy_decision is not None
+    assert terminal.policy_decision.effect == "allow"
+    assert terminal.context_summary != "edit"
+    assert "message_count" in terminal.context_summary
+
+
+def test_budget_and_cancel_paths_persist_terminal_iterations(tmp_path: Path) -> None:
+    provider = Provider(
+        (
+            response(
+                ToolCall(
+                    name="edit_file", arguments={"path": "../escape", "content": "x"}
+                )
+            ),
+        )
+    )
+    deps, records, _, _ = dependencies(
+        tmp_path,
+        provider,
+        Validator(()),
+        budget=BudgetLimits(total_model_calls=1),
+    )
+    budgeted = AgentLoop().run(uuid4(), "unsafe", deps)
+    assert budgeted.stop_reason is StopReason.BUDGET_EXHAUSTED
+    assert records.iterations[-1].state_after is RunState.FAILED
+    assert records.iterations[-1].stop_reason is StopReason.BUDGET_EXHAUSTED
+
+    run_id = uuid4()
+    cancel_records = EventRecords()
+    cancel_deps = replace(deps, events=cancel_records, iterations=cancel_records)
+    loop = AgentLoop()
+    cancelled = loop.cancel(run_id, "cancel", cancel_deps)
+    assert cancelled.status is RunState.CANCELLED
+    assert cancel_records.iterations[-1].state_before is RunState.RUNNING
+    assert cancel_records.iterations[-1].state_after is RunState.CANCELLED
+
+
+def test_cancel_does_not_mutate_terminal_run(tmp_path: Path) -> None:
+    store = RunRecords()
+
+    def factory(run: Run) -> LoopDependencies:
+        deps, _, _, _ = dependencies(
+            tmp_path,
+            Provider(
+                (
+                    response(
+                        ToolCall(
+                            name="edit_file",
+                            arguments={"path": "a.py", "content": "ok"},
+                        )
+                    ),
+                    response(FinishAction(summary="done")),
+                )
+            ),
+            Validator((validation(0),)),
+        )
+        return replace(deps, events=store, iterations=store, sessions=store)
+
+    service = RunService(store, AgentLoop(), factory)
+    run = service.create_run(RunRequest(task="complete"))
+    completed = service.resume(run.id)
+    after_cancel = RunService(store, AgentLoop(), factory).cancel(run.id)
+
+    assert completed.status is RunState.COMPLETED
+    assert after_cancel == completed
+    assert store.get_run(run.id).state is RunState.COMPLETED  # type: ignore[union-attr]
+
+
+def test_finish_rejects_unresolved_policy_feedback_at_same_revision(tmp_path: Path) -> None:
+    provider = Provider(
+        (
+            response(
+                ToolCall(name="edit_file", arguments={"path": "a.py", "content": "ok"})
+            ),
+            response(
+                ToolCall(
+                    name="edit_file", arguments={"path": "../escape", "content": "x"}
+                )
+            ),
+            response(FinishAction(summary="must not finish")),
+        )
+    )
+    deps, records, _, _ = dependencies(
+        tmp_path,
+        provider,
+        Validator((validation(0),)),
+        budget=BudgetLimits(total_model_calls=3),
+    )
+
+    summary = AgentLoop().run(uuid4(), "safe finish", deps)
+
+    assert summary.status is RunState.FAILED
+    assert summary.stop_reason is StopReason.BUDGET_EXHAUSTED
+    assert "hard.repository_escape" in summary.unresolved_risks
+    assert FeedbackKind.POLICY_BLOCKED in summary.completion_blockers
+    assert [event.event_type for event in records.events].count("feedback.invalid_action") == 1
+
+
+@pytest.mark.parametrize(
+    ("boundary", "expected_stop"),
+    (
+        ("context", "dependency_error"),
+        ("provider", "provider_error"),
+        ("policy", "dependency_error"),
+        ("tool", "dependency_error"),
+        ("validator", "dependency_error"),
+        ("revision", "dependency_error"),
+        ("classifier", "dependency_error"),
+    ),
+)
+def test_dependency_exceptions_become_terminal_summaries(
+    tmp_path: Path, boundary: str, expected_stop: str
+) -> None:
+    action = ToolCall(name="edit_file", arguments={"path": "a.py", "content": "ok"})
+    provider: Any = Provider((response(action),))
+    deps, records, _, _ = dependencies(
+        tmp_path, provider, Validator((validation(0),))
+    )
+
+    class RaisesContext:
+        def build(self, run_id: UUID, task: str, events: Sequence[Event]) -> ModelContext:
+            raise RuntimeError("context failed")
+
+    class RaisesPolicy:
+        def evaluate(self, *args: Any, **kwargs: Any) -> Any:
+            raise RuntimeError("policy failed")
+
+    class RaisesTool:
+        def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
+            raise RuntimeError("tool failed")
+
+    class RaisesValidator:
+        def validate(self) -> ValidationResult:
+            raise RuntimeError("validator failed")
+
+    class RaisesClassifier:
+        def classify(self, *args: Any, **kwargs: Any) -> Any:
+            raise RuntimeError("classifier failed")
+
+    if boundary == "context":
+        deps = replace(deps, context_builder=RaisesContext())
+    elif boundary == "provider":
+        deps = replace(deps, provider=RaisingProvider())
+    elif boundary == "policy":
+        deps = replace(deps, policy=RaisesPolicy())
+    elif boundary == "tool":
+        registration = ToolRegistry()
+        registration.register(deps.tools.definitions()[0], RaisesTool())
+        deps = replace(deps, tools=registration)
+    elif boundary == "validator":
+        deps = replace(deps, validator=RaisesValidator())
+    elif boundary == "revision":
+        deps = replace(
+            deps,
+            revision=lambda: (_ for _ in ()).throw(RuntimeError("revision failed")),
+        )
+    else:
+        deps = replace(deps, classifier=RaisesClassifier())
+
+    summary = AgentLoop().run(uuid4(), "boundary", deps)
+
+    assert summary.status is RunState.FAILED
+    assert summary.stop_reason is not None
+    assert summary.stop_reason.value == expected_stop
+    assert records.iterations[-1].state_after is RunState.FAILED
+    assert records.iterations[-1].feedback is not None
+    assert records.iterations[-1].feedback.kind in {
+        FeedbackKind.ENVIRONMENT_FAILURE,
+        FeedbackKind.TOOL_ERROR,
+    }

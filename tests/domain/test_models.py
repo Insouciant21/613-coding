@@ -58,12 +58,14 @@ def test_enums_expose_governance_and_feedback_values() -> None:
         "no_progress",
         "invalid_action",
         "provider_error",
+        "dependency_error",
     }
     assert {status.value for status in ApprovalStatus} == {
         "pending",
         "approved",
         "rejected",
         "expired",
+        "consumed",
     }
 
 

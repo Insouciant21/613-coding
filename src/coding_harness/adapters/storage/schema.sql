@@ -30,6 +30,12 @@ CREATE TABLE IF NOT EXISTS iterations (
 
 CREATE INDEX IF NOT EXISTS idx_iterations_run_time ON iterations(run_id, timestamp);
 
+CREATE TABLE IF NOT EXISTS loop_sessions (
+    run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
+    session_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS events (
     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL UNIQUE,
@@ -49,6 +55,8 @@ CREATE TABLE IF NOT EXISTS approvals (
     created_at TEXT NOT NULL,
     resolved_at TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_approvals_run ON approvals(run_id, created_at);
 
 CREATE TABLE IF NOT EXISTS task_graphs (
     id TEXT PRIMARY KEY,

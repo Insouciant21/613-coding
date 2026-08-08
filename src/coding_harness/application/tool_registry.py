@@ -53,6 +53,13 @@ class ToolRegistry:
         )
 
     def dispatch(self, call: ToolCall, context: ToolContext) -> ToolResult:
+        registration = self._validated_registration(call)
+        return registration.executor.execute(call, context)
+
+    def validate(self, call: ToolCall) -> None:
+        self._validated_registration(call)
+
+    def _validated_registration(self, call: ToolCall) -> _Registration:
         registration = self._registrations.get(call.name)
         if registration is None:
             raise UnknownToolError(f"unknown tool: {call.name}")
@@ -60,7 +67,7 @@ class ToolRegistry:
             registration.validator.validate(call.arguments)
         except ValidationError as error:
             raise ToolSchemaError(f"invalid arguments for tool: {call.name}") from error
-        return registration.executor.execute(call, context)
+        return registration
 
     def definitions(self) -> tuple[ToolDefinition, ...]:
         return tuple(
