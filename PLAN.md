@@ -64,6 +64,12 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - Verification: focused CLI/config/credential suite passed 11 tests; full suite passed 205 tests; Ruff and mypy passed; Typer root help smoke passed.
 - Boundaries: commands are thin adapters over injected services and demo functions; JSON/table output and nonzero failures are covered.
 
+## DELIVERY-03 Task Evidence
+
+- Status: complete; commit `a8b1f63`; report `.superpowers/sdd/2026-08-08-613-coding-delivery/task-3-report.md`.
+- Verification: API suite passed 5 tests; full suite passed 210 tests; Ruff and mypy passed.
+- Boundaries: FastAPI routes are dependency-injected adapters with generic safe errors, ordered events, and lifecycle/approval endpoints.
+
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 
 ## CORE-01 Task Evidence
