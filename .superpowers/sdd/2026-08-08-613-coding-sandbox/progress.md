@@ -5,7 +5,7 @@ Pre-flight review: no conflict found between SANDBOX task requirements and the g
 
 Task 1: fix round 1/5 (1 addressed, 0 open — finite CPU/time limits; commits 0a63777..9df471d)
 Task 1: complete (commits 219b475..9df471d, review clean)
-Task 2: pending
+Task 2: in progress (SANDBOX-02; task-brief helper fallback because nested sdd-workspace lacks execute permission)
 Task 3: pending
 Task 4: pending
 Task 5: pending

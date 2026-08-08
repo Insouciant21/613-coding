@@ -255,3 +255,22 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Independent read-only re-review marked finite CPU/time validation and its regression coverage `ADDRESSED`.
 - New breakage: none. Out-of-scope observations: none. No Critical/Important finding remains.
 - Decision: SANDBOX-01 complete through `9df471d`; proceed to SANDBOX-02 workspace and artifact isolation.
+
+### 2026-08-09 04:01:20 Asia/Shanghai — SANDBOX-02 workspace and artifact export
+
+- Task: SANDBOX-02; triggered `using-superpowers`, `test-driven-development`, `systematic-debugging`, and `verification-before-completion`.
+- TDD RED: `UV_CACHE_DIR=/tmp/613-sandbox-02-uv-cache uv run pytest tests/sandbox/test_workspace.py tests/sandbox/test_artifacts.py -q` failed during collection with two expected `ModuleNotFoundError` errors for the absent workspace/artifact modules.
+- Implementation: added temporary Git-shaped workspaces that preserve ignored/untracked files, canonical/symlink-safe manifests, scoped cleanup, normalized write sets, deterministic unified patches, binary summaries, and pre-export redaction through `WorkArtifact` metadata.
+- GREEN: `UV_CACHE_DIR=/tmp/613-sandbox-02-uv-cache uv run pytest tests/sandbox -q` passed with 16 tests. Scoped Ruff, scoped mypy, and `git diff --check` passed.
+- Debugging evidence: the first implementation run had 6 passed and 1 failed because `WorkspacePathError` did not satisfy the focused `ValueError` boundary; the traceback was reproduced, the exception hierarchy was corrected, and the final focused run passed.
+- Security regression RED/GREEN: a cleanup ownership test first failed because a fabricated workspace was deleted without error; manager-owned/cleaned path tracking was added, and the final sandbox suite passed 17 tests.
+- Changed files: `src/coding_harness/adapters/sandbox/workspace.py`, `src/coding_harness/adapters/sandbox/artifacts.py`, `tests/sandbox/test_workspace.py`, `tests/sandbox/test_artifacts.py`, and the task report.
+- Human intervention: none; protected `.claude/` and both untracked requirement documents were untouched. No commit was attempted because Git metadata is not writable in this sandbox.
+- Lesson: artifact export must compare the whole working-tree manifest, not only Git's tracked diff, when ignored and untracked worker output is part of the contract.
+
+### 2026-08-09 04:10:07 Asia/Shanghai — SANDBOX-02 controller hardening
+
+- Review-driven TDD found and fixed five artifact/isolation boundary defects: incomplete temporary-root cleanup, dotfile allowlist corruption, empty allowlist fail-open behavior, ignored explicit empty baselines, and missing mode-only changes.
+- RED evidence: workspace tests failed 3 cases before the cleanup/write-set fix; artifact tests failed 2 cases before baseline/mode support. GREEN: 12 focused workspace/artifact tests and 21 sandbox tests passed.
+- Full controller verification: 147 tests passed; Ruff passed; mypy passed across 50 source files; `uv lock --check` resolved 61 packages; `git diff --check` passed.
+- Scope: only SANDBOX-02 source, tests, and evidence were changed. Protected user-owned untracked paths remain untouched.
