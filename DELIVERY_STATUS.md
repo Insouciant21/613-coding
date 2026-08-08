@@ -35,7 +35,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 ## CORE-03 Evidence
 
 - Verification timestamp: `2026-08-08 22:17:38 Asia/Shanghai`.
-- Status: implementation complete; commit pending at evidence creation.
+- Status: complete; commit `e8b938f`.
 - Tests: 4 focused port tests passed; 11 combined domain/port tests passed.
 - Ruff and mypy: passed for domain and ports.
 

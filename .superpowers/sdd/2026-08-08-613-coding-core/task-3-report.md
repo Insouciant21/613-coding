@@ -2,7 +2,7 @@
 
 Status: implementation complete; scoped verification clean.
 
-Commit: pending at report creation.
+Commit: `e8b938f` (`feat: define harness dependency ports`).
 
 TDD RED: `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src uv run --no-sync pytest tests/ports -q` failed during collection because `coding_harness.ports.embeddings` was missing.
 

@@ -19,3 +19,5 @@ Task 2: fix round 1/5 (1 addressed, 0 open; commit 69b1c59)
 - Aligned `Event.new` with the required explicit timestamp parameter.
 
 Task 2: complete (commits 59bc4f2..69b1c59; scoped verification clean)
+
+Task 3: complete (commit e8b938f; 11 combined tests, Ruff, and mypy clean)

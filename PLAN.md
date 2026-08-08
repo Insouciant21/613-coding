@@ -68,5 +68,5 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 ## CORE-03 Task Evidence
 
-- Status: implementation complete; commit hash is recorded after commit.
+- Status: complete; commit `e8b938f`; scoped contract review clean.
 - Verification: 4 focused port tests and 11 combined domain/port tests passed; Ruff and mypy passed for the same scope.
