@@ -25,7 +25,7 @@
 
 | Plan | Scope | Depends on | Status |
 | --- | --- | --- | --- |
-| `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | CORE-01 through CORE-10 complete |
+| `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | CORE-01 through CORE-10 complete; CORE-11 implementation under review |
 | `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
@@ -109,3 +109,11 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Verification: `uv run pytest -q` passed with 110 tests; Ruff, mypy, `uv lock --check`, and `git diff --check` passed. The offline demo returned `completed/success`, persisted `runs.state=completed`, observed objective feedback, blocked the guardrail escape, retrieved memory, and corrected `answer.py` to `return 2`.
 - Boundaries: SQLite persists serializable loop session, approval, budget, validation, and audit state; runtime dependencies are reconstructed through the factory. The repository owns the loop; objective validation controls `finish`; the offline demo uses a scripted LLM and an explicit five-call demo budget only.
 - Review: scoped re-review from `f154bba` through `f9394d7` marked all original findings addressed with no new Critical/Important breakage. A stale concurrent `RunService._persist_status` observation was outside the fix diff and is deferred to final whole-branch review.
+
+## CORE-11 Task Evidence
+
+- Status: implementation complete; independent task review pending.
+- Commit: `552593e` (`feat: secure provider credentials`).
+- TDD evidence: the focused suite first failed during collection because the credentials adapter package did not exist, then passed after implementing the application boundary and keyring adapter.
+- Verification: `uv run pytest tests/adapters/credentials/test_keyring.py -q` passed with 4 tests; `uv run pytest -q` passed with 114 tests; Ruff, mypy, `uv lock --check`, and `git diff --check a513c95..552593e` passed.
+- Boundaries: status and `SecretReference` are metadata-only; OS keyring access is injectable; provider entries are isolated; environment fallback is opt-in; raw-secret provider injection remains a separately governed future integration boundary.

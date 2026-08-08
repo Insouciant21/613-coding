@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 01:11:12 (Asia/Shanghai)
-Responsible actor: `/root` controller; CORE-10 complete at `f9394d7` after scoped re-review.
+Last updated: 2026-08-09 01:31:54 (Asia/Shanghai)
+Responsible actor: `/root` controller; CORE-11 implementation `552593e` verified, independent review pending.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -14,7 +14,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | `PLAN.md` | approved with bootstrap revision | `PLAN.md`, `docs/superpowers/plans/`; commits `a2909c7`, `fc7bf53`; user selected Subagent-Driven on 2026-08-08 | begin CORE-01 |
 | `AGENT_LOG.md` | active | `AGENT_LOG.md` | append every significant task |
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
-| Source implementation | CORE-01 through CORE-10 complete | task evidence in `PLAN.md` and `AGENT_LOG.md`; CORE-10 commits `2dd32f9`, `d705637`, `06b397e`, `f9394d7` | begin CORE-11 |
+| Source implementation | CORE-01 through CORE-10 complete; CORE-11 implementation under review | task evidence in `PLAN.md` and `AGENT_LOG.md`; CORE-11 commit `552593e` | complete independent CORE-11 review |
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
 | Container sandbox | not started | no Docker runtime yet | run lifecycle/security tests |
 | Multi-agent orchestration | not started | no Supervisor yet | run task-graph/worker tests |
@@ -90,6 +90,15 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - Mechanism: invalid actions, policy deny/ask/allow, cross-process exact approval resume/reject/expiry, redacted and atomic SQLite session/approval/iteration persistence, persisted budget limits/usage and validation freshness, objective completion blockers, terminal audit records, no progress, cancellation, dependency terminal states, and four budget types remain deterministic and injectable.
 - Demo check: direct execution returned `completed/success`, observed objective feedback, blocked the guardrail escape, retrieved memory, corrected `answer.py`, and persisted `runs.state=completed`. Scripted mock LLM only; explicit `total_model_calls=5` is demo configuration, not a product-wide limit; no credentials or network calls.
 - Review: scoped re-review from `f154bba` through `f9394d7` marked all findings addressed with no new Critical/Important breakage. Stale concurrent `RunService._persist_status` was recorded as out-of-scope for this fix diff and remains a final-review observation.
+
+## CORE-11 Evidence
+
+- Verification timestamp: `2026-08-09 01:31:54 Asia/Shanghai`.
+- Status: implementation complete, independent task review pending; commit `552593e`.
+- Tests: focused credential suite passed 4 tests; full suite passed 114 tests.
+- Static gates: Ruff, mypy, `uv lock --check`, and `git diff --check a513c95..552593e` passed.
+- Security boundary: returned status/references contain no key material; fake-keyring captured-output checks remain secret-free; providers use isolated entries; environment fallback is disabled by default and must be explicitly enabled.
+- Follow-up boundary: raw-secret injection into a provider call is intentionally absent and must be designed as a separately governed non-persisting integration.
 
 ## Recording Rules
 
