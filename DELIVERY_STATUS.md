@@ -329,3 +329,9 @@ Every completed plan task must link a commit and fresh verification output here.
 - Distribution-focused suite passed 7; Ruff, mypy, and `git diff --check` passed.
 - Docker build was attempted and failed only while fetching the Docker Hub OAuth token due to connection reset; no image smoke pass is claimed.
 - GitLab/GitHub workflow files and Render manifest are configuration evidence only; no remote CI result or public URL is claimed.
+
+## Final External-State Audit
+
+- Verification timestamp: `2026-08-09 07:21:49 Asia/Shanghai`.
+- No Git remote, forge token, deployment credential, local CI runner, or public tunnel is available. Docker daemon `29.6.2` is available, but Docker Hub OAuth retrieval resets.
+- Remaining external requirements are therefore explicitly open: remote CI final pass, Docker image/worker smoke, deployed WebUI URL, and student-written reflection.

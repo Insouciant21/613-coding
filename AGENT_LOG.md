@@ -479,3 +479,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Verification: distribution-focused suite passed 7; full `uv run pytest -q` passed 235 tests; Ruff, mypy, `uv lock --check`, `git diff --check`, and `uv build` passed. Docker build was attempted and remains blocked by Docker Hub token connection reset.
 - Commit: `0d8d63a`; no public URL or remote pipeline result is claimed.
 - Lesson: CI/deployment declarations improve reproducibility but are not substitutes for a recorded remote pass or deployed endpoint.
+
+### 2026-08-09 07:21:49 Asia/Shanghai - final external-state audit
+
+- Task: verify whether the remaining course delivery gates can be executed in the current workspace.
+- Evidence: `git remote -v` is empty; no GitLab/GitHub/deployment environment variables or credentials are present; `gitlab-runner`, `actionlint`, `act`, and `cloudflared` are unavailable; Docker daemon `29.6.2` is present but the Docker Hub OAuth request resets.
+- Result: repository-internal implementation, tests, manifests, and local evidence are complete; remote CI final pass, Docker registry/image smoke, public WebUI URL, and student-authored reflection cannot be produced from this workspace.
+- Human intervention required: configure a forge/deployment account and write the student reflection; no safe in-scope filesystem change can substitute for those external actions.
+- Lesson: stop at the external boundary once all reproducible local work is complete; preserve explicit missing evidence instead of claiming it.
