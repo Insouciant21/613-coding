@@ -110,3 +110,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: the focused event test failed with `[REDACTED] != banana`.
 - Fix: tokenize snake/camel/hyphenated keys and redact only explicit secret parts or qualified key names; require the explicit event timestamp specified by CORE-02.
 - GREEN: 7 domain tests passed; Ruff and mypy passed.
+
+### 2026-08-08 22:17:38 Asia/Shanghai — CORE-03 dependency ports
+
+- Task: CORE-03; triggered `test-driven-development` and `verification-before-completion`.
+- TDD RED: port tests failed during collection because the embedding port module was absent.
+- Implementation: added typed Protocol boundaries for LLMs, embeddings, tools, event storage, and policy; added strict immutable-shaped context/result models.
+- GREEN: 4 focused port tests and 11 combined domain/port tests passed; Ruff and mypy passed.
+- Human intervention: none; tests use fakes only and no provider/network calls.
