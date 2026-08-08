@@ -97,7 +97,7 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 
 ## Runtime Composition Repair Evidence
 
-- Status: complete; local composition is covered by `tests/application/test_composition.py` and commit pending with this repair.
+- Status: complete; local composition is covered by `tests/application/test_composition.py` and commit `d657369`.
 - Verification: real CLI create/cancel and FastAPI create/health/events smoke passed; no provider credential or fabricated model response is used.
 
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.

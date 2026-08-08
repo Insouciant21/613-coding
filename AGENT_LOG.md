@@ -374,6 +374,7 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation: added SQLite/LanceDB local composition, project reuse, deferred-provider failure semantics, and optional `--repo` scope for lifecycle CLI commands; wired `coding-harness web` to the same bundle.
 - Verification: composition tests passed 2; real CLI create/cancel smoke and FastAPI create/health/events smoke passed. A configured provider remains required for model-driven resume.
 - Scope: no credentials or fabricated LLM responses were added.
+- Commit: `d657369` (`fix: wire local service composition`).
 
 ### 2026-08-09 06:25:00 Asia/Shanghai - DELIVERY-07 documentation and final evidence
 
