@@ -229,3 +229,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commit: `9af4f03` (`fix: close core final review findings`).
 - Workflow context: used the user-authorized current-workspace fallback because Git ref locks prevented worktree creation. Human intervention: prior authorization only. User-owned untracked `.claude/` and both untracked requirement documents remained untouched.
 - Lesson: transaction context management and resource ownership are separate SQLite concerns; optimistic concurrency must compare the snapshot atomically at the persistence boundary, surface the winning state to callers, and prevent later terminal entry points from trusting stale loop-session state.
+
+### 2026-08-09 03:33:03 Asia/Shanghai — SANDBOX-01 runtime contracts
+
+- Task: SANDBOX-01; triggered `subagent-driven-development`, `test-driven-development`, `systematic-debugging`, and `verification-before-completion`.
+- TDD RED: focused collection failed with `ModuleNotFoundError: No module named 'coding_harness.adapters.sandbox'` and one collection error before implementation.
+- Implementation: added strict sandbox/resource/command/artifact models, the injectable `SandboxRuntime` port, and a deterministic fake runtime that records lifecycle calls and rejects destroyed handles.
+- Verification: focused sandbox contracts passed 5 tests; the full offline suite passed 131 tests; Ruff, mypy across 48 source files, `uv lock --check`, and `git diff --check` passed.
+- Workflow deviation: the external Codex implementer stalled after more than six minutes while exiting a successful full-suite run inside its nested bwrap sandbox. The controller reproduced the same tree outside that nested sandbox (`131 passed in 1.59s`), interrupted the stalled process, preserved its files, and reconstructed the task report from observed output. No user-owned untracked files were touched.
+- Human intervention: the user confirmed continuous execution. Lesson: nested sandbox process shutdown can differ from the product test environment; controller verification and repository evidence remain authoritative.
