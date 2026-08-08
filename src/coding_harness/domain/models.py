@@ -77,6 +77,7 @@ class ApprovalStatus(StrEnum):
     APPROVED = "approved"
     REJECTED = "rejected"
     EXPIRED = "expired"
+    EXECUTING = "executing"
     CONSUMED = "consumed"
 
 
@@ -165,6 +166,7 @@ class LoopSession(DomainModel):
     completion_blockers: tuple[FeedbackKind, ...] = ()
     resource_usage: ResourceUsage = Field(default_factory=ResourceUsage)
     budget_limits: dict[str, Any] | None = None
+    classifier_state: dict[str, Any] | None = None
     changed_files: tuple[str, ...] = ()
     context_summary: str = ""
 

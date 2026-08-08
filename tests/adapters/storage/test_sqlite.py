@@ -9,8 +9,16 @@ from uuid import uuid4
 import pytest
 
 from coding_harness.adapters.storage.sqlite import SqliteEventStore
+from coding_harness.domain.actions import ActionEnvelope, ToolCall
 from coding_harness.domain.events import Event
-from coding_harness.domain.models import IterationRecord, PermissionMode, Run, RunState
+from coding_harness.domain.models import (
+    ApprovalRequest,
+    IterationRecord,
+    LoopSession,
+    PermissionMode,
+    Run,
+    RunState,
+)
 
 
 def test_store_creates_required_schema(tmp_path: Path) -> None:
@@ -67,6 +75,43 @@ def test_store_redacts_payload_even_for_direct_event_construction(tmp_path: Path
     assert b"must-not-persist" not in (tmp_path / "state.db").read_bytes()
 
 
+def test_store_redacts_iteration_session_and_approval_payloads(tmp_path: Path) -> None:
+    path = tmp_path / "state.db"
+    store = SqliteEventStore(path)
+    run = Run(task="redact state")
+    store.create_run(run)
+    secret = "api_key=must-not-persist"
+    call = ToolCall(
+        name="edit_file", arguments={"path": "a.py", "content": secret}
+    )
+    store.save_iteration(
+        IterationRecord(
+            run_id=run.id,
+            iteration=1,
+            state_before=RunState.RUNNING,
+            state_after=RunState.RUNNING,
+            model_response={"content": secret},
+            action=ActionEnvelope(action=call),
+            tool_results=[{"stdout": secret}],
+            validation={"stderr": secret},
+            timestamp=datetime.now(UTC),
+        )
+    )
+    store.save_loop_session(
+        LoopSession(
+            run_id=run.id,
+            pending_call=call,
+            validation_evidence=({"stdout": secret},),
+            context_summary=secret,
+        )
+    )
+    store.save_approval(
+        ApprovalRequest(run_id=run.id, action=call, reason=secret)
+    )
+
+    assert b"must-not-persist" not in path.read_bytes()
+
+
 def test_failed_iteration_write_rolls_back(tmp_path: Path) -> None:
     path = tmp_path / "state.db"
     store = SqliteEventStore(path)
@@ -82,6 +127,31 @@ def test_failed_iteration_write_rolls_back(tmp_path: Path) -> None:
     with sqlite3.connect(path) as connection:
         count = connection.execute("SELECT COUNT(*) FROM iterations").fetchone()[0]
     assert count == 0
+
+
+def test_iteration_and_session_update_roll_back_together(tmp_path: Path) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+    run = Run(task="atomic loop state")
+    store.create_run(run)
+    original = LoopSession(run_id=run.id, iteration=1)
+    store.save_loop_session(original)
+    first = IterationRecord(
+        run_id=run.id,
+        iteration=1,
+        state_before=RunState.RUNNING,
+        state_after=RunState.RUNNING,
+        timestamp=datetime.now(UTC),
+    )
+    store.save_iteration(first)
+    duplicate = first.model_copy(update={"id": uuid4()})
+
+    with pytest.raises(sqlite3.IntegrityError):
+        store.save_iteration_and_session(
+            duplicate,
+            LoopSession(run_id=run.id, iteration=2, state=RunState.PAUSED),
+        )
+
+    assert store.get_loop_session(run.id) == original
 
 
 def test_concurrent_event_appends_are_serialized(tmp_path: Path) -> None:

@@ -65,6 +65,7 @@ def test_enums_expose_governance_and_feedback_values() -> None:
         "approved",
         "rejected",
         "expired",
+        "executing",
         "consumed",
     }
 

@@ -8,6 +8,7 @@ from typing import Any, ClassVar
 from pydantic import Field, field_validator
 
 from coding_harness.domain.actions import ToolCall
+from coding_harness.domain.events import redact_payload
 from coding_harness.domain.models import PermissionMode
 from coding_harness.domain.models_base import DomainModel
 from coding_harness.ports.policy import PolicyDecision, PolicyEffect
@@ -121,6 +122,8 @@ class PolicyEngine:
         )
 
     def _hard_denial(self, call: ToolCall, root: Path) -> str | None:
+        if redact_payload(call.arguments) != call.arguments:
+            return "hard.secret_material"
         strings = tuple(self._strings(call.arguments))
         if any("/var/run/docker.sock" in value for value in strings):
             return "hard.docker_socket"

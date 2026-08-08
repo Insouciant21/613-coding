@@ -43,6 +43,11 @@ class ApprovalResolution(DomainModel):
     resolved_at: datetime
 
 
+class ApprovalClaim(DomainModel):
+    request: ApprovalRequest
+    acquired: bool
+
+
 class ApprovalService:
     def __init__(
         self,
@@ -89,7 +94,10 @@ class ApprovalService:
         resolved = request.model_copy(
             update={"status": status, "resolved_at": now}
         )
-        self._store.save_approval(resolved)
+        if not self._store.compare_and_set_approval(
+            request_id, ApprovalStatus.PENDING, resolved
+        ):
+            raise StaleApprovalError("approval request is no longer pending")
         fingerprint = self._fingerprint(request.action)
         return ApprovalResolution(
             request_id=request_id,
@@ -114,33 +122,74 @@ class ApprovalService:
             request = request.model_copy(
                 update={"status": ApprovalStatus.EXPIRED, "resolved_at": now}
             )
-            self._store.save_approval(request)
+            self._store.compare_and_set_approval(
+                request_id, ApprovalStatus.PENDING, request
+            )
         return request
+
+    def claim(self, request_id: UUID, call: ToolCall) -> ApprovalClaim:
+        request = self.get_request(request_id)
+        if request.status is not ApprovalStatus.APPROVED:
+            return ApprovalClaim(request=request, acquired=False)
+        now = self._now()
+        if request.expires_at is None or request.expires_at <= now:
+            expired = request.model_copy(
+                update={"status": ApprovalStatus.EXPIRED, "resolved_at": now}
+            )
+            self._store.compare_and_set_approval(
+                request_id, ApprovalStatus.APPROVED, expired
+            )
+            return ApprovalClaim(request=request, acquired=False)
+        if self._fingerprint(request.action) != self._fingerprint(call):
+            return ApprovalClaim(request=request, acquired=False)
+        executing = request.model_copy(update={"status": ApprovalStatus.EXECUTING})
+        return ApprovalClaim(
+            request=executing,
+            acquired=self._store.compare_and_set_approval(
+                request_id, ApprovalStatus.APPROVED, executing
+            ),
+        )
+
+    def complete_claim(self, request_id: UUID) -> None:
+        request = self.get_request(request_id)
+        consumed = request.model_copy(update={"status": ApprovalStatus.CONSUMED})
+        if not self._store.compare_and_set_approval(
+            request_id, ApprovalStatus.EXECUTING, consumed
+        ):
+            raise StaleApprovalError("approval claim is no longer executing")
+
+    def invalidate(self, request_id: UUID) -> None:
+        request, rejected = self.invalidation_update(request_id)
+        if not self._store.compare_and_set_approval(
+            request_id, request.status, rejected
+        ):
+            raise StaleApprovalError("approval request is no longer active")
+
+    def invalidation_update(
+        self, request_id: UUID
+    ) -> tuple[ApprovalRequest, ApprovalRequest]:
+        request = self.get_request(request_id)
+        if request.status not in {ApprovalStatus.PENDING, ApprovalStatus.APPROVED}:
+            raise StaleApprovalError("approval request cannot be invalidated")
+        rejected = request.model_copy(
+            update={"status": ApprovalStatus.REJECTED, "resolved_at": self._now()}
+        )
+        return request, rejected
 
     def consume(self, call: ToolCall, request_id: UUID | None = None) -> bool:
         fingerprint = self._fingerprint(call)
-        now = self._now()
         requests = (
             [self.get_request(request_id)]
             if request_id is not None
             else self._store.list_approvals(self.run_id)
         )
         for request in requests:
-            if request.status is not ApprovalStatus.APPROVED:
-                continue
-            if request.expires_at is None or request.expires_at <= now:
-                self._store.save_approval(
-                    request.model_copy(
-                        update={"status": ApprovalStatus.EXPIRED, "resolved_at": now}
-                    )
-                )
-                continue
             if self._fingerprint(request.action) != fingerprint:
                 continue
-            self._store.save_approval(
-                request.model_copy(update={"status": ApprovalStatus.CONSUMED})
-            )
-            return True
+            claim = self.claim(request.id, call)
+            if claim.acquired:
+                self.complete_claim(request.id)
+                return True
         return False
 
     def _now(self) -> datetime:

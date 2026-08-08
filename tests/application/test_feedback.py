@@ -84,6 +84,22 @@ def test_repeated_failure_becomes_no_progress() -> None:
     assert not no_progress.retryable
 
 
+def test_feedback_classifier_restores_repeated_failure_state() -> None:
+    failure = result(ValidationKind.TEST, 1, "same failure")
+    call = ToolCall(name="run_command", arguments={"argv": ["pytest"]})
+    first = FeedbackClassifier(repeated_failure_limit=3)
+    assert first.classify(failure, call, ("a.py",)).kind is FeedbackKind.TEST_FAILURE
+    assert first.classify(failure, call, ("a.py",)).kind is FeedbackKind.TEST_FAILURE
+
+    reconstructed = FeedbackClassifier()
+    reconstructed.restore(first.snapshot())
+
+    assert (
+        reconstructed.classify(failure, call, ("a.py",)).kind
+        is FeedbackKind.NO_PROGRESS
+    )
+
+
 def test_validation_tracker_requires_fresh_pass() -> None:
     tracker = ValidationTracker()
     revision = uuid4().hex

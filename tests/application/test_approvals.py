@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
 
+from coding_harness.adapters.storage.sqlite import SqliteEventStore
 from coding_harness.application.approvals import (
     ApprovalDecision,
     ApprovalService,
     StaleApprovalError,
 )
 from coding_harness.domain.actions import ToolCall
-from coding_harness.domain.models import ApprovalRequest, ApprovalStatus
+from coding_harness.domain.models import ApprovalRequest, ApprovalStatus, Run
 from coding_harness.ports.policy import PolicyDecision, PolicyEffect
 
 
@@ -35,6 +38,18 @@ class ApprovalRecords:
 
     def list_approvals(self, run_id: UUID) -> list[ApprovalRequest]:
         return [request for request in self.requests.values() if request.run_id == run_id]
+
+    def compare_and_set_approval(
+        self,
+        request_id: UUID,
+        expected_status: ApprovalStatus,
+        replacement: ApprovalRequest,
+    ) -> bool:
+        current = self.requests.get(request_id)
+        if current is None or current.status is not expected_status:
+            return False
+        self.requests[request_id] = replacement
+        return True
 
 
 def ask(call: ToolCall) -> PolicyDecision:
@@ -84,3 +99,24 @@ def test_rejection_never_authorizes_action() -> None:
     request = service.request(ask(call))
     service.resolve(request.id, ApprovalDecision.REJECT)
     assert not service.consume(call)
+
+
+def test_sqlite_approval_claim_is_atomic_across_services(tmp_path: Path) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+    run = Run(task="claim once")
+    store.create_run(run)
+    call = ToolCall(name="edit_file", arguments={"path": "a.py", "content": "x"})
+    service = ApprovalService(run_id=run.id, store=store)
+    request = service.request(ask(call))
+    service.resolve(request.id, ApprovalDecision.APPROVE)
+
+    def claim() -> bool:
+        return ApprovalService(run_id=run.id, store=store).claim(
+            request.id, call
+        ).acquired
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        claims = list(executor.map(lambda _: claim(), range(2)))
+
+    assert claims.count(True) == 1
+    assert store.get_approval(request.id).status is ApprovalStatus.EXECUTING  # type: ignore[union-attr]

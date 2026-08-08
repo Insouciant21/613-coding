@@ -11,7 +11,11 @@ from uuid import UUID, uuid4
 import pytest
 
 from coding_harness.adapters.storage.sqlite import SqliteEventStore
-from coding_harness.application.approvals import ApprovalDecision, ApprovalService
+from coding_harness.application.approvals import (
+    ApprovalDecision,
+    ApprovalService,
+    StaleApprovalError,
+)
 from coding_harness.application.budgets import BudgetLimits
 from coding_harness.application.feedback import FeedbackClassifier
 from coding_harness.application.loop import AgentLoop, LoopDependencies
@@ -85,6 +89,17 @@ class EventRecords:
     def save_loop_session(self, session: LoopSession) -> None:
         self.sessions[session.run_id] = session
 
+    def save_iteration_and_session(
+        self,
+        iteration: IterationRecord,
+        session: LoopSession,
+        approval_update: ApprovalRequest | None = None,
+    ) -> None:
+        self.iterations.append(iteration)
+        self.sessions[session.run_id] = session
+        if approval_update is not None:
+            self.approval_requests[approval_update.id] = approval_update
+
     def get_loop_session(self, run_id: UUID) -> LoopSession | None:
         return self.sessions.get(run_id)
 
@@ -100,6 +115,18 @@ class EventRecords:
             for request in self.approval_requests.values()
             if request.run_id == run_id
         ]
+
+    def compare_and_set_approval(
+        self,
+        request_id: UUID,
+        expected_status: ApprovalStatus,
+        replacement: ApprovalRequest,
+    ) -> bool:
+        current = self.approval_requests.get(request_id)
+        if current is None or current.status is not expected_status:
+            return False
+        self.approval_requests[request_id] = replacement
+        return True
 
 
 class RunRecords(EventRecords):
@@ -302,6 +329,7 @@ def test_policy_denial_is_feedback_and_budget_stops_loop(tmp_path: Path) -> None
     )
     summary = AgentLoop().run(uuid4(), "unsafe", deps)
     assert summary.stop_reason is StopReason.BUDGET_EXHAUSTED
+    assert summary.resource_usage.model_calls == 2
     assert not executor.calls
     assert "feedback.policy_blocked" in [event.event_type for event in records.events]
 
@@ -395,6 +423,16 @@ def test_run_service_creates_approves_resumes_and_cancels(tmp_path: Path) -> Non
     cancelled_run = service.create_run(RunRequest(task="cancel"))
     cancelled = service.cancel(cancelled_run.id)
     assert cancelled.status is RunState.CANCELLED
+
+    pending_cancel = service.create_run(
+        RunRequest(task="cancel pending", permission_mode=PermissionMode.STRICT)
+    )
+    pending_summary = service.resume(pending_cancel.id)
+    pending_request = pending_summary.approvals[-1]
+    assert service.cancel(pending_cancel.id).status is RunState.CANCELLED
+    with pytest.raises(StaleApprovalError):
+        service.approve(pending_request)
+    assert records.get_approval(pending_request).status is ApprovalStatus.REJECTED  # type: ignore[union-attr]
 
 
 def test_expired_approval_terminates_instead_of_waiting_forever(tmp_path: Path) -> None:
@@ -561,6 +599,60 @@ def test_sqlite_reconstruction_rejects_pending_action(tmp_path: Path) -> None:
     assert rejected.stop_reason is StopReason.APPROVAL_REJECTED
 
 
+def test_reconstructed_approval_rechecks_current_hard_and_repository_policy(
+    tmp_path: Path,
+) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+    executed: list[ToolCall] = []
+
+    def make_service(*, writes_allowed: bool, responses: Sequence[Any]) -> RunService:
+        def factory(run: Run) -> LoopDependencies:
+            deps, _, executor, _ = dependencies(
+                tmp_path,
+                Provider(responses),
+                Validator(()),
+                mode=run.permission_mode,
+            )
+            original_execute = executor.execute
+
+            def execute(call: ToolCall, context: ToolContext) -> ToolResult:
+                executed.append(call)
+                return original_execute(call, context)
+
+            executor.execute = execute  # type: ignore[method-assign]
+            return replace(
+                deps,
+                policy_config=RepositoryPolicyConfig(
+                    repository_root=tmp_path, allow_writes=writes_allowed
+                ),
+                approvals=ApprovalService(run_id=run.id, store=store),
+                events=store,
+                iterations=store,
+                sessions=store,
+            )
+
+        return RunService(store, AgentLoop(), factory)
+
+    first = make_service(
+        writes_allowed=True,
+        responses=(
+            response(
+                ToolCall(name="edit_file", arguments={"path": "a.py", "content": "x"})
+            ),
+        ),
+    )
+    run = first.create_run(RunRequest(task="policy", permission_mode=PermissionMode.STRICT))
+    request_id = first.resume(run.id).approvals[-1]
+
+    reconstructed = make_service(writes_allowed=False, responses=())
+    reconstructed.approve(request_id)
+    summary = reconstructed.resume(run.id)
+
+    assert summary.status is RunState.FAILED
+    assert "config.writes_disabled" in summary.unresolved_risks
+    assert not executed
+
+
 def test_terminal_iterations_capture_schema_policy_and_real_transitions(
     tmp_path: Path,
 ) -> None:
@@ -682,6 +774,40 @@ def test_finish_rejects_unresolved_policy_feedback_at_same_revision(tmp_path: Pa
     assert [event.event_type for event in records.events].count("feedback.invalid_action") == 1
 
 
+def test_passing_validation_does_not_clear_unresolved_policy_risk(
+    tmp_path: Path,
+) -> None:
+    provider = Provider(
+        (
+            response(
+                ToolCall(name="edit_file", arguments={"path": "a.py", "content": "ok"})
+            ),
+            response(
+                ToolCall(
+                    name="edit_file", arguments={"path": "../escape", "content": "x"}
+                )
+            ),
+            response(
+                ToolCall(name="edit_file", arguments={"path": "b.py", "content": "ok"})
+            ),
+            response(FinishAction(summary="risk remains")),
+        )
+    )
+    deps, _, _, _ = dependencies(
+        tmp_path,
+        provider,
+        Validator((validation(0), validation(0))),
+        budget=BudgetLimits(total_model_calls=4),
+    )
+
+    summary = AgentLoop().run(uuid4(), "do not bypass risk", deps)
+
+    assert summary.status is RunState.FAILED
+    assert summary.stop_reason is StopReason.BUDGET_EXHAUSTED
+    assert "hard.repository_escape" in summary.unresolved_risks
+    assert FeedbackKind.POLICY_BLOCKED in summary.completion_blockers
+
+
 @pytest.mark.parametrize(
     ("boundary", "expected_stop"),
     (
@@ -754,3 +880,55 @@ def test_dependency_exceptions_become_terminal_summaries(
         FeedbackKind.ENVIRONMENT_FAILURE,
         FeedbackKind.TOOL_ERROR,
     }
+
+
+@pytest.mark.parametrize(
+    "boundary",
+    ("context", "policy", "tool", "validator", "classifier"),
+)
+def test_malformed_dependency_results_become_terminal_summaries(
+    tmp_path: Path, boundary: str
+) -> None:
+    action = ToolCall(name="edit_file", arguments={"path": "a.py", "content": "ok"})
+    deps, records, _, _ = dependencies(
+        tmp_path, Provider((response(action),)), Validator((validation(0),))
+    )
+
+    class MalformedContext:
+        def build(self, run_id: UUID, task: str, events: Sequence[Event]) -> Any:
+            return {"unexpected": True}
+
+    class MalformedPolicy:
+        def evaluate(self, *args: Any, **kwargs: Any) -> Any:
+            return {"unexpected": True}
+
+    class MalformedTool:
+        def execute(self, call: ToolCall, context: ToolContext) -> Any:
+            return {"unexpected": True}
+
+    class MalformedValidator:
+        def validate(self) -> Any:
+            return {"unexpected": True}
+
+    class MalformedClassifier:
+        def classify(self, *args: Any, **kwargs: Any) -> Any:
+            return {"unexpected": True}
+
+    if boundary == "context":
+        deps = replace(deps, context_builder=MalformedContext())
+    elif boundary == "policy":
+        deps = replace(deps, policy=MalformedPolicy())
+    elif boundary == "tool":
+        registry = ToolRegistry()
+        registry.register(deps.tools.definitions()[0], MalformedTool())
+        deps = replace(deps, tools=registry)
+    elif boundary == "validator":
+        deps = replace(deps, validator=MalformedValidator())
+    else:
+        deps = replace(deps, classifier=MalformedClassifier())
+
+    summary = AgentLoop().run(uuid4(), "malformed boundary", deps)
+
+    assert summary.status is RunState.FAILED
+    assert summary.stop_reason is StopReason.DEPENDENCY_ERROR
+    assert records.iterations[-1].state_after is RunState.FAILED

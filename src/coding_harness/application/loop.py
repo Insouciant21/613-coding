@@ -26,6 +26,7 @@ from coding_harness.application.validation import ValidationResult, ValidationTr
 from coding_harness.domain.actions import ActionEnvelope, FinishAction, ToolCall
 from coding_harness.domain.events import Event, redact_payload
 from coding_harness.domain.models import (
+    ApprovalRequest,
     ApprovalStatus,
     Feedback,
     FeedbackKind,
@@ -38,7 +39,7 @@ from coding_harness.domain.models import (
     SchemaValidationEvidence,
     StopReason,
 )
-from coding_harness.ports.llm import LLMProvider, LLMResponse, ModelContext
+from coding_harness.ports.llm import LLMProvider, LLMResponse, ModelContext, ToolDefinition
 from coding_harness.ports.policy import PolicyDecision, PolicyEffect
 from coding_harness.ports.storage import EventStore, LoopSessionStore
 from coding_harness.ports.tools import ToolContext, ToolResult
@@ -93,6 +94,7 @@ class _Session:
     stop_reason: StopReason | None = None
     changed_files: list[str] = field(default_factory=list)
     context_summary: str = ""
+    classifier_state: dict[str, Any] | None = None
 
     @classmethod
     def restore(cls, snapshot: LoopSession, limits: BudgetLimits) -> _Session:
@@ -124,6 +126,7 @@ class _Session:
             stop_reason=snapshot.stop_reason,
             changed_files=list(snapshot.changed_files),
             context_summary=snapshot.context_summary,
+            classifier_state=snapshot.classifier_state,
         )
 
     def snapshot(self, run_id: UUID) -> LoopSession:
@@ -143,6 +146,7 @@ class _Session:
             completion_blockers=tuple(self.completion_blockers),
             resource_usage=self.budget.usage,
             budget_limits=self.budget.limits.model_dump(mode="json"),
+            classifier_state=self.classifier_state,
             changed_files=tuple(self.changed_files),
             context_summary=self.context_summary,
         )
@@ -166,7 +170,13 @@ class AgentLoop:
 
         while True:
             state_before = session.state
-            budget = session.budget.consume(turns=1, calls=1, seconds=0, cost=0)
+            budget = session.budget.consume(
+                turns=1,
+                calls=1,
+                seconds=0,
+                cost=0,
+                commit_on_reject=False,
+            )
             if not budget.allowed:
                 return self._terminal_without_action(
                     run_id,
@@ -182,8 +192,10 @@ class AgentLoop:
 
             self._transition(run_id, session, dependencies, RunState.WAITING_MODEL)
             try:
-                context = dependencies.context_builder.build(
-                    run_id, task, dependencies.events.list_for_run(run_id)
+                context = ModelContext.model_validate(
+                    dependencies.context_builder.build(
+                        run_id, task, dependencies.events.list_for_run(run_id)
+                    )
                 )
             except Exception as error:
                 return self._dependency_failure(
@@ -197,7 +209,10 @@ class AgentLoop:
             session.context_summary = self._summarize_context(context)
 
             try:
-                definitions = dependencies.tools.definitions()
+                definitions = tuple(
+                    ToolDefinition.model_validate(definition)
+                    for definition in dependencies.tools.definitions()
+                )
             except Exception as error:
                 return self._dependency_failure(
                     run_id,
@@ -335,6 +350,7 @@ class AgentLoop:
                     can_finish = (
                         session.validation.is_fresh_and_passing(revision)
                         and not session.completion_blockers
+                        and not session.unresolved_risks
                         and session.pending_request is None
                     )
                     if can_finish:
@@ -431,10 +447,12 @@ class AgentLoop:
                     valid=True, target="tool_call"
                 )
                 try:
-                    decision = dependencies.policy.evaluate(
-                        action,
-                        dependencies.policy_config,
-                        dependencies.permission_mode,
+                    decision = PolicyDecision.model_validate(
+                        dependencies.policy.evaluate(
+                            action,
+                            dependencies.policy_config,
+                            dependencies.permission_mode,
+                        )
                     )
                 except Exception as error:
                     return self._dependency_failure(
@@ -515,6 +533,7 @@ class AgentLoop:
                         action=envelope,
                         schema_validation=schema_evidence,
                         policy_decision=policy_evidence,
+                        approval_update=request,
                     )
                     return self._summary(run_id, session)
                 if self._execute(
@@ -541,6 +560,30 @@ class AgentLoop:
         if session.state.is_terminal:
             return self._summary(run_id, session)
         state_before = session.state
+        approval_update: ApprovalRequest | None = None
+        if session.pending_request is not None:
+            try:
+                _, approval_update = dependencies.approvals.invalidation_update(
+                    session.pending_request
+                )
+            except ApprovalError:
+                pass
+            except Exception as error:
+                return self._dependency_failure(
+                    run_id,
+                    session,
+                    dependencies,
+                    boundary="approval",
+                    error=error,
+                    state_before=state_before,
+                    action=(
+                        ActionEnvelope(action=session.pending_call)
+                        if session.pending_call is not None
+                        else None
+                    ),
+                )
+        session.pending_call = None
+        session.pending_request = None
         self._terminal(
             run_id,
             session,
@@ -555,6 +598,7 @@ class AgentLoop:
             dependencies,
             state_before=state_before,
             context=ModelContext(run_id=run_id, task=task),
+            approval_update=approval_update,
         )
         return self._summary(run_id, session)
 
@@ -633,9 +677,97 @@ class AgentLoop:
                 StopReason.TIMEOUT,
                 "approval.expired",
             )
+        if request.status in {ApprovalStatus.EXECUTING, ApprovalStatus.CONSUMED}:
+            return self._pause_pending_claim(
+                run_id,
+                pending,
+                session,
+                dependencies,
+                state_before=session.state,
+                request_id=request_id,
+            )
         try:
-            consumed = dependencies.approvals.consume(pending, request_id)
-        except ApprovalError as error:
+            dependencies.tools.validate(pending)
+        except Exception as error:
+            return self._dependency_failure(
+                run_id,
+                session,
+                dependencies,
+                boundary="tool",
+                error=error,
+                state_before=session.state,
+                action=ActionEnvelope(action=pending),
+                schema_validation=SchemaValidationEvidence(
+                    valid=False,
+                    target="tool_call",
+                    error_type=type(error).__name__,
+                ),
+            )
+        try:
+            current_decision = PolicyDecision.model_validate(
+                dependencies.policy.evaluate(
+                    pending,
+                    dependencies.policy_config,
+                    dependencies.permission_mode,
+                )
+            )
+        except Exception as error:
+            return self._dependency_failure(
+                run_id,
+                session,
+                dependencies,
+                boundary="policy",
+                error=error,
+                state_before=session.state,
+                action=ActionEnvelope(action=pending),
+            )
+        policy_evidence = self._policy_evidence(current_decision)
+        if current_decision.effect is PolicyEffect.DENY:
+            feedback = Feedback(
+                kind=FeedbackKind.POLICY_BLOCKED,
+                message="current policy denied approved action",
+                retryable=False,
+                details={"rule_id": current_decision.rule_id},
+            )
+            self._block(session, feedback.kind)
+            if current_decision.rule_id not in session.unresolved_risks:
+                session.unresolved_risks.append(current_decision.rule_id)
+            try:
+                _, approval_update = dependencies.approvals.invalidation_update(
+                    request_id
+                )
+            except Exception as error:
+                return self._dependency_failure(
+                    run_id,
+                    session,
+                    dependencies,
+                    boundary="approval",
+                    error=error,
+                    state_before=session.state,
+                    action=ActionEnvelope(action=pending),
+                    policy_decision=policy_evidence,
+                )
+            session.pending_call = None
+            session.pending_request = None
+            return self._terminal_feedback(
+                run_id,
+                session,
+                dependencies,
+                state_before=session.state,
+                state=RunState.FAILED,
+                reason=StopReason.APPROVAL_REJECTED,
+                event_type="approval.policy_rejected",
+                feedback=feedback,
+                action=ActionEnvelope(action=pending),
+                schema_validation=SchemaValidationEvidence(
+                    valid=True, target="tool_call"
+                ),
+                policy_decision=policy_evidence,
+                approval_update=approval_update,
+            )
+        try:
+            claim = dependencies.approvals.claim(request_id, pending)
+        except Exception as error:
             return self._dependency_failure(
                 run_id,
                 session,
@@ -644,16 +776,54 @@ class AgentLoop:
                 error=error,
                 state_before=session.state,
                 action=ActionEnvelope(action=pending),
+                policy_decision=policy_evidence,
             )
-        if not consumed:
-            return self._terminate_pending_approval(
+        if not claim.acquired:
+            try:
+                latest = dependencies.approvals.get_request(request_id)
+            except Exception as error:
+                return self._dependency_failure(
+                    run_id,
+                    session,
+                    dependencies,
+                    boundary="approval",
+                    error=error,
+                    state_before=session.state,
+                    action=ActionEnvelope(action=pending),
+                    policy_decision=policy_evidence,
+                )
+            feedback = Feedback(
+                kind=FeedbackKind.TOOL_ERROR,
+                message="approval action is already claimed or no longer executable",
+                retryable=False,
+                details={
+                    "request_id": str(request_id),
+                    "status": latest.status.value,
+                },
+            )
+            if latest.status in {ApprovalStatus.EXECUTING, ApprovalStatus.CONSUMED}:
+                return self._pause_pending_claim(
+                    run_id,
+                    pending,
+                    session,
+                    dependencies,
+                    state_before=session.state,
+                    request_id=request_id,
+                )
+            return self._terminal_feedback(
                 run_id,
-                pending,
                 session,
                 dependencies,
-                FeedbackKind.TIMEOUT,
-                StopReason.TIMEOUT,
-                "approval.expired",
+                state_before=session.state,
+                state=RunState.FAILED,
+                reason=StopReason.DEPENDENCY_ERROR,
+                event_type="approval.stale_claim",
+                feedback=feedback,
+                action=ActionEnvelope(action=pending),
+                schema_validation=SchemaValidationEvidence(
+                    valid=True, target="tool_call"
+                ),
+                policy_decision=policy_evidence,
             )
         state_before = session.state
         session.pending_call = None
@@ -670,15 +840,54 @@ class AgentLoop:
             schema_validation=SchemaValidationEvidence(
                 valid=True, target="tool_call"
             ),
-            policy_decision=PolicyDecisionEvidence(
-                effect="allow",
-                rule_id="approval.exact_action",
-                reason="approved exact pending action",
+            policy_decision=policy_evidence,
+            approval_update=request.model_copy(
+                update={"status": ApprovalStatus.CONSUMED}
             ),
         )
         if terminal:
             return self._summary(run_id, session)
         return None
+
+    def _pause_pending_claim(
+        self,
+        run_id: UUID,
+        pending: ToolCall,
+        session: _Session,
+        dependencies: LoopDependencies,
+        *,
+        state_before: RunState,
+        request_id: UUID,
+    ) -> RunSummary:
+        feedback = Feedback(
+            kind=FeedbackKind.TOOL_ERROR,
+            message="approval execution is uncertain; manual reconciliation required",
+            retryable=False,
+            details={"request_id": str(request_id)},
+        )
+        self._block(session, feedback.kind)
+        if "approval.execution_uncertain" not in session.unresolved_risks:
+            session.unresolved_risks.append("approval.execution_uncertain")
+        self._feedback_event(dependencies, run_id, feedback)
+        self._transition(run_id, session, dependencies, RunState.PAUSED)
+        session.stop_reason = None
+        self._record(
+            run_id,
+            session,
+            dependencies,
+            state_before=state_before,
+            action=ActionEnvelope(action=pending),
+            feedback=feedback,
+            schema_validation=SchemaValidationEvidence(
+                valid=True, target="tool_call"
+            ),
+            policy_decision=PolicyDecisionEvidence(
+                effect="ask",
+                rule_id="approval.execution_uncertain",
+                reason="approval claim is already executing or consumed",
+            ),
+        )
+        return self._summary(run_id, session)
 
     def _terminate_pending_approval(
         self,
@@ -730,6 +939,7 @@ class AgentLoop:
         state_before: RunState,
         schema_validation: SchemaValidationEvidence,
         policy_decision: PolicyDecisionEvidence,
+        approval_update: ApprovalRequest | None = None,
     ) -> bool:
         context = ToolContext(
             run_id=run_id,
@@ -737,7 +947,9 @@ class AgentLoop:
             permission_mode=dependencies.permission_mode,
         )
         try:
-            tool_result = dependencies.tools.dispatch(call, context)
+            tool_result = ToolResult.model_validate(
+                dependencies.tools.dispatch(call, context)
+            )
         except ToolRegistryError as error:
             feedback = Feedback(
                 kind=FeedbackKind.TOOL_ERROR,
@@ -761,6 +973,7 @@ class AgentLoop:
                     error_type=type(error).__name__,
                 ),
                 policy_decision=policy_decision,
+                approval_update=approval_update,
             )
             return False
         except Exception as error:
@@ -776,6 +989,7 @@ class AgentLoop:
                 action=turn[2] if turn else ActionEnvelope(action=call),
                 schema_validation=schema_validation,
                 policy_decision=policy_decision,
+                approval_update=approval_update,
             )
             return True
 
@@ -805,11 +1019,14 @@ class AgentLoop:
                 state_before=state_before,
                 schema_validation=schema_validation,
                 policy_decision=policy_decision,
+                approval_update=approval_update,
             )
             return False
 
         try:
-            validation = dependencies.validator.validate()
+            validation = ValidationResult.model_validate(
+                dependencies.validator.validate()
+            )
         except Exception as error:
             self._dependency_failure(
                 run_id,
@@ -824,6 +1041,7 @@ class AgentLoop:
                 tool_result=tool_result,
                 schema_validation=schema_validation,
                 policy_decision=policy_decision,
+                approval_update=approval_update,
             )
             return True
         try:
@@ -843,6 +1061,7 @@ class AgentLoop:
                 validation=validation,
                 schema_validation=schema_validation,
                 policy_decision=policy_decision,
+                approval_update=approval_update,
             )
             return True
         session.validation.record(validation, revision)
@@ -864,11 +1083,14 @@ class AgentLoop:
                 validation=validation,
                 schema_validation=schema_validation,
                 policy_decision=policy_decision,
+                approval_update=approval_update,
             )
             return True
         session.changed_files = list(dict.fromkeys((*session.changed_files, *changed_files)))
         try:
-            feedback = dependencies.classifier.classify(validation, call, changed_files)
+            feedback = Feedback.model_validate(
+                dependencies.classifier.classify(validation, call, changed_files)
+            )
         except Exception as error:
             self._dependency_failure(
                 run_id,
@@ -884,6 +1106,7 @@ class AgentLoop:
                 validation=validation,
                 schema_validation=schema_validation,
                 policy_decision=policy_decision,
+                approval_update=approval_update,
             )
             return True
 
@@ -895,7 +1118,11 @@ class AgentLoop:
         )
         self._feedback_event(dependencies, run_id, feedback)
         if feedback.kind is FeedbackKind.PASS:
-            session.completion_blockers.clear()
+            session.completion_blockers = [
+                blocker
+                for blocker in session.completion_blockers
+                if blocker is FeedbackKind.POLICY_BLOCKED
+            ]
         else:
             self._block(session, feedback.kind)
 
@@ -932,6 +1159,7 @@ class AgentLoop:
             state_before=state_before,
             schema_validation=schema_validation,
             policy_decision=policy_decision,
+            approval_update=approval_update,
         )
         return terminal
 
@@ -951,6 +1179,7 @@ class AgentLoop:
         validation: ValidationResult | None = None,
         schema_validation: SchemaValidationEvidence | None = None,
         policy_decision: PolicyDecisionEvidence | None = None,
+        approval_update: ApprovalRequest | None = None,
     ) -> RunSummary:
         kind = (
             FeedbackKind.TOOL_ERROR
@@ -985,6 +1214,7 @@ class AgentLoop:
             validation=validation,
             schema_validation=schema_validation,
             policy_decision=policy_decision,
+            approval_update=approval_update,
         )
 
     def _terminal_without_action(
@@ -1035,6 +1265,7 @@ class AgentLoop:
         validation: ValidationResult | None = None,
         schema_validation: SchemaValidationEvidence | None = None,
         policy_decision: PolicyDecisionEvidence | None = None,
+        approval_update: ApprovalRequest | None = None,
     ) -> RunSummary:
         self._feedback_event(dependencies, run_id, feedback)
         self._terminal(
@@ -1053,6 +1284,7 @@ class AgentLoop:
             validation=validation,
             schema_validation=schema_validation,
             policy_decision=policy_decision,
+            approval_update=approval_update,
         )
         return self._summary(run_id, session)
 
@@ -1070,6 +1302,7 @@ class AgentLoop:
         state_before: RunState,
         schema_validation: SchemaValidationEvidence,
         policy_decision: PolicyDecisionEvidence,
+        approval_update: ApprovalRequest | None = None,
     ) -> None:
         context, response, envelope = turn or (
             None,
@@ -1089,6 +1322,7 @@ class AgentLoop:
             validation=validation,
             schema_validation=schema_validation,
             policy_decision=policy_decision,
+            approval_update=approval_update,
         )
 
     def _record(
@@ -1106,38 +1340,48 @@ class AgentLoop:
         validation: ValidationResult | None = None,
         schema_validation: SchemaValidationEvidence | None = None,
         policy_decision: PolicyDecisionEvidence | None = None,
+        approval_update: ApprovalRequest | None = None,
     ) -> None:
         if context is not None:
             session.context_summary = self._summarize_context(context)
+        session.classifier_state = self._classifier_snapshot(dependencies)
         session.iteration += 1
-        dependencies.iterations.save_iteration(
-            IterationRecord(
-                run_id=run_id,
-                iteration=session.iteration,
-                state_before=state_before,
-                state_after=session.state,
-                context_summary=session.context_summary,
-                model_response=response.model_dump(mode="json") if response else None,
-                action=action,
-                schema_validation=schema_validation,
-                policy_decision=policy_decision,
-                tool_results=(
-                    [tool_result.model_dump(mode="json")]
-                    if tool_result is not None
-                    else []
-                ),
-                validation=validation.model_dump(mode="json") if validation else None,
-                feedback=feedback,
-                stop_reason=session.stop_reason if session.state.is_terminal else None,
-                timestamp=dependencies.clock(),
-            )
+        iteration = IterationRecord(
+            run_id=run_id,
+            iteration=session.iteration,
+            state_before=state_before,
+            state_after=session.state,
+            context_summary=session.context_summary,
+            model_response=response.model_dump(mode="json") if response else None,
+            action=action,
+            schema_validation=schema_validation,
+            policy_decision=policy_decision,
+            tool_results=(
+                [tool_result.model_dump(mode="json")]
+                if tool_result is not None
+                else []
+            ),
+            validation=validation.model_dump(mode="json") if validation else None,
+            feedback=feedback,
+            stop_reason=session.stop_reason if session.state.is_terminal else None,
+            timestamp=dependencies.clock(),
         )
-        self._save(run_id, session, dependencies)
+        state_store = dependencies.sessions
+        if hasattr(dependencies.iterations, "save_iteration_and_session"):
+            state_store = dependencies.iterations  # type: ignore[assignment]
+        state_store.save_iteration_and_session(
+            iteration,
+            session.snapshot(run_id),
+            approval_update,
+        )
 
     def _load(self, run_id: UUID, dependencies: LoopDependencies) -> _Session:
         snapshot = dependencies.sessions.get_loop_session(run_id)
         if snapshot is not None:
-            return _Session.restore(snapshot, dependencies.budget_limits)
+            session = _Session.restore(snapshot, dependencies.budget_limits)
+            if session.classifier_state is not None:
+                dependencies.classifier.restore(session.classifier_state)
+            return session
         session = _Session(
             state=RunState.RUNNING,
             budget=BudgetTracker(dependencies.budget_limits),
@@ -1149,7 +1393,19 @@ class AgentLoop:
     def _save(
         run_id: UUID, session: _Session, dependencies: LoopDependencies
     ) -> None:
+        session.classifier_state = AgentLoop._classifier_snapshot(dependencies)
         dependencies.sessions.save_loop_session(session.snapshot(run_id))
+
+    @staticmethod
+    def _classifier_snapshot(dependencies: LoopDependencies) -> dict[str, Any] | None:
+        snapshot = getattr(dependencies.classifier, "snapshot", None)
+        if not callable(snapshot):
+            return None
+        try:
+            value = snapshot()
+        except Exception:
+            return None
+        return value if isinstance(value, dict) else None
 
     def _transition(
         self,

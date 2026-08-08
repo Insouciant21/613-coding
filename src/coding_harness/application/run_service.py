@@ -10,6 +10,7 @@ from uuid import UUID
 from coding_harness.application.approvals import (
     ApprovalDecision,
     ApprovalResolution,
+    StaleApprovalError,
 )
 from coding_harness.application.loop import AgentLoop, LoopDependencies
 from coding_harness.domain.models import (
@@ -91,6 +92,8 @@ class RunService:
         if request is None or request.run_id is None:
             raise KeyError(f"unknown approval: {request_id}")
         run = self._require_run(request.run_id)
+        if run.state.is_terminal:
+            raise StaleApprovalError("cannot resolve approval for a terminal run")
         dependencies = self._get_dependencies(run)
         return dependencies.approvals.resolve(request_id, decision)
 

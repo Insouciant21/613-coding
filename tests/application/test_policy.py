@@ -65,6 +65,20 @@ def test_hard_denials_cannot_be_bypassed(
     assert decision.rule_id.startswith("hard.")
 
 
+def test_secret_bearing_action_is_hard_denied_before_persistence(
+    config: RepositoryPolicyConfig,
+) -> None:
+    call = ToolCall(
+        name="edit_file",
+        arguments={"path": "settings.py", "content": "api_key=must-not-persist"},
+    )
+
+    decision = PolicyEngine().evaluate(call, config, PermissionMode.STRICT)
+
+    assert decision.effect is PolicyEffect.DENY
+    assert decision.rule_id == "hard.secret_material"
+
+
 def test_symlink_escape_and_memory_override_are_hard_denied(
     tmp_path: Path, config: RepositoryPolicyConfig
 ) -> None:

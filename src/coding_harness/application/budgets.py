@@ -46,27 +46,40 @@ class BudgetTracker:
             provider_cost=self.cost,
         )
 
-    def consume(self, turns: int, calls: int, seconds: float, cost: float) -> BudgetDecision:
+    def consume(
+        self,
+        turns: int,
+        calls: int,
+        seconds: float,
+        cost: float,
+        *,
+        commit_on_reject: bool = True,
+    ) -> BudgetDecision:
         if turns < 0 or calls < 0 or seconds < 0 or cost < 0:
             raise ValueError("budget consumption cannot be negative")
-        self.turns += turns
-        self.calls += calls
-        self.seconds += seconds
-        self.cost += cost
+        projected = (
+            self.turns + turns,
+            self.calls + calls,
+            self.seconds + seconds,
+            self.cost + cost,
+        )
         exceeded = tuple(
             name
             for name, used, limit in (
-                ("per_agent_turns", self.turns, self.limits.per_agent_turns),
-                ("total_model_calls", self.calls, self.limits.total_model_calls),
-                ("wall_time_seconds", self.seconds, self.limits.wall_time_seconds),
-                ("provider_cost", self.cost, self.limits.provider_cost),
+                ("per_agent_turns", projected[0], self.limits.per_agent_turns),
+                ("total_model_calls", projected[1], self.limits.total_model_calls),
+                ("wall_time_seconds", projected[2], self.limits.wall_time_seconds),
+                ("provider_cost", projected[3], self.limits.provider_cost),
             )
             if limit is not None and used > limit
         )
         if exceeded:
+            if commit_on_reject:
+                self.turns, self.calls, self.seconds, self.cost = projected
             return BudgetDecision(
                 allowed=False,
                 stop_reason=StopReason.BUDGET_EXHAUSTED,
                 exceeded=exceeded,
             )
+        self.turns, self.calls, self.seconds, self.cost = projected
         return BudgetDecision(allowed=True)

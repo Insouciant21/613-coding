@@ -6,12 +6,20 @@ import hashlib
 import json
 from collections import Counter
 from collections.abc import Sequence
-from typing import ClassVar
+from typing import Any, ClassVar
+
+from pydantic import Field
 
 from coding_harness.domain.actions import ToolCall
 from coding_harness.domain.models import Feedback, FeedbackKind
+from coding_harness.domain.models_base import DomainModel
 
 from .validation import ValidationKind, ValidationResult
+
+
+class _ClassifierState(DomainModel):
+    repeated_failure_limit: int = Field(ge=2)
+    fingerprints: dict[str, int]
 
 
 class FeedbackClassifier:
@@ -29,6 +37,19 @@ class FeedbackClassifier:
             raise ValueError("repeated_failure_limit must be at least two")
         self._limit = repeated_failure_limit
         self._fingerprints: Counter[str] = Counter()
+
+    def snapshot(self) -> dict[str, Any]:
+        return _ClassifierState(
+            repeated_failure_limit=self._limit,
+            fingerprints=dict(self._fingerprints),
+        ).model_dump(mode="json")
+
+    def restore(self, snapshot: dict[str, Any]) -> None:
+        state = _ClassifierState.model_validate(snapshot)
+        if any(count < 0 for count in state.fingerprints.values()):
+            raise ValueError("feedback fingerprint counts cannot be negative")
+        self._limit = state.repeated_failure_limit
+        self._fingerprints = Counter(state.fingerprints)
 
     def classify(
         self,

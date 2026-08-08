@@ -11,6 +11,7 @@ from uuid import UUID
 from coding_harness.domain.events import Event, redact_payload
 from coding_harness.domain.models import (
     ApprovalRequest,
+    ApprovalStatus,
     IterationRecord,
     LoopSession,
     PermissionMode,
@@ -143,6 +144,7 @@ class SqliteEventStore:
         ]
 
     def save_iteration(self, iteration: IterationRecord) -> None:
+        record_json = self._redacted_json(iteration.model_dump(mode="json"))
         with self._connect() as connection:
             connection.execute(
                 """
@@ -153,7 +155,7 @@ class SqliteEventStore:
                     str(iteration.id),
                     str(iteration.run_id),
                     iteration.iteration,
-                    iteration.model_dump_json(),
+                    record_json,
                     iteration.timestamp.isoformat(),
                 ),
             )
@@ -167,6 +169,7 @@ class SqliteEventStore:
         return [IterationRecord.model_validate_json(row["record_json"]) for row in rows]
 
     def save_loop_session(self, session: LoopSession) -> None:
+        session_json = self._redacted_json(session.model_dump(mode="json"))
         with self._connect() as connection:
             connection.execute(
                 """
@@ -178,10 +181,51 @@ class SqliteEventStore:
                 """,
                 (
                     str(session.run_id),
-                    session.model_dump_json(),
+                    session_json,
                     datetime.now(UTC).isoformat(),
                 ),
             )
+
+    def save_iteration_and_session(
+        self,
+        iteration: IterationRecord,
+        session: LoopSession,
+        approval_update: ApprovalRequest | None = None,
+    ) -> None:
+        if iteration.run_id != session.run_id:
+            raise ValueError("iteration and session must belong to the same run")
+        record_json = self._redacted_json(iteration.model_dump(mode="json"))
+        session_json = self._redacted_json(session.model_dump(mode="json"))
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO iterations (id, run_id, iteration_number, record_json, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    str(iteration.id),
+                    str(iteration.run_id),
+                    iteration.iteration,
+                    record_json,
+                    iteration.timestamp.isoformat(),
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO loop_sessions (run_id, session_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(run_id) DO UPDATE SET
+                    session_json = excluded.session_json,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    str(session.run_id),
+                    session_json,
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+            if approval_update is not None:
+                self._replace_claimed_approval(connection, approval_update)
 
     def get_loop_session(self, run_id: UUID) -> LoopSession | None:
         with self._connect() as connection:
@@ -196,6 +240,7 @@ class SqliteEventStore:
     def save_approval(self, request: ApprovalRequest) -> None:
         if request.run_id is None:
             raise ValueError("approval request requires a run_id")
+        request_json = self._redacted_json(request.model_dump(mode="json"))
         with self._connect() as connection:
             connection.execute(
                 """
@@ -209,7 +254,7 @@ class SqliteEventStore:
                 (
                     str(request.id),
                     str(request.run_id),
-                    request.model_dump_json(),
+                    request_json,
                     request.created_at.isoformat(),
                     request.resolved_at.isoformat() if request.resolved_at else None,
                 ),
@@ -235,6 +280,86 @@ class SqliteEventStore:
                 (str(run_id),),
             ).fetchall()
         return [ApprovalRequest.model_validate_json(row["request_json"]) for row in rows]
+
+    def compare_and_set_approval(
+        self,
+        request_id: UUID,
+        expected_status: ApprovalStatus,
+        replacement: ApprovalRequest,
+    ) -> bool:
+        if replacement.id != request_id:
+            raise ValueError("replacement approval id does not match request id")
+        request_json = self._redacted_json(replacement.model_dump(mode="json"))
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT request_json FROM approvals WHERE id = ?",
+                (str(request_id),),
+            ).fetchone()
+            if row is None:
+                return False
+            current = ApprovalRequest.model_validate_json(row["request_json"])
+            if current.status is not expected_status:
+                return False
+            connection.execute(
+                """
+                UPDATE approvals
+                SET request_json = ?, resolved_at = ?
+                WHERE id = ?
+                """,
+                (
+                    request_json,
+                    replacement.resolved_at.isoformat()
+                    if replacement.resolved_at
+                    else None,
+                    str(request_id),
+                ),
+            )
+        return True
+
+    def _replace_claimed_approval(
+        self,
+        connection: sqlite3.Connection,
+        replacement: ApprovalRequest,
+    ) -> None:
+        row = connection.execute(
+            "SELECT request_json FROM approvals WHERE id = ?",
+            (str(replacement.id),),
+        ).fetchone()
+        if row is None:
+            raise KeyError(replacement.id)
+        current = ApprovalRequest.model_validate_json(row["request_json"])
+        expected = {
+            ApprovalStatus.CONSUMED: {ApprovalStatus.EXECUTING},
+            ApprovalStatus.REJECTED: {
+                ApprovalStatus.PENDING,
+                ApprovalStatus.APPROVED,
+            },
+        }.get(replacement.status, {current.status})
+        if current.status not in expected:
+            raise ValueError("approval status changed before loop-state commit")
+        connection.execute(
+            """
+            UPDATE approvals
+            SET request_json = ?, resolved_at = ?
+            WHERE id = ?
+            """,
+            (
+                self._redacted_json(replacement.model_dump(mode="json")),
+                replacement.resolved_at.isoformat()
+                if replacement.resolved_at
+                else None,
+                str(replacement.id),
+            ),
+        )
+
+    @staticmethod
+    def _redacted_json(value: object) -> str:
+        return json.dumps(
+            redact_payload(value),
+            sort_keys=True,
+            separators=(",", ":"),
+        )
 
     @staticmethod
     def _parse_datetime(value: str) -> datetime:
