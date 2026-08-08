@@ -58,6 +58,12 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - Verification: focused configuration/credential suite passed 7 tests; full suite passed 201 tests; scoped Ruff and mypy passed; `git diff --check` passed.
 - Boundaries: TOML paths are canonicalized, validation commands are argv-only, unattended runs require a finite budget, and credential CLI output is metadata-only with hidden input.
 
+## DELIVERY-02 Task Evidence
+
+- Status: complete; commit `bae307b`; report `.superpowers/sdd/2026-08-08-613-coding-delivery/task-2-report.md`.
+- Verification: focused CLI/config/credential suite passed 11 tests; full suite passed 205 tests; Ruff and mypy passed; Typer root help smoke passed.
+- Boundaries: commands are thin adapters over injected services and demo functions; JSON/table output and nonzero failures are covered.
+
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 
 ## CORE-01 Task Evidence
