@@ -63,7 +63,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 ## CORE-07 Evidence
 
 - Verification timestamp: `2026-08-08 22:37:12 Asia/Shanghai`.
-- Status: implementation complete; commit pending at evidence creation.
+- Status: complete; commit `8956821`.
 - Tests: 17 focused policy/approval tests and all 49 project tests passed.
 - Governance: hard denials remain unapprovable; sensitive actions use exact, expiring, single-use approvals.
 

@@ -2,7 +2,7 @@
 
 Status: implementation complete; scoped verification clean.
 
-Commit: pending at report creation.
+Commit: `8956821` (`feat: enforce policy and approvals`).
 
 TDD RED: policy and approval tests failed during collection because their application modules did not exist. A later focused RED also proved shell-wrapped `rm -rf /` was not initially hard-denied and approval requests lacked run ownership.
 

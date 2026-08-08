@@ -27,3 +27,5 @@ Task 4: complete (commit a97e711; 16 combined tests, Ruff, and mypy clean)
 Task 5: complete (commit 2dcb00e; 23 combined tests, Ruff, and mypy clean)
 
 Task 6: complete (commit 44a4a9a; 32 full-suite tests, Ruff, mypy, and lock check clean)
+
+Task 7: complete (commit 8956821; 49 full-suite tests, Ruff, and mypy clean)
