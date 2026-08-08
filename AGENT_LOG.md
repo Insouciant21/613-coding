@@ -343,3 +343,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Demo output: `completed`, `total_calls=5`, `feedback_repaired=true`, `approval_granted=true`, `integration_applied=true`, `final_validation_passed=true`; events include graph creation, coder retry, and all node successes.
 - Verification: focused demo test passed 1; full suite passed 194; Ruff, mypy across 65 source files, `uv lock --check`, and `git diff --check` passed.
 - Commit: `376fd41`; MULTI_AGENT phase complete, proceed to DELIVERY.
+### 2026-08-09 05:24:04 Asia/Shanghai - DELIVERY-01 configuration and credential commands
+
+- Task: DELIVERY-01; triggered `test-driven-development` and `verification-before-completion`.
+- TDD RED: `uv run --no-sync pytest -q tests/config/test_config.py tests/cli/test_credentials.py` failed during collection with the expected missing `coding_harness.config` and `coding_harness.cli` modules.
+- Implementation: added strict TOML/Pydantic `HarnessConfig` loading with canonical repository paths, balanced default mode, argv validation, policy flags, and finite unattended budgets; added Typer `config check` and keyring-backed `credentials set/status/update/clear` adapters with hidden input and secret-free output.
+- GREEN: focused suite passed 7 tests; full suite passed 201 tests. Scoped Ruff and mypy passed; `git diff --check` passed.
+- Commit: `2a53a73` (`feat: add configuration and credential commands`). Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-1-report.md`.
+- Human intervention: none. Protected unrelated untracked paths (`.claude/` and the two requirement documents) were preserved. No real key, network call, or provider was used.
+- Lesson: keep configuration parsing and CLI presentation at the adapter boundary; reuse `CredentialService` so raw secret material never becomes command output or application state.

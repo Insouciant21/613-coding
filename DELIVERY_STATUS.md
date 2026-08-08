@@ -24,6 +24,16 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Reflection | not started | no `REFLECTION.md` yet | student-authored final report |
 | Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |
 
+## DELIVERY-01 Evidence
+
+- Verification timestamp: `2026-08-09 05:24:04 Asia/Shanghai`.
+- Status: complete; implementation commit `2a53a73` (`feat: add configuration and credential commands`).
+- TDD RED: focused collection failed with the expected missing `coding_harness.config` and `coding_harness.cli` modules.
+- GREEN: focused config/credential suite passed 7 tests; full suite passed 201 tests.
+- Static gates: scoped Ruff and mypy passed; `git diff --check` passed. CLI smoke `config check --repo .` exited 0.
+- Boundary: TOML config canonicalizes repository paths, rejects non-argv validation commands and invalid unattended budgets, defaults to balanced mode, and exposes existing policy/budget values without policy logic in the CLI. Credential input is hidden and status/command output is secret-free.
+- Detailed evidence: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-1-report.md` and `AGENT_LOG.md`.
+
 ## CORE-02 Evidence
 
 - Verification timestamp: `2026-08-08 22:08:51 Asia/Shanghai`.
