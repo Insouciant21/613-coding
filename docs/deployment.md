@@ -41,11 +41,11 @@ SQLite is the source of truth for runs, events, approvals, task graphs, memory t
 
 ## GitLab CI/CD
 
-`.gitlab-ci.yml` defines `unit-test`, `lint`, `typecheck`, `demo`, and `build` stages. Jobs use locked `uv` dependencies, run offline tests/demos, and publish `dist/` as the build artifact. `scripts.record_delivery` validates a Git commit and appends command/result evidence without converting failures into passes.
+`.gitlab-ci.yml` defines `unit-test`, `lint`, `typecheck`, `demo`, `build`, and `docker-build` stages. `.github/workflows/ci.yml` provides equivalent push/PR checks when the repository is hosted on GitHub. Jobs use locked `uv` dependencies, run tests/demos, build the package, and build the Docker image. `scripts.record_delivery` validates a Git commit and appends command/result evidence without converting failures into passes.
 
 ## Limitations And Evidence
 
-The Docker Engine is an operator prerequisite for real worker containers. The current environment has a Docker daemon, but the DELIVERY-05 build could not retrieve the Docker Hub token because the network connection reset; no image pull or container smoke pass is claimed. No unverified deployment claim is made. A deployed URL: not verified.
+The Docker Engine is an operator prerequisite for real worker containers. The current environment has a Docker daemon, but the latest Docker build could not retrieve the Docker Hub OAuth token because the network connection reset; no image pull or container smoke pass is claimed. `render.yaml` is an operator-controlled deployment declaration, not evidence of a deployed service. No unverified deployment claim is made. A deployed URL: not verified.
 
 ## Directory Layout
 

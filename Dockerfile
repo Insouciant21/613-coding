@@ -7,9 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
+COPY src ./src
 RUN pip install --no-cache-dir uv==0.8.14 \
     && uv sync --frozen --no-dev
-COPY src ./src
 COPY docker/entrypoint.sh /usr/local/bin/613-entrypoint
 RUN useradd --create-home --uid 10001 coding \
     && chmod 0755 /usr/local/bin/613-entrypoint \

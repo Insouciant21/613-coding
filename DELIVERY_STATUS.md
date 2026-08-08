@@ -22,6 +22,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
+| CI and deployment manifests | implemented; locally inspected | `.gitlab-ci.yml`, `.github/workflows/ci.yml`, `render.yaml`, Dockerfile ordering test; current task evidence below | run remote pipeline and deploy manifest |
 | Public WebUI URL | not verified | `docs/deployment.md` explicitly records no deployed URL | deploy isolated demonstration with user-controlled infrastructure |
 | Reflection | reserved for student | `REFLECTION.md` contains an explicit student-authored boundary and no AI-written narrative | student writes the final report |
 | Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |
@@ -320,3 +321,10 @@ Every completed plan task must link a commit and fresh verification output here.
 - Implementation commit: `cf25473`.
 - TDD evidence: the composition workflow test failed before repository tool registration and passed after the toolset/validator wiring.
 - Security boundary: tool schemas and policy are still enforced by the owned loop; validation accepts only exact configured argv commands.
+
+## CI and Deployment Manifest Evidence
+
+- Verification timestamp: `2026-08-09 07:14:20 Asia/Shanghai`.
+- Distribution-focused suite passed 7; Ruff, mypy, and `git diff --check` passed.
+- Docker build was attempted and failed only while fetching the Docker Hub OAuth token due to connection reset; no image smoke pass is claimed.
+- GitLab/GitHub workflow files and Render manifest are configuration evidence only; no remote CI result or public URL is claimed.

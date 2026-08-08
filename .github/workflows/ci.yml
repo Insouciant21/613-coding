@@ -1,0 +1,48 @@
+name: 613 Coding CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.14"
+      - run: uv sync --frozen
+      - run: uv run pytest -q
+
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.14"
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run mypy src
+
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.14"
+      - run: uv sync --frozen
+      - run: uv run pytest tests/demo -q
+
+  package-and-container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.14"
+      - run: uv sync --frozen
+      - run: uv build
+      - run: docker build --pull -t 613-coding:${{ github.sha }} .

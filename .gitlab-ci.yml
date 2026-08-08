@@ -4,6 +4,7 @@ stages:
   - typecheck
   - demo
   - build
+  - container
 
 default:
   image: python:3.12.8-slim-bookworm
@@ -39,3 +40,15 @@ build:
   artifacts:
     paths:
       - dist/
+
+docker-build:
+  stage: container
+  image: docker:27.5.1-cli
+  services:
+    - name: docker:27.5.1-dind
+      command: ["--tls=false"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker build --pull -t 613-coding:"$CI_COMMIT_SHA" .

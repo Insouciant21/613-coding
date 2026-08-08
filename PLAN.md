@@ -120,6 +120,12 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - TDD: the end-to-end `read_file` → validation → `finish` test failed before registration and passed after wiring the toolset.
 - Boundary: filesystem paths remain canonical-root constrained, validation commands remain argv-only and exact-match policy checked, and tool/validation failures return deterministic loop feedback.
 
+## CI and Deployment Manifest Evidence
+
+- Status: repository configuration complete in the current task; Docker source-copy order fixed, GitLab/GitHub CI container jobs added, and `render.yaml` declares an operator-controlled Web Service.
+- Verification: distribution-focused suite passed 7; Docker build attempt failed at external Docker Hub token retrieval, so no Docker or deployment success is claimed.
+- Boundary: remote CI final status and public URL require a configured forge/deployment account.
+
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 
 ## CORE-01 Task Evidence
