@@ -37,3 +37,11 @@ Task 9: complete (commit 86c4633; 75 full-suite tests, Ruff, mypy, and lock chec
 Task 10: fix round 1/5 (task review: 2 Critical, 5 Important, 2 spec-required Minor findings open; review head f154bba)
 
 - Implemented in `d705637`; focused 36-test and full 98-test gates, Ruff, mypy, and lock check clean. The controller verified the demo's SQLite terminal state directly. Scoped re-review is pending because this resumed environment did not expose a dispatch path after the reviewer completed; do not mark Task 10 complete until that gate runs.
+
+Task 10: fix round 2/5 (20 findings addressed, 0 open; commits aceee71..f9394d7)
+
+- Hardened SQLite persistence with redaction, atomic iteration/session writes, atomic approval claims, `EXECUTING` approval lifecycle, cancellation invalidation, current-policy re-evaluation, dependency-result validation, classifier restoration, exact budget accounting, and secret-bearing action denial.
+- Independent scoped re-review verdict: all original findings and fix-round security checks addressed; no new Critical/Important breakage. Out-of-scope observation: stale concurrent `RunService._persist_status` can overwrite a newer terminal row; this code was unchanged in the fix diff and is deferred to whole-branch review.
+- Controller verification: `uv run pytest -q` 110 passed; `uv run ruff check .`, `uv run mypy src`, `uv lock --check`, and `git diff --check f154bba..f9394d7` passed. Offline demo returned `completed/success`, observed feedback, guardrail, memory retrieval, and `answer.py` ending in `return 2`.
+
+Task 10: complete (commits 2dd32f9..f9394d7, review clean)
