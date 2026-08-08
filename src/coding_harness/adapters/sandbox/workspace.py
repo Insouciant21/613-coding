@@ -5,9 +5,10 @@ from __future__ import annotations
 import shutil
 import stat
 import tempfile
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 
 
 class WorkspaceError(RuntimeError):
@@ -22,6 +23,10 @@ class WriteSetViolation(WorkspaceError):
     """A changed path was not included in the worker's declared write set."""
 
 
+class WorkspaceIntegrityError(WorkspacePathError):
+    """A workspace or baseline was not issued by its manager."""
+
+
 @dataclass(frozen=True)
 class FileSnapshot:
     kind: str
@@ -31,10 +36,13 @@ class FileSnapshot:
 
 @dataclass(frozen=True)
 class WorkspaceBaseline:
-    files: dict[str, FileSnapshot]
+    files: Mapping[str, FileSnapshot]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "files", MappingProxyType(dict(self.files)))
 
 
-@dataclass
+@dataclass(frozen=True)
 class Workspace:
     path: Path
     source_repo: Path
@@ -120,8 +128,8 @@ class WorkspaceManager:
         if self._root is not None:
             self._root.mkdir(parents=True, exist_ok=True)
         self._declared_write_set = normalize_write_set(declared_write_set)
-        self._owned: dict[Path, Path] = {}
-        self._cleaned: set[Path] = set()
+        self._owned: dict[int, tuple[Workspace, Path]] = {}
+        self._cleaned: list[Workspace] = []
 
     def create(
         self,
@@ -141,19 +149,20 @@ class WorkspaceManager:
             shutil.copytree(source, destination, symlinks=True)
             destination = _canonical(destination)
             baseline = WorkspaceBaseline(snapshot_tree(destination))
-            self._owned[destination] = _canonical(temporary_path)
-            return Workspace(destination, source, str(run_id), str(worker_id), write_set, baseline)
+            workspace = Workspace(destination, source, str(run_id), str(worker_id), write_set, baseline)
+            self._owned[id(workspace)] = (workspace, _canonical(temporary_path))
+            return workspace
         except Exception:
             shutil.rmtree(temporary_path, ignore_errors=True)
             raise
 
     def cleanup(self, workspace: Workspace) -> None:
-        path = _canonical(workspace.path, strict=False)
-        if path in self._cleaned:
+        if any(item is workspace for item in self._cleaned):
             return
-        temporary_path = self._owned.get(path)
-        if temporary_path is None:
+        record = self._owned.get(id(workspace))
+        if record is None or record[0] is not workspace:
             raise WorkspacePathError("workspace was not created by manager")
+        path, temporary_path = workspace.path, record[1]
         if self._root is not None:
             try:
                 path.relative_to(self._root)
@@ -163,9 +172,12 @@ class WorkspaceManager:
             raise WorkspacePathError("refusing to remove workspace root")
         if temporary_path.exists():
             shutil.rmtree(temporary_path)
-        del self._owned[path]
-        self._cleaned.add(path)
+        del self._owned[id(workspace)]
+        self._cleaned.append(workspace)
 
-    @staticmethod
-    def capture_baseline(workspace: Workspace) -> WorkspaceBaseline:
-        return WorkspaceBaseline(snapshot_tree(workspace.path))
+    def validate(self, workspace: Workspace) -> None:
+        """Validate that a workspace is the exact object issued by this manager."""
+
+        record = self._owned.get(id(workspace))
+        if record is None or record[0] is not workspace:
+            raise WorkspaceIntegrityError("workspace was not created by manager")

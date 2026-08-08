@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
@@ -76,7 +77,7 @@ def test_declared_write_set_is_enforced_during_artifact_collection(tmp_path: Pat
     from coding_harness.adapters.sandbox.artifacts import ArtifactExporter
 
     with pytest.raises(WriteSetViolation, match="untracked.txt"):
-        ArtifactExporter().collect(workspace, workspace.baseline)
+        ArtifactExporter(manager).collect(workspace, workspace.baseline)
     manager.cleanup(workspace)
 
 
@@ -90,7 +91,7 @@ def test_empty_declared_write_set_rejects_all_changes(tmp_path: Path) -> None:
 
     try:
         with pytest.raises(WriteSetViolation, match="new.txt"):
-            ArtifactExporter().collect(workspace, workspace.baseline)
+            ArtifactExporter(manager).collect(workspace, workspace.baseline)
     finally:
         manager.cleanup(workspace)
 
@@ -112,3 +113,35 @@ def test_cleanup_refuses_workspace_not_created_by_manager(tmp_path: Path) -> Non
     with pytest.raises(WorkspacePathError, match="created by manager"):
         manager.cleanup(foreign)
     assert (foreign_path / "keep.txt").exists()
+
+
+def test_cleanup_refuses_forged_workspace_with_owned_path(tmp_path: Path) -> None:
+    source = _git_repo(tmp_path)
+    manager = WorkspaceManager(tmp_path / "workspaces")
+    workspace = manager.create(source, "run", "worker")
+    forged = Workspace(
+        path=workspace.path,
+        source_repo=workspace.source_repo,
+        run_id=workspace.run_id,
+        worker_id=workspace.worker_id,
+        declared_write_set=workspace.declared_write_set,
+        baseline=workspace.baseline,
+    )
+
+    with pytest.raises(WorkspacePathError, match="created by manager"):
+        manager.cleanup(forged)
+    assert workspace.path.exists()
+    manager.cleanup(workspace)
+
+
+def test_workspace_and_baseline_are_immutable(tmp_path: Path) -> None:
+    source = _git_repo(tmp_path)
+    manager = WorkspaceManager(tmp_path / "workspaces", declared_write_set=("tracked.txt",))
+    workspace = manager.create(source, "run", "worker")
+
+    with pytest.raises(FrozenInstanceError):
+        workspace.declared_write_set = ("**",)
+    with pytest.raises(TypeError):
+        workspace.baseline.files["tracked.txt"] = workspace.baseline.files["tracked.txt"]
+
+    manager.cleanup(workspace)

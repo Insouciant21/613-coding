@@ -5,7 +5,6 @@ from __future__ import annotations
 import difflib
 import fnmatch
 from collections.abc import Mapping, Sequence
-from pathlib import Path
 from typing import Any
 
 from coding_harness.domain.redaction import redact_text
@@ -15,6 +14,8 @@ from .workspace import (
     FileSnapshot,
     Workspace,
     WorkspaceBaseline,
+    WorkspaceIntegrityError,
+    WorkspaceManager,
     WriteSetViolation,
     normalize_write_set,
     snapshot_tree,
@@ -24,8 +25,10 @@ from .workspace import (
 def _redact(value: Any) -> Any:
     if isinstance(value, str):
         return redact_text(value)
+    if isinstance(value, bytes):
+        return redact_text(value.decode("utf-8", errors="replace"))
     if isinstance(value, Mapping):
-        return {str(key): _redact(item) for key, item in value.items()}
+        return {redact_text(str(key)): _redact(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return tuple(_redact(item) for item in value)
     return value
@@ -92,11 +95,13 @@ def _patch_for(path: str, before: FileSnapshot | None, after: FileSnapshot | Non
 class ArtifactExporter:
     def __init__(
         self,
+        workspace_manager: WorkspaceManager,
         declared_write_set: Sequence[str] | None = None,
         verification_evidence: Sequence[dict[str, Any]] = (),
         assumptions: Sequence[str] = (),
         follow_up_requests: Sequence[str] = (),
     ) -> None:
+        self._workspace_manager = workspace_manager
         self._declared_write_set = normalize_write_set(declared_write_set) if declared_write_set is not None else None
         self._verification_evidence = tuple(verification_evidence)
         self._assumptions = tuple(assumptions)
@@ -105,10 +110,13 @@ class ArtifactExporter:
     def collect(
         self,
         workspace: Workspace,
-        baseline: WorkspaceBaseline | Mapping[str, FileSnapshot] | None = None,
+        baseline: WorkspaceBaseline | None = None,
     ) -> WorkArtifact:
+        self._workspace_manager.validate(workspace)
         current = snapshot_tree(workspace.path)
-        original = self._baseline(workspace.baseline if baseline is None else baseline)
+        if baseline is not None and baseline is not workspace.baseline:
+            raise WorkspaceIntegrityError("baseline was not created by manager")
+        original = workspace.baseline
         paths = sorted(set(original.files) | set(current))
         changed = tuple(path for path in paths if _changed(original.files.get(path), current.get(path)))
         write_set = self._declared_write_set
@@ -124,7 +132,7 @@ class ArtifactExporter:
             summary += "; binary files: " + ", ".join(binary)
         return WorkArtifact(
             patch=redact_text(patch),
-            changed_files=changed,
+            changed_files=tuple(redact_text(path) for path in changed),
             summary=redact_text(summary),
             verification_evidence=tuple(_redact(item) for item in self._verification_evidence),
             assumptions=tuple(redact_text(item) for item in self._assumptions),
@@ -132,14 +140,6 @@ class ArtifactExporter:
         )
 
     @staticmethod
-    def _baseline(value: WorkspaceBaseline | Mapping[str, FileSnapshot]) -> WorkspaceBaseline:
-        files = dict(value.files) if isinstance(value, WorkspaceBaseline) else dict(value)
-        for path in files:
-            candidate = Path(path)
-            if candidate.is_absolute() or ".." in candidate.parts:
-                raise ValueError(f"baseline path must be repository-relative: {path}")
-        return WorkspaceBaseline(files)
-
     @staticmethod
     def _allowed(path: str, write_set: Sequence[str]) -> bool:
         return any(fnmatch.fnmatchcase(path, pattern) or path == pattern or path.startswith(pattern.rstrip("/") + "/") for pattern in write_set)
