@@ -80,3 +80,8 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 - Status: complete; commit `2dcb00e`; scoped adapter review clean.
 - Verification: 7 focused LLM-adapter tests and 23 combined core tests passed; Ruff and mypy passed; HTTP tests were fully offline.
+
+## CORE-06 Task Evidence
+
+- Status: implementation complete; commit hash is recorded after commit.
+- Verification: 8 focused repository-tool tests and all 32 project tests passed; Ruff, mypy, and `uv lock --check` passed.

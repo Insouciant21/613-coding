@@ -134,3 +134,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation: added deterministic scripted responses with deep snapshots and a single-call OpenAI-compatible HTTP adapter with typed failures.
 - GREEN: 7 focused adapter tests and 23 combined core tests passed; Ruff and mypy passed.
 - Human intervention: none; HTTP tests use MockTransport, no API key, real LLM, retry, or external request.
+
+### 2026-08-08 22:31:15 Asia/Shanghai — CORE-06 repository tools
+
+- Task: CORE-06; triggered `test-driven-development` and `verification-before-completion`.
+- TDD RED: tests failed during collection because tool adapters and the registry were absent.
+- Implementation: canonical-root filesystem reads/edits/search, bounded UTF-8 handling, pure-Python Git diff, and JSON Schema validated dispatch.
+- Dependencies: added and uv-locked Dulwich, jsonschema, and types-jsonschema to implement the specified low-level boundaries without shell Git or ad hoc schema parsing.
+- GREEN: 8 focused tests and all 32 project tests passed; Ruff, mypy, and lock check passed.

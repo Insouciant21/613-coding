@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-08 22:25:19 (Asia/Shanghai)
+Last updated: 2026-08-08 22:31:15 (Asia/Shanghai)
 Responsible actor: `/root` controller; CORE-01 implementation/review commits `4d51108`, `3b0ea0e`; CORE-02 commits `59bc4f2`, `2934063`, `69b1c59`.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -52,6 +52,13 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - Status: complete; commit `2dcb00e`.
 - Tests: 7 focused LLM-adapter tests and 23 combined core tests passed.
 - Provider boundary: only MockTransport used; no real LLM, network request, or credential.
+
+## CORE-06 Evidence
+
+- Verification timestamp: `2026-08-08 22:31:15 Asia/Shanghai`.
+- Status: implementation complete; commit pending at evidence creation.
+- Tests: 8 focused repository-tool tests and all 32 project tests passed.
+- Security boundary: path/symlink escape, size, UTF-8, unknown tool, and invalid JSON Schema arguments are rejected before execution.
 
 ## Recording Rules
 
