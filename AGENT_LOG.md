@@ -306,3 +306,17 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Verification: demo test passed 1; full suite passed 169; Ruff, mypy across 54 source files, `uv lock --check`, and `git diff --check` passed.
 - Real Docker smoke remained guarded because no approved pinned worker image was local; no image was pulled.
 - Review decision: SANDBOX phase complete; proceed to MULTI_AGENT.
+
+### 2026-08-09 05:05:00 Asia/Shanghai — MULTI-01 task graph and worker contracts
+
+- TDD RED: focused collection failed because task graph/worker domain modules were absent.
+- Implementation: added frozen graph nodes, dependency/cycle/overlap validation, deterministic ready-node calculation and transitions, WorkerRole/WorkerContext values, and async orchestration ports.
+- Verification: focused tests passed 7; full suite passed 176; Ruff, mypy across 57 source files, `uv lock --check`, and `git diff --check` passed.
+- Commit: `9744339`; protected user-owned paths untouched.
+
+### 2026-08-09 05:12:00 Asia/Shanghai — MULTI-02 role policies and worker runtime
+
+- TDD RED: focused collection failed because role policy/worker runtime modules were absent. A first GREEN regression showed loop output was returned instead of the sandbox-exported artifact; export-contract coverage then passed.
+- Implementation: added role-specific tool policies and injected WorkerRuntime lifecycle with sandbox create/export/destroy, read-only enforcement, node write-set checks, and failure cleanup.
+- Verification: focused tests passed 5; full suite passed 181; Ruff, mypy across 59 source files, `uv lock --check`, and `git diff --check` passed.
+- Commit: `5910d7b`; proceed to MULTI-03 Supervisor scheduling.

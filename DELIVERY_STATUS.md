@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 04:50:00 (Asia/Shanghai)
-Responsible actor: `/root`; SANDBOX phase complete through `fb1c222`; proceed to MULTI_AGENT.
+Last updated: 2026-08-09 05:12:00 (Asia/Shanghai)
+Responsible actor: `/root`; MULTI-02 complete through `5910d7b`; proceed to MULTI-03.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -17,7 +17,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Source implementation | Core complete after final-review repair | task evidence in `PLAN.md` and `AGENT_LOG.md`; final-review implementation/evidence commit `9af4f03`; final-fix report under `.superpowers/sdd/2026-08-08-613-coding-core/` | begin sandbox subsystem |
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
 | Container sandbox | complete | SANDBOX-01 `9df471d`; SANDBOX-02 `aa3600a`; SANDBOX-03 `3ec6ac1`; SANDBOX-04 `439540f`; SANDBOX-05 `fb1c222`; reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | retain regression gate |
-| Multi-agent orchestration | not started | no Supervisor yet | run task-graph/worker tests |
+| Multi-agent orchestration | in progress | MULTI-01 `9744339`; MULTI-02 `5910d7b`; task reports under `.superpowers/sdd/2026-08-08-613-coding-multi-agent/` | implement MULTI-03 Supervisor |
 | README and distribution | not started | no package or Dockerfile yet | verify `uv tool install` and Docker demo |
 | GitLab CI `unit-test` job | not started | no `.gitlab-ci.yml` yet | last pipeline must pass |
 | Public WebUI URL | not started | no deployment yet | deploy isolated demonstration |
@@ -161,6 +161,12 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - Verification: demo test passed 1; full suite passed 169; Ruff, mypy across 54 source files, `uv lock --check`, and `git diff --check` passed.
 - Real Docker smoke was explicitly skipped because no approved pinned worker image was local.
 - Detailed source evidence: `.superpowers/sdd/2026-08-08-613-coding-sandbox/task-5-report.md`.
+
+## MULTI-01/02 Evidence
+
+- `MULTI-01`: complete at `9744339`; 7 focused and 176 full tests passed; graph/worker contracts are recorded in the multi-agent task report.
+- `MULTI-02`: complete at `5910d7b`; 5 focused and 181 full tests passed; role policies and worker runtime enforce scoped writes and cleanup.
+- Detailed evidence: `.superpowers/sdd/2026-08-08-613-coding-multi-agent/task-1-report.md` and `task-2-report.md`.
 
 ## Recording Rules
 
