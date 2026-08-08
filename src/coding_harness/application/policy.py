@@ -11,6 +11,7 @@ from coding_harness.domain.actions import ToolCall
 from coding_harness.domain.events import redact_payload
 from coding_harness.domain.models import PermissionMode
 from coding_harness.domain.models_base import DomainModel
+from coding_harness.domain.sandbox import ResourceLimits
 from coding_harness.ports.policy import PolicyDecision, PolicyEffect
 
 
@@ -30,6 +31,16 @@ class RepositoryPolicyConfig(DomainModel):
         if not root.is_dir():
             raise ValueError("repository_root must be a directory")
         return root
+
+
+class SandboxPolicyConfig(DomainModel):
+    """Operator-approved bounds for one worker sandbox."""
+
+    max_limits: ResourceLimits = Field(default_factory=ResourceLimits)
+    allow_network: bool = False
+    network_allowlist: tuple[str, ...] = ()
+    environment_allowlist: frozenset[str] = Field(default_factory=frozenset)
+    approved_images: frozenset[str] = Field(default_factory=frozenset)
 
 
 class PolicyEngine:
