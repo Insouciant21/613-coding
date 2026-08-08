@@ -2,7 +2,7 @@
 
 Status: implementation complete; scoped verification clean.
 
-Commit: pending at report creation.
+Commit: `2dcb00e` (`feat: add mock and openai-compatible llm providers`).
 
 TDD RED: adapter tests failed during collection because `coding_harness.adapters.llm` did not exist.
 

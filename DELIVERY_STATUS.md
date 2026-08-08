@@ -49,7 +49,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 ## CORE-05 Evidence
 
 - Verification timestamp: `2026-08-08 22:25:19 Asia/Shanghai`.
-- Status: implementation complete; commit pending at evidence creation.
+- Status: complete; commit `2dcb00e`.
 - Tests: 7 focused LLM-adapter tests and 23 combined core tests passed.
 - Provider boundary: only MockTransport used; no real LLM, network request, or credential.
 
