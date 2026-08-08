@@ -74,17 +74,12 @@ class ApprovalService:
     def resolve(
         self, request_id: UUID, decision: ApprovalDecision
     ) -> ApprovalResolution:
-        request = self._requests.get(request_id)
-        if request is None:
-            raise ApprovalNotFoundError(str(request_id))
+        request = self.get_request(request_id)
         now = self._now()
         if request.status is not ApprovalStatus.PENDING:
             raise StaleApprovalError("approval request is no longer pending")
-        if request.expires_at is None or now >= request.expires_at:
-            self._requests[request_id] = request.model_copy(
-                update={"status": ApprovalStatus.EXPIRED, "resolved_at": now}
-            )
-            raise StaleApprovalError("approval request expired")
+        if request.expires_at is None:
+            raise StaleApprovalError("approval request has no expiration")
         status = (
             ApprovalStatus.APPROVED
             if decision is ApprovalDecision.APPROVE
@@ -103,6 +98,22 @@ class ApprovalService:
             action_fingerprint=fingerprint,
             resolved_at=now,
         )
+
+    def get_request(self, request_id: UUID) -> ApprovalRequest:
+        request = self._requests.get(request_id)
+        if request is None:
+            raise ApprovalNotFoundError(str(request_id))
+        now = self._now()
+        if (
+            request.status is ApprovalStatus.PENDING
+            and request.expires_at is not None
+            and now >= request.expires_at
+        ):
+            request = request.model_copy(
+                update={"status": ApprovalStatus.EXPIRED, "resolved_at": now}
+            )
+            self._requests[request_id] = request
+        return request
 
     def consume(self, call: ToolCall) -> bool:
         fingerprint = self._fingerprint(call)

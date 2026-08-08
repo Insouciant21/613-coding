@@ -213,3 +213,13 @@ class MemoryEntry(DomainModel):
         if value.tzinfo is None:
             raise ValueError("timestamp must be timezone-aware")
         return value
+
+
+class RunSummary(DomainModel):
+    run_id: UUID
+    status: RunState
+    stop_reason: StopReason | None = None
+    changed_files: tuple[str, ...] = ()
+    validation_evidence: tuple[dict[str, Any], ...] = ()
+    approvals: tuple[UUID, ...] = ()
+    unresolved_risks: tuple[str, ...] = ()

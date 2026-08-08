@@ -11,6 +11,7 @@ from coding_harness.application.approvals import (
     StaleApprovalError,
 )
 from coding_harness.domain.actions import ToolCall
+from coding_harness.domain.models import ApprovalStatus
 from coding_harness.ports.policy import PolicyDecision, PolicyEffect
 
 
@@ -55,6 +56,7 @@ def test_stale_approval_cannot_be_resolved() -> None:
     clock.now += timedelta(seconds=6)
     with pytest.raises(StaleApprovalError):
         service.resolve(request.id, ApprovalDecision.APPROVE)
+    assert service.get_request(request.id).status is ApprovalStatus.EXPIRED
 
 
 def test_rejection_never_authorizes_action() -> None:

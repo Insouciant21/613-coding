@@ -83,6 +83,28 @@ class SqliteEventStore:
             updated_at=self._parse_datetime(row["updated_at"]),
         )
 
+    def update_run(self, run: Run) -> None:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE runs
+                SET project_id = ?, task = ?, permission_mode = ?, state = ?,
+                    stop_reason = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    str(run.project_id) if run.project_id else None,
+                    run.task,
+                    run.permission_mode.value,
+                    run.state.value,
+                    run.stop_reason.value if run.stop_reason else None,
+                    run.updated_at.isoformat(),
+                    str(run.id),
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise KeyError(run.id)
+
     def append(self, event: Event) -> None:
         payload = redact_payload(event.payload)
         with self._connect() as connection:
