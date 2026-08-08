@@ -47,3 +47,14 @@ Task 10: fix round 2/5 (20 findings addressed, 0 open; commits aceee71..f9394d7)
 Task 10: complete (commits 2dd32f9..f9394d7, review clean)
 
 Task 11: implementation complete at `552593e`; focused 4-test and full 114-test gates, Ruff, mypy, lock check, and diff check clean. Independent task review pending because no reviewer dispatch slot was exposed after the implementer completed; do not mark Task 11 complete or begin Sandbox until the review gate runs.
+
+Task 11: minor (deferred): whitespace-only credential values pass validation.
+Task 11: minor (deferred): `SecretReference.configured` is always true.
+Task 11: fix round 1/5 (2 addressed, 0 open; commits 552593e..d748a0e)
+
+- RED: the double-fault test failed with the raw `get_password` exception; 1 failed, 5 passed.
+- GREEN: focused 6 passed; full 116 passed; Ruff, mypy, lock check, and diff check passed.
+- Scoped re-review marked both Important findings addressed with no new Critical/Important breakage.
+- Re-review out-of-scope notes for final review: the missing-delete idempotency test was a characterization that passed before the fix; double-fault explicit cause omits the delete error while preserving it as context; the narrow fake backend may need maintenance if the adapter grows.
+
+Task 11: complete (commits a513c95..d748a0e, review clean)

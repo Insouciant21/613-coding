@@ -204,3 +204,15 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - GREEN: focused suite 4 passed; full suite 114 passed; Ruff and mypy passed. Captured-output assertions contain no key-like values.
 - Report: `.superpowers/sdd/2026-08-08-613-coding-core/task-11-report.md`.
 - Lesson: keep credential references opaque and defer any raw-secret injection to a separately governed provider boundary.
+
+### 2026-08-09 02:02:37 Asia/Shanghai — CORE-11 review and fix round
+
+- Task: CORE-11 review/fix round 1; triggered `requesting-code-review`, `receiving-code-review`, `systematic-debugging`, `test-driven-development`, and `verification-before-completion`.
+- Review: an independent read-only Claude Code reviewer found two Important issues: untested backend delete/read double-fault handling and a `type: ignore` that hid the `source="none"` state mismatch. It also recorded two deferred Minor findings.
+- TDD: after discarding an unproven production edit, the controller retained the new behavior tests and observed the focused RED: 1 failed, 5 passed, with the raw `get_password` exception. A fresh implementation agent then added the minimal production fix.
+- Implementation: nested recovery error mapping preserves missing-delete idempotency and converts double-faults to `CredentialError`; explicit source narrowing prevents `"none"` from reaching `SecretReference` and removes the type suppression.
+- Verification: focused credentials 6 passed; full suite 116 passed; Ruff, mypy, `uv lock --check`, and `git diff --check` passed.
+- Commit: `d748a0e` (`fix: harden credential error handling`).
+- Scoped re-review: both Important findings `ADDRESSED`; no new Critical/Important breakage.
+- Workflow deviation: the platform collaboration namespace was unavailable in this continuation. The first CLI fix agent stalled and left unreported changes, so the controller restored the production baseline, observed RED, and used separate read/edit-only Claude Code agents for the production and test-quality steps. User-owned untracked files remained untouched.
+- Lesson: a fix report must reproduce exact command evidence; model-generated test names, exception types, or timings are not acceptable substitutes.

@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 01:31:54 (Asia/Shanghai)
-Responsible actor: `/root` controller; CORE-11 implementation `552593e` verified, independent review pending.
+Last updated: 2026-08-09 02:02:37 (Asia/Shanghai)
+Responsible actor: `/root` controller; CORE-11 complete at `d748a0e`, Core final review pending.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -14,7 +14,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | `PLAN.md` | approved with bootstrap revision | `PLAN.md`, `docs/superpowers/plans/`; commits `a2909c7`, `fc7bf53`; user selected Subagent-Driven on 2026-08-08 | begin CORE-01 |
 | `AGENT_LOG.md` | active | `AGENT_LOG.md` | append every significant task |
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
-| Source implementation | CORE-01 through CORE-10 complete; CORE-11 implementation under review | task evidence in `PLAN.md` and `AGENT_LOG.md`; CORE-11 commit `552593e` | complete independent CORE-11 review |
+| Source implementation | CORE-01 through CORE-11 complete; Core final review pending | task evidence in `PLAN.md` and `AGENT_LOG.md`; CORE-11 commits `552593e`, `d748a0e` | complete Core whole-branch review |
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
 | Container sandbox | not started | no Docker runtime yet | run lifecycle/security tests |
 | Multi-agent orchestration | not started | no Supervisor yet | run task-graph/worker tests |
@@ -93,12 +93,13 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 
 ## CORE-11 Evidence
 
-- Verification timestamp: `2026-08-09 01:31:54 Asia/Shanghai`.
-- Status: implementation complete, independent task review pending; commit `552593e`.
-- Tests: focused credential suite passed 4 tests; full suite passed 114 tests.
-- Static gates: Ruff, mypy, `uv lock --check`, and `git diff --check a513c95..552593e` passed.
+- Verification timestamp: `2026-08-09 02:02:37 Asia/Shanghai`.
+- Status: complete after independent review and fix round 1; commits `552593e`, `d748a0e`.
+- Tests: focused credential suite passed 6 tests; full suite passed 116 tests.
+- Static gates: Ruff, mypy, `uv lock --check`, and `git diff --check` passed.
 - Security boundary: returned status/references contain no key material; fake-keyring captured-output checks remain secret-free; providers use isolated entries; environment fallback is disabled by default and must be explicitly enabled.
 - Follow-up boundary: raw-secret injection into a provider call is intentionally absent and must be designed as a separately governed non-persisting integration.
+- Review: the task review found two Important issues; fix round 1 added backend failure tests, mapped double-faults to `CredentialError`, and removed the source type suppression. Scoped re-review marked both addressed with no new Critical/Important breakage.
 
 ## Recording Rules
 
