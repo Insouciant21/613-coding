@@ -42,7 +42,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 ## CORE-04 Evidence
 
 - Verification timestamp: `2026-08-08 22:21:23 Asia/Shanghai`.
-- Status: implementation complete; commit pending at evidence creation.
+- Status: complete; commit `a97e711`.
 - Tests: 5 focused SQLite tests and 16 combined core tests passed, including foreign-key rollback and concurrent append checks.
 - Persistence: direct raw-secret event payloads are redacted before SQLite insertion.
 
@@ -57,7 +57,7 @@ Every completed plan task must link a commit and fresh verification output here.
 ## Plan Evidence
 
 - `2026-08-08`: `writing-plans` produced four subsystem plans and the root dependency index in commit `a2909c7`.
-- No implementation task has started. No test, lint, type-check, Docker, or CI result is being marked as pass.
+- CORE-01 through CORE-04 are implemented with task-scoped tests and evidence; Docker and CI work have not started.
 
 ## CORE-01 Evidence
 

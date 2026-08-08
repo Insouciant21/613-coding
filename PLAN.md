@@ -25,7 +25,7 @@
 
 | Plan | Scope | Depends on | Status |
 | --- | --- | --- | --- |
-| `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | CORE-01 complete; CORE-02 blocked on provisioning |
+| `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | CORE-01 through CORE-04 complete |
 | `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
@@ -47,7 +47,7 @@ The implementation critical path is `CORE → SANDBOX → MULTI_AGENT → DELIVE
 
 Detailed task steps, file paths, interfaces, failing tests, and commit commands live in the four linked plans. The following IDs are the cross-plan tracking keys:
 
-- `CORE-01` through `CORE-10`: package, domain, providers, storage, tools/policy, validation/feedback, memory, agent loop, credentials, and deterministic demo.
+- `CORE-01` through `CORE-11`: package, domain, providers, storage, tools/policy, validation/feedback, memory, agent loop, credentials, and deterministic demo.
 - `SANDBOX-01` through `SANDBOX-05`: sandbox contracts, workspace/artifacts, Docker lifecycle, security/resource policy, and integration evidence.
 - `MULTI-01` through `MULTI-05`: task graph, worker runtime, Supervisor scheduling, artifact integration, and orchestration demo.
 - `DELIVERY-01` through `DELIVERY-07`: CLI, API, WebUI, distribution, CI, documentation, and delivery-record automation.
@@ -73,5 +73,5 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 ## CORE-04 Task Evidence
 
-- Status: implementation complete; commit hash is recorded after commit.
+- Status: complete; commit `a97e711`; scoped storage review clean.
 - Verification: 5 focused SQLite tests and 16 combined core tests passed; Ruff and mypy passed; temporary concurrent appends completed without loss.

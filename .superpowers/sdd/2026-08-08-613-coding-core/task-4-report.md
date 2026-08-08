@@ -2,7 +2,7 @@
 
 Status: implementation complete; scoped verification clean.
 
-Commit: pending at report creation.
+Commit: `a97e711` (`feat: persist runs and events in sqlite`).
 
 TDD RED: the focused SQLite test failed during collection because `coding_harness.adapters.storage` did not exist.
 

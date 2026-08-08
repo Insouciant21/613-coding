@@ -21,3 +21,5 @@ Task 2: fix round 1/5 (1 addressed, 0 open; commit 69b1c59)
 Task 2: complete (commits 59bc4f2..69b1c59; scoped verification clean)
 
 Task 3: complete (commit e8b938f; 11 combined tests, Ruff, and mypy clean)
+
+Task 4: complete (commit a97e711; 16 combined tests, Ruff, and mypy clean)
