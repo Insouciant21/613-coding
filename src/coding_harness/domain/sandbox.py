@@ -21,11 +21,11 @@ class NetworkPolicy(StrEnum):
 class ResourceLimits(DomainModel):
     """Finite limits applied to one worker sandbox."""
 
-    cpu_seconds: float = Field(default=300.0, gt=0)
+    cpu_seconds: float = Field(default=300.0, gt=0, allow_inf_nan=False)
     memory_bytes: int = Field(default=512 * 1024 * 1024, gt=0)
     pids: int = Field(default=128, gt=0)
     disk_bytes: int = Field(default=2 * 1024 * 1024 * 1024, gt=0)
-    timeout_seconds: float = Field(default=300.0, gt=0)
+    timeout_seconds: float = Field(default=300.0, gt=0, allow_inf_nan=False)
     output_bytes: int = Field(default=1024 * 1024, gt=0)
 
 

@@ -239,3 +239,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commit: `024925a` (`feat: define sandbox runtime contract`); independent task review remains pending.
 - Workflow deviation: the external Codex implementer stalled after more than six minutes while exiting a successful full-suite run inside its nested bwrap sandbox. The controller reproduced the same tree outside that nested sandbox (`131 passed in 1.59s`), interrupted the stalled process, preserved its files, and reconstructed the task report from observed output. No user-owned untracked files were touched.
 - Human intervention: the user confirmed continuous execution. Lesson: nested sandbox process shutdown can differ from the product test environment; controller verification and repository evidence remain authoritative.
+
+### 2026-08-09 03:48:49 Asia/Shanghai — SANDBOX-01 finite-limit review fix
+
+- Task: SANDBOX-01 fix round 1; triggered `receiving-code-review`, `systematic-debugging`, `test-driven-development`, and `verification-before-completion`.
+- Review: independent task review found one Important issue and no Critical/Minor issues: positive infinity was accepted for CPU and command-time limits despite the finite-resource invariant.
+- TDD RED: the focused regression produced 2 failed and 7 passed; `float("inf")` was accepted for `cpu_seconds` and `timeout_seconds`.
+- Fix: added `allow_inf_nan=False` to exactly those two Pydantic fields and parameterized coverage for both infinities.
+- Controller verification: focused sandbox contracts passed 9 tests; the full offline suite passed 135 tests; Ruff, mypy across 48 source files, `uv lock --check`, and `git diff --check` passed.
+- Workflow note: the isolated fix Agent used a writable `/tmp` uv cache and intentionally skipped its nested full suite; the controller ran the complete suite. Scoped re-review remains pending.

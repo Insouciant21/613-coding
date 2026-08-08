@@ -32,6 +32,15 @@ def test_sandbox_spec_rejects_unpinned_image_and_invalid_limits(tmp_path: Path) 
         ResourceLimits(cpu_seconds=0)
 
 
+@pytest.mark.parametrize("field_name", ("cpu_seconds", "timeout_seconds"))
+@pytest.mark.parametrize("value", (float("inf"), float("-inf")))
+def test_resource_limits_reject_non_finite_duration_limits(
+    field_name: str, value: float
+) -> None:
+    with pytest.raises(ValidationError):
+        ResourceLimits(**{field_name: value})
+
+
 def test_sandbox_defaults_are_non_root_read_only_and_default_deny(tmp_path: Path) -> None:
     spec = _spec(tmp_path)
     assert spec.network_policy is NetworkPolicy.DENY
