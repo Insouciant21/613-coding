@@ -362,6 +362,15 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commit pending: implementation and this evidence will be committed together.
 - Protected unrelated untracked paths remain untouched.
 
+### 2026-08-09 06:25:00 Asia/Shanghai - DELIVERY-07 documentation and final evidence
+
+- Task: DELIVERY-07; followed `test-driven-development` and `verification-before-completion`.
+- TDD RED: documentation checks failed because deployment and reflection files were absent.
+- Implementation: added deployment/acquisition/security/CI/limitations documentation, expanded README, and a student-authored reflection boundary notice without AI-written reflection prose.
+- Verification: documentation checks passed; the complete offline suite and static gates are run before final handoff. Deployment remains explicitly unverified.
+- Commit pending: documentation and evidence will be committed together.
+- Protected unrelated untracked paths remain untouched.
+
 ### 2026-08-09 06:10:00 Asia/Shanghai - DELIVERY-06 CI and delivery recorder
 
 - Task: DELIVERY-06; followed `test-driven-development` and `verification-before-completion`.
