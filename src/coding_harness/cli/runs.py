@@ -18,6 +18,7 @@ from coding_harness.demo.sandbox import run_sandbox_demo
 
 run_app = typer.Typer(no_args_is_help=True)
 runs_app = typer.Typer(no_args_is_help=True)
+_REPO_OPTION = typer.Option(Path("."), "--repo", exists=True, file_okay=False)
 
 _service_factory: Callable[[Path | None], Any] | None = None
 
@@ -31,7 +32,9 @@ def configure_run_service(factory: Callable[[Path | None], Any]) -> None:
 
 def get_run_service(repo_root: Path | None = None) -> Any:
     if _service_factory is None:
-        raise RuntimeError("run service is not configured for this CLI process")
+        from coding_harness.application.composition import build_services
+
+        return build_services(repo_root or Path(".")).run_service
     return _service_factory(repo_root)
 
 
@@ -80,10 +83,11 @@ def run_task(
 @runs_app.command("status")
 def status(
     run_id: UUID,
+    repo: Path = _REPO_OPTION,
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     try:
-        _emit(get_run_service().get_summary(run_id), as_json)
+        _emit(get_run_service(repo.resolve()).get_summary(run_id), as_json)
     except Exception as error:  # noqa: BLE001
         _fail(error)
 
@@ -91,10 +95,11 @@ def status(
 @runs_app.command("events")
 def events(
     run_id: UUID,
+    repo: Path = _REPO_OPTION,
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     try:
-        service = get_run_service()
+        service = get_run_service(repo.resolve())
         values = service.list_events(run_id)
         _emit(values, as_json)
     except Exception as error:  # noqa: BLE001
@@ -102,33 +107,49 @@ def events(
 
 
 @runs_app.command("approve")
-def approve(approval_id: UUID, as_json: bool = typer.Option(False, "--json")) -> None:
+def approve(
+    approval_id: UUID,
+    repo: Path = _REPO_OPTION,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
     try:
-        _emit(get_run_service().approve(approval_id), as_json)
+        _emit(get_run_service(repo.resolve()).approve(approval_id), as_json)
     except Exception as error:  # noqa: BLE001
         _fail(error)
 
 
 @runs_app.command("reject")
-def reject(approval_id: UUID, as_json: bool = typer.Option(False, "--json")) -> None:
+def reject(
+    approval_id: UUID,
+    repo: Path = _REPO_OPTION,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
     try:
-        _emit(get_run_service().reject(approval_id), as_json)
+        _emit(get_run_service(repo.resolve()).reject(approval_id), as_json)
     except Exception as error:  # noqa: BLE001
         _fail(error)
 
 
 @runs_app.command("resume")
-def resume(run_id: UUID, as_json: bool = typer.Option(False, "--json")) -> None:
+def resume(
+    run_id: UUID,
+    repo: Path = _REPO_OPTION,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
     try:
-        _emit(get_run_service().resume(run_id), as_json)
+        _emit(get_run_service(repo.resolve()).resume(run_id), as_json)
     except Exception as error:  # noqa: BLE001
         _fail(error)
 
 
 @runs_app.command("cancel")
-def cancel(run_id: UUID, as_json: bool = typer.Option(False, "--json")) -> None:
+def cancel(
+    run_id: UUID,
+    repo: Path = _REPO_OPTION,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
     try:
-        _emit(get_run_service().cancel(run_id), as_json)
+        _emit(get_run_service(repo.resolve()).cancel(run_id), as_json)
     except Exception as error:  # noqa: BLE001
         _fail(error)
 

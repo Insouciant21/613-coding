@@ -4,3 +4,4 @@ docs/superpowers
 .venv/
 __pycache__/
 *.py[cod]
+.613-coding/

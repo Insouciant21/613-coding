@@ -368,6 +368,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Root cause: delivery adapters expose `configure_run_service` but the installed entrypoint never supplies a provider-backed `RunService`; WebUI uses an explicit health-only service placeholder.
 - Decision: record the boundary rather than fabricate a provider or pass raw credentials through the CLI. The delivery registry now says runtime composition requires an injected provider/service bundle.
 
+### 2026-08-09 runtime composition repair
+
+- TDD RED: `tests/application/test_composition.py` initially failed on the absent composition module.
+- Implementation: added SQLite/LanceDB local composition, project reuse, deferred-provider failure semantics, and optional `--repo` scope for lifecycle CLI commands; wired `coding-harness web` to the same bundle.
+- Verification: composition tests passed 2; real CLI create/cancel smoke and FastAPI create/health/events smoke passed. A configured provider remains required for model-driven resume.
+- Scope: no credentials or fabricated LLM responses were added.
+
 ### 2026-08-09 06:25:00 Asia/Shanghai - DELIVERY-07 documentation and final evidence
 
 - Task: DELIVERY-07; followed `test-driven-development` and `verification-before-completion`.

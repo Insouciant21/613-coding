@@ -15,6 +15,6 @@ uv run pytest
 
 Build and install the package with `uv build` and `uv tool install .`. The installed command exposes `coding-harness config check`, `coding-harness credentials status`, `coding-harness run task`, and `coding-harness web`.
 
-The API adapter is created with `coding_harness.api.create_app(services)`. CLI/API adapters require an injected application service bundle so provider credentials and policy composition stay outside presentation code. Deployment, keyring safety, `.env` limitations, Docker boundaries, and CI stages are documented in [`docs/deployment.md`](docs/deployment.md).
+The API adapter is created with `coding_harness.api.create_app(services)`. CLI/API adapters use the local SQLite/LanceDB composition by default; resuming a run requires injecting a real `LLMProvider`, while provider credentials and policy composition stay outside presentation code. Deployment, keyring safety, `.env` limitations, Docker boundaries, and CI stages are documented in [`docs/deployment.md`](docs/deployment.md).
 
 The public console boundary is intentionally narrow: it may operate an example repository or an isolated upload, never an arbitrary host path. SQLite remains authoritative for structured state and memory text; LanceDB is rebuildable retrieval metadata.

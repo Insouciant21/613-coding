@@ -12,7 +12,7 @@ uv tool install .
 coding-harness web --host 127.0.0.1 --port 8000
 ```
 
-The Docker demonstration uses `docker build -t 613-coding .` and `docker run --rm -p 8000:8000 613-coding`. The image starts the local FastAPI console and exposes `/healthz`. CLI/API adapters require an injected application service bundle; provider and policy composition is intentionally kept outside presentation code.
+The Docker demonstration uses `docker build -t 613-coding .` and `docker run --rm -p 8000:8000 613-coding`. The image starts the local FastAPI console and exposes `/healthz`. CLI/API adapters use the local SQLite/LanceDB composition by default; resuming a run requires an injected real `LLMProvider`, and provider/policy composition stays outside presentation code.
 
 ## Credentials And Configuration
 

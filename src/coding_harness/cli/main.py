@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 import typer
 
 from .config import app as config_app
@@ -22,20 +20,15 @@ app.command("demo")(demo_command)
 def web(
     host: str = "127.0.0.1",
     port: int = 8000,
+    repo: str = ".",
 ) -> None:
     """Start the local operations console."""
 
     import uvicorn
 
     from coding_harness.api.app import create_app
+    from coding_harness.application.composition import build_services
 
-    class UnavailableServices:
-        run_service = None
-
-        @staticmethod
-        def list_events(_run_id: UUID) -> list[object]:
-            return []
-
-    uvicorn.run(create_app(UnavailableServices()), host=host, port=port)
+    uvicorn.run(create_app(build_services(repo)), host=host, port=port)
 
 __all__ = ["app"]

@@ -75,6 +75,20 @@ class SqliteEventStore:
                 ),
             )
 
+    def get_project_by_root(self, canonical_root: str | Path) -> Project | None:
+        root = Path(canonical_root).resolve(strict=True)
+        with self._transaction() as connection:
+            row = connection.execute(
+                "SELECT * FROM projects WHERE canonical_root = ?", (str(root),)
+            ).fetchone()
+        if row is None:
+            return None
+        return Project(
+            id=UUID(row["id"]),
+            canonical_root=Path(row["canonical_root"]),
+            created_at=self._parse_datetime(row["created_at"]),
+        )
+
     def get_run(self, run_id: UUID) -> Run | None:
         with self._transaction() as connection:
             row = connection.execute(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -102,3 +103,16 @@ def test_demo_dispatches_named_demo(monkeypatch, tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert called == ["multi-agent"]
     assert '"demo": "multi-agent"' in result.stdout
+
+
+def test_default_factory_creates_and_cancels_a_real_local_run(tmp_path: Path) -> None:
+    created = CliRunner().invoke(app, ["run", "task", "inspect", "--repo", str(tmp_path), "--json"])
+    assert created.exit_code == 0
+    run_id = json.loads(created.stdout)["id"]
+
+    cancelled = CliRunner().invoke(
+        app, ["runs", "cancel", run_id, "--repo", str(tmp_path), "--json"]
+    )
+
+    assert cancelled.exit_code == 0
+    assert json.loads(cancelled.stdout)["status"] == "cancelled"
