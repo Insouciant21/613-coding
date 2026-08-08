@@ -82,6 +82,12 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - Verification: distribution suite passed 4 tests; full suite passed 216 tests; `uv build`, Ruff, and mypy passed. Docker build was attempted and blocked by Docker Hub token network reset.
 - Boundaries: installed `coding-harness` entrypoint and `web` command are present; Docker image runs non-root with healthcheck and no socket mount.
 
+## DELIVERY-06 Task Evidence
+
+- Status: complete; commit `511fdd9`; report `.superpowers/sdd/2026-08-08-613-coding-delivery/task-6-report.md`.
+- Verification: recorder suite passed 3 tests; full suite passed 219 tests; Ruff and mypy passed.
+- Boundaries: evidence records validate Git commits, retain failures, and suppress duplicate task/commit records; CI stages are explicit.
+
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 
 ## CORE-01 Task Evidence
