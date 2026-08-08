@@ -8,9 +8,9 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | --- | --- | --- | --- |
 | Approved design | complete | `docs/superpowers/specs/2026-08-07-613-coding-design.md`; commits `6ad0eec`, `c4fd219`, `ba03b70` | none |
 | `AGENTS.md` workflow rules | complete | `AGENTS.md`; commit `ba03b70` | keep updated per task |
-| `SPEC.md` | approved | `SPEC.md`; commit `a2909c7`; user selected Subagent-Driven on 2026-08-08 | complete cold-start validation |
+| `SPEC.md` | approved with bootstrap revision | `SPEC.md`; commits `a2909c7`, `fc7bf53`; cold-start report incorporated | begin CORE-01 |
 | `SPEC_PROCESS.md` | in progress | `SPEC_PROCESS.md`; `/tmp/613-cold-start.T1D2Hh/cold-start-report.md` | cold-start revision review |
-| `PLAN.md` | approved | `PLAN.md`, `docs/superpowers/plans/`; commit `a2909c7`; user selected Subagent-Driven on 2026-08-08 | complete cold-start validation |
+| `PLAN.md` | approved with bootstrap revision | `PLAN.md`, `docs/superpowers/plans/`; commits `a2909c7`, `fc7bf53`; user selected Subagent-Driven on 2026-08-08 | begin CORE-01 |
 | `AGENT_LOG.md` | active | `AGENT_LOG.md` | append every significant task |
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
 | Source implementation | not started | no source package yet | complete approved plan tasks |
@@ -21,11 +21,15 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | GitLab CI `unit-test` job | not started | no `.gitlab-ci.yml` yet | last pipeline must pass |
 | Public WebUI URL | not started | no deployment yet | deploy isolated demonstration |
 | Reflection | not started | no `REFLECTION.md` yet | student-authored final report |
-| Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision recorded in `SPEC_PROCESS.md` | recheck revised bootstrap instructions |
+| Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |
 
 ## Recording Rules
 
 Every completed plan task must link a commit and fresh verification output here. Failures, pauses, rejected approvals, user changes, and CI failures remain visible until superseded by new evidence.
+
+## Bootstrap Revision Evidence
+
+- `fc7bf53` adds standard-library CORE-01 verification, explicit online/offline dependency provisioning, and a hard stop when the local cache or wheelhouse is absent.
 
 ## Plan Evidence
 

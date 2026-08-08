@@ -48,3 +48,10 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Result: CORE-01 reached package scaffolding; `uv run pytest` failed because the fresh environment had no pytest, Pydantic, Ruff, or mypy and no network cache. The report also identified an unspecified build-backend bootstrap path.
 - Evidence: `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`.
 - Human/agent response: revised `SPEC.md`, the approved design, and CORE-01/CORE-02 plan instructions to distinguish dependency provisioning from offline test execution; added a standard-library baseline test and an explicit `DEPENDENCY_PROVISIONING_BLOCKED` stop condition.
+- Commit: `fc7bf53` (`docs: clarify offline dependency bootstrap`).
+
+### Worktree fallback
+
+- Task: establish isolated worktree for Subagent-Driven implementation.
+- Result: `.worktrees/` was added to `.gitignore`, but `git worktree add` could not create a branch ref lock because `.git/refs/heads/*.lock` is read-only in this environment.
+- Decision: follow the worktree skill fallback and execute in the current sandboxed workspace. The failed worktree has no created branch or linked checkout; `git worktree list` contains only `main`.

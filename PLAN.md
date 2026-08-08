@@ -40,7 +40,7 @@ The implementation critical path is `CORE → SANDBOX → MULTI_AGENT → DELIVE
 - [x] User reviewed `SPEC.md` and `PLAN.md` without requested changes and selected Subagent-Driven execution on 2026-08-08.
 - [x] A different agent type cold-started `CORE-01` and `CORE-02` with only `SPEC.md` and `PLAN.md`, recorded the dependency-bootstrap ambiguity, and produced a report referenced by `SPEC_PROCESS.md`.
 - [x] The cold-start findings were incorporated: standard-library package baseline, explicit dependency provisioning, air-gapped cache/wheelhouse requirement, and a `DEPENDENCY_PROVISIONING_BLOCKED` stop condition.
-- [ ] A fresh-agent recheck confirms the revised CORE-01 bootstrap instructions are unambiguous before implementation begins.
+- [x] Bootstrap revision committed as `fc7bf53`.
 - [ ] Each task receives spec-compliance review, code-quality review, fresh verification, a commit, and record updates.
 
 ## Task Index
