@@ -281,3 +281,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Scoped re-review closed those findings but exposed a filesystem boundary: replacing a genuine workspace root with an external symlink bypassed snapshot canonicalization. Fix commit `aa3600a` rejects symlink, non-directory, and non-canonical roots before export and adds regression coverage.
 - Final verification: `uv run pytest tests/sandbox -q` passed 26 tests; full `uv run pytest -q` passed 152 tests; Ruff, mypy across 50 source files, `uv lock --check`, and `git diff --check` passed.
 - Review decision: SANDBOX-02 has no remaining Critical/Important findings and is complete. Next task: SANDBOX-03 Docker lifecycle.
+
+### 2026-08-09 04:30:00 Asia/Shanghai — SANDBOX-03 Docker lifecycle
+
+- Task: SANDBOX-03; TDD RED was the expected missing `docker_runtime` module collection error.
+- Implementation: added Docker options and runtime lifecycle with copied workspace mounts, pinned image/user/read-only/capability/network settings, bounded memory/PIDs/CPU, timeout/output mapping, artifact export, and cleanup on create/start failures.
+- Hardening: added runtime-enforced timeout, start-failure cleanup, and frozen object-identity handles to prevent same-UUID forgery and container leaks. Commits: `bf129cd`, `3ec6ac1`.
+- Verification: focused runtime tests passed 8; sandbox suite passed 34; full suite passed 160; Ruff, mypy across 52 source files, `uv lock --check`, and `git diff --check` passed.
+- Docker smoke: daemon `29.6.2` was available, but only an unapproved `postgres:16-alpine` image was local; no real worker image was pulled, so guarded smoke was skipped with that explicit reason.
+- Review decision: fake-client lifecycle and security boundary review clean; proceed to SANDBOX-04 policy composition.

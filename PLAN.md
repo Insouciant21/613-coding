@@ -26,7 +26,7 @@
 | Plan | Scope | Depends on | Status |
 | --- | --- | --- | --- |
 | `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | complete after final-review repair at `9af4f03` |
-| `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | in progress; SANDBOX-02 complete through `aa3600a` |
+| `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | in progress; SANDBOX-03 complete through `3ec6ac1` |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
 
@@ -146,3 +146,11 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Verification: 17 focused workspace/artifact tests, 26 sandbox tests, and all 152 project tests passed. Ruff, mypy across 50 source files, `uv lock --check`, and `git diff --check` passed.
 - Boundaries: complete repository-shaped copies retain ignored/untracked files; manager-issued immutable workspaces reject forged and replaced roots; empty write sets deny changes; deterministic redacted artifacts include text, binary summaries, deletions, and Git mode changes; cleanup removes only complete manager-owned temporary roots.
 - Review: initial Critical/Important findings were fixed in `840cc21`; scoped re-review found and `aa3600a` fixed external symlink-root replacement. No Critical/Important finding remains.
+
+## SANDBOX-03 Task Evidence
+
+- Status: complete through implementation and handle-ownership repair; real Docker smoke explicitly skipped because no approved pinned worker image was local.
+- Commits: `bf129cd` (`feat: run workers in temporary docker containers`), `3ec6ac1` (`fix: harden docker runtime handle ownership`).
+- TDD evidence: focused collection failed before implementation due to the missing Docker adapter. Final focused runtime suite passed 8 tests.
+- Verification: 34 sandbox tests and all 160 project tests passed; Ruff, mypy across 52 source files, `uv lock --check`, and `git diff --check` passed.
+- Boundaries: only manager-created copied workspaces are mounted; container options pin image/user/read-only/capability/network/memory/PID/CPU settings; command timeouts and output caps map to `CommandResult`; artifacts export through the manager-bound exporter; stop/remove/workspace cleanup runs across failure paths.

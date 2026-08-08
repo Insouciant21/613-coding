@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 04:18:00 (Asia/Shanghai)
-Responsible actor: `/root`; SANDBOX-02 complete through `aa3600a` after independent review repair.
+Last updated: 2026-08-09 04:30:00 (Asia/Shanghai)
+Responsible actor: `/root`; SANDBOX-03 complete through `3ec6ac1`; proceed to SANDBOX-04.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -16,7 +16,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
 | Source implementation | Core complete after final-review repair | task evidence in `PLAN.md` and `AGENT_LOG.md`; final-review implementation/evidence commit `9af4f03`; final-fix report under `.superpowers/sdd/2026-08-08-613-coding-core/` | begin sandbox subsystem |
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
-| Container sandbox | in progress | SANDBOX-01 complete through `9df471d`; SANDBOX-02 complete through `aa3600a`; task reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | implement SANDBOX-03 |
+| Container sandbox | in progress | SANDBOX-01 complete through `9df471d`; SANDBOX-02 complete through `aa3600a`; SANDBOX-03 complete through `3ec6ac1`; task reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | implement SANDBOX-04 |
 | Multi-agent orchestration | not started | no Supervisor yet | run task-graph/worker tests |
 | README and distribution | not started | no package or Dockerfile yet | verify `uv tool install` and Docker demo |
 | GitLab CI `unit-test` job | not started | no `.gitlab-ci.yml` yet | last pipeline must pass |
@@ -133,6 +133,16 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - Boundary: complete working-tree copy retains `.git`, ignored, and untracked files; manager-issued immutable workspaces reject forged and replaced roots; empty write sets deny changes; patches include mode-only changes and are deterministic/redacted; binary data is summarized without bytes; cleanup covers complete owned roots across success and failure paths.
 - Detailed source evidence: `.superpowers/sdd/2026-08-08-613-coding-sandbox/task-2-report.md`.
 - Review evidence: `.superpowers/sdd/2026-08-08-613-coding-sandbox/task-2-review.md`; repairs `840cc21` and `aa3600a`.
+
+## SANDBOX-03 Evidence
+
+- Verification timestamp: `2026-08-09 04:30:00 Asia/Shanghai`.
+- Status: complete through `bf129cd` and `3ec6ac1`; fake-client lifecycle review clean.
+- GREEN: 8 focused Docker runtime tests, 34 sandbox tests, and the full 160-test suite passed.
+- Static gates: Ruff, mypy across 52 source files, `uv lock --check`, and `git diff --check` passed.
+- Boundary: copied workspaces only; pinned image, non-root/read-only/capability-free container, no socket or credential mounts, network disabled, memory/PID/CPU/output/time limits, opaque identity handles, artifact export, and cleanup on lifecycle failures.
+- Real smoke: Docker daemon `29.6.2` available, but no approved pinned worker image exists locally; smoke was explicitly skipped without pulling an image.
+- Detailed source evidence: `.superpowers/sdd/2026-08-08-613-coding-sandbox/task-3-report.md`.
 
 ## Recording Rules
 
