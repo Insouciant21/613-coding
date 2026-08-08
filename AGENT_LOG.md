@@ -359,7 +359,7 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: focused runner tests failed during collection because `coding_harness.cli.main` was absent.
 - Implementation: added Typer `run task`, `runs status/events/approve/reject/resume/cancel`, and `demo core/sandbox/multi-agent` adapters with injectable service factory, JSON/table output, and nonzero error exits.
 - Verification: focused CLI/config/credential suite passed 11 tests; full suite passed 205 tests; Ruff and mypy passed; root `--help` listed all five command groups.
-- Commit pending: implementation and this evidence will be committed together.
+- Commits: implementation `bae307b`; index `4658c54`.
 - Protected unrelated untracked paths remain untouched.
 
 ### 2026-08-09 06:25:00 Asia/Shanghai - DELIVERY-07 documentation and final evidence
@@ -368,7 +368,7 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: documentation checks failed because deployment and reflection files were absent.
 - Implementation: added deployment/acquisition/security/CI/limitations documentation, expanded README, and a student-authored reflection boundary notice without AI-written reflection prose.
 - Verification: documentation checks passed; the complete offline suite and static gates are run before final handoff. Deployment remains explicitly unverified.
-- Commit pending: documentation and evidence will be committed together.
+- Commits: implementation/evidence `773bc2a`; index `318dc4a`.
 - Protected unrelated untracked paths remain untouched.
 
 ### 2026-08-09 06:10:00 Asia/Shanghai - DELIVERY-06 CI and delivery recorder
@@ -377,7 +377,7 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: recorder tests failed during collection because the `scripts` package/module was absent.
 - Implementation: added `scripts.record_delivery` with commit validation, Asia/Shanghai timestamping, append-only/idempotent markers, and visible failure results; added GitLab stages `unit-test`, `lint`, `typecheck`, `demo`, and `build`.
 - Verification: recorder suite passed 3 tests; full suite passed 219 tests; Ruff/mypy passed.
-- Commit pending: implementation and evidence will be committed together.
+- Commits: implementation `511fdd9`; index `188add5`.
 - Protected unrelated untracked paths remain untouched.
 
 ### 2026-08-09 06:00:00 Asia/Shanghai - DELIVERY-05 package and Docker distribution
@@ -386,7 +386,7 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: distribution tests failed on missing package script and Docker files.
 - Implementation: added `coding-harness` console entrypoint, `web` command, Dockerfile, non-root image user, healthcheck, entrypoint, and secret/local-state `.dockerignore` rules.
 - Verification: distribution tests passed 4; full suite passed 216; `uv build`, Ruff, mypy, and diff checks passed. Docker build was attempted but Docker Hub token retrieval failed with a network reset; no image pull or smoke pass was claimed.
-- Commit pending: implementation and evidence will be committed together.
+- Commits: implementation `a0f55b4`; index `5e86358`.
 - Protected unrelated untracked paths remain untouched.
 
 ### 2026-08-09 05:50:00 Asia/Shanghai - DELIVERY-04 operations WebUI
@@ -395,7 +395,7 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: WebUI asset tests failed because the template/static assets were absent.
 - Implementation: added a responsive operations console, API-only state/event rendering, approval/resume/cancel controls, and FastAPI static/root serving; added README usage boundary.
 - Verification: WebUI/API focused tests passed 7; full suite passed 212 tests; Ruff and mypy passed; root/CSS/JS smoke returned HTTP 200.
-- Commit pending: implementation and evidence will be committed together.
+- Commits: implementation `8403520`; index `767bfd6`.
 - Protected unrelated untracked paths remain untouched.
 
 ### 2026-08-09 05:42:00 Asia/Shanghai - DELIVERY-03 FastAPI API
@@ -404,5 +404,5 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: API test collection failed on the absent `coding_harness.api` package.
 - Implementation: added dependency-injected FastAPI app, run lifecycle routes, approval decision route, bounded ordered event retrieval, and health endpoint with safe error mapping.
 - Verification: API suite passed 5 tests; full suite passed 210 tests; Ruff and mypy passed; no secret-bearing error text is returned.
-- Commit pending: implementation and evidence will be committed together.
+- Commits: implementation `a8b1f63`; index `5c1b550`.
 - Protected unrelated untracked paths remain untouched.

@@ -240,21 +240,21 @@ Every completed plan task must link a commit and fresh verification output here.
 
 ## DELIVERY-02 Evidence
 
-- Status: complete pending commit; implementation and focused tests are in the current delivery change.
+- Status: complete; implementation commit `bae307b`, evidence commit `4658c54`.
 - TDD: focused runner tests first failed on the missing CLI module, then 11 CLI/config/credential tests passed.
 - Verification: full suite passed 205 tests; Ruff, mypy, and root Typer help smoke passed.
 - Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-2-report.md`.
 
 ## DELIVERY-03 Evidence
 
-- Status: complete pending commit; FastAPI app and routes are implemented with injected services.
+- Status: complete; implementation commit `a8b1f63`, evidence commit `5c1b550`.
 - Verification: API-focused suite passed 5 tests; full suite passed 210 tests; Ruff and mypy passed.
 - Boundary: request validation, generic error responses, health, ordered events, and lifecycle endpoints are covered.
 - Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-3-report.md`.
 
 ## DELIVERY-04 Evidence
 
-- Status: complete pending commit; responsive operations console is served by the API app.
+- Status: complete; implementation commit `8403520`, evidence commit `767bfd6`.
 - Verification: focused WebUI/API suite passed 7 tests; full suite passed 212 tests; Ruff and mypy passed; root/static smoke returned 200.
 - Open Design boundary: the local MCP was unavailable, so implementation followed the approved operations-console design without external generation.
 - Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-4-report.md`.
@@ -268,13 +268,14 @@ Every completed plan task must link a commit and fresh verification output here.
 
 ## DELIVERY-06 Evidence
 
-- Status: complete pending commit; recorder and GitLab CI are implemented.
+- Status: complete; implementation commit `511fdd9`, evidence commit `188add5`.
 - Verification: recorder suite passed 3 tests; full suite passed 219 tests; Ruff and mypy passed.
 - Boundary: commit references are validated, duplicate records are suppressed, and failed results remain visible.
 - Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-6-report.md`.
 
 ## DELIVERY-07 Evidence
 
-- Status: complete pending final verification and commit; README, deployment, and reflection-boundary docs are present.
+- Status: complete; implementation/evidence commit `773bc2a`, final index commit `318dc4a`.
+- Final verification: `uv run pytest -q` passed 222 tests; `uv run ruff check .`, `uv run mypy src`, `uv lock --check`, `git diff --check`, and `uv build` passed.
 - Boundary: no deployed URL is claimed; Docker network failure remains visible; reflection narrative is reserved for the student.
 - Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-7-report.md`.
