@@ -247,4 +247,5 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: the focused regression produced 2 failed and 7 passed; `float("inf")` was accepted for `cpu_seconds` and `timeout_seconds`.
 - Fix: added `allow_inf_nan=False` to exactly those two Pydantic fields and parameterized coverage for both infinities.
 - Controller verification: focused sandbox contracts passed 9 tests; the full offline suite passed 135 tests; Ruff, mypy across 48 source files, `uv lock --check`, and `git diff --check` passed.
+- Commit: `5d4e787` (`fix: require finite sandbox duration limits`).
 - Workflow note: the isolated fix Agent used a writable `/tmp` uv cache and intentionally skipped its nested full suite; the controller ran the complete suite. Scoped re-review remains pending.
