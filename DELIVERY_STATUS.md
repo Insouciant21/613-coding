@@ -21,6 +21,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | README and distribution | implemented; locally verified | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata; commits `773bc2a`, `a0f55b4`, `d657369` | Docker build/smoke requires registry access and approved image |
 | GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
+| Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
 | Public WebUI URL | not verified | `docs/deployment.md` explicitly records no deployed URL | deploy isolated demonstration with user-controlled infrastructure |
 | Reflection | reserved for student | `REFLECTION.md` contains an explicit student-authored boundary and no AI-written narrative | student writes the final report |
 | Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |
@@ -312,3 +313,9 @@ Every completed plan task must link a commit and fresh verification output here.
 - TDD evidence: config/adapter/composition focused tests passed 13 after expected RED failures.
 - Fresh gates: full suite `231 passed`; Ruff passed; mypy passed for 81 source files; `uv lock --check`, `git diff --check`, and `uv build` passed.
 - Security boundary: provider metadata is non-secret; the keyring secret is read lazily and is absent from persisted event JSON. No real provider request or deployment claim is made.
+
+## Repository Tool Composition Evidence
+
+- Verification timestamp: `2026-08-09 07:08:18 Asia/Shanghai` (focused RED/GREEN).
+- TDD evidence: the composition workflow test failed before repository tool registration and passed after the toolset/validator wiring.
+- Security boundary: tool schemas and policy are still enforced by the owned loop; validation accepts only exact configured argv commands.

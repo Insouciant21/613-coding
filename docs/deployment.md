@@ -31,7 +31,7 @@ credential = "openai"
 timeout_seconds = 60.0
 ```
 
-Then run `coding-harness credentials set openai`. The provider reads the key lazily from the OS keyring on its first call and keeps it only in the ephemeral HTTP client. Missing credentials remain a controlled provider error; no key is written to repository configuration, SQLite, LanceDB, events, prompts, subprocess arguments, or container environments.
+Then run `coding-harness credentials set openai`. The provider reads the key lazily from the OS keyring on its first call and keeps it only in the ephemeral HTTP client. The local composition registers bounded file/search/diff tools and executes only validation commands declared in `harness.toml`. Missing credentials remain a controlled provider error; no key is written to repository configuration, SQLite, LanceDB, events, prompts, subprocess arguments, or container environments.
 
 ## Runtime Boundary
 

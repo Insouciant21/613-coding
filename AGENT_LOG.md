@@ -461,3 +461,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - GREEN: focused provider/config/composition tests passed 13; full `uv run pytest -q` passed 231 tests; Ruff, mypy across 81 source files, `uv lock --check`, `git diff --check`, and `uv build` passed.
 - Commit: `cf252e0`; no real provider request, API key, or external network call was used.
 - Lesson: credential status metadata is not enough to make a provider runnable; the secret-reading boundary must remain lazy, injectable, and outside domain persistence.
+
+### 2026-08-09 07:08:18 Asia/Shanghai - repository tool composition
+
+- Task: make provider-backed local runs execute the owned repository workflow instead of exposing an empty tool registry.
+- TDD RED: the composition test for `read_file` followed by declared validation and `finish` returned `FAILED` because `build_services` registered no repository tools.
+- Implementation: added bounded `list_files`, `search_files`, `read_file`, `edit_file`, `git_diff`, and `run_validation` executors; validation runs only exact commands from configuration, and its result is reused by the loop's validator boundary. Policy now treats `run_validation` as a declared command tool.
+- GREEN: composition and policy focused tests passed 20; full-suite and static verification are pending this task's final run.
+- Commit: pending in this task; no real provider request or secret was used.
+- Lesson: a provider adapter alone is not a runnable coding harness; the composition root must register the same validated tools and objective validator used by the loop.

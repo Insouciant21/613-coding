@@ -114,6 +114,12 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - Verification: focused provider/config/composition tests passed 13; full suite passed 231 tests; Ruff, mypy across 81 source files, `uv lock --check`, `git diff --check`, and `uv build` passed.
 - Boundary: no real provider request was made; key material exists only inside the ephemeral HTTP client and is never serialized.
 
+## Repository Tool Composition Evidence
+
+- Status: implementation complete in the current task; local composition now registers bounded repository tools and a declared-command validator.
+- TDD: the end-to-end `read_file` → validation → `finish` test failed before registration and passed after wiring the toolset.
+- Boundary: filesystem paths remain canonical-root constrained, validation commands remain argv-only and exact-match policy checked, and tool/validation failures return deterministic loop feedback.
+
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 
 ## CORE-01 Task Evidence

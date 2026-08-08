@@ -51,6 +51,7 @@ class PolicyEngine:
         {"apply_patch", "edit_file", "write_file"}
     )
     _NETWORK_TOOLS: ClassVar[frozenset[str]] = frozenset({"network_request"})
+    _VALIDATION_TOOLS: ClassVar[frozenset[str]] = frozenset({"run_validation"})
     _INSTALL_TOOLS: ClassVar[frozenset[str]] = frozenset({"install_dependency"})
     _GIT_WRITE_TOOLS: ClassVar[frozenset[str]] = frozenset(
         {"git_add", "git_commit", "git_push"}
@@ -82,6 +83,8 @@ class PolicyEngine:
             effect = PolicyEffect.ASK if mode is PermissionMode.STRICT else PolicyEffect.ALLOW
             return self._decision(effect, f"mode.{mode.value}.write", "repository write", call)
         if call.name == "run_command":
+            return self._command_decision(call, config, mode)
+        if call.name in self._VALIDATION_TOOLS:
             return self._command_decision(call, config, mode)
         if call.name in self._INSTALL_TOOLS:
             return self._scoped_sensitive(

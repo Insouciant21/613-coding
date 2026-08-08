@@ -4,9 +4,12 @@ from pathlib import Path
 
 import httpx
 
+from coding_harness.adapters.llm.mock import ScriptedLLM
 from coding_harness.application.composition import build_services
 from coding_harness.application.run_service import RunRequest
+from coding_harness.domain.actions import ActionEnvelope, FinishAction, ToolCall
 from coding_harness.domain.models import RunState, StopReason
+from coding_harness.ports.llm import LLMResponse
 
 
 class _ProbeProvider:
@@ -108,3 +111,39 @@ total_model_calls = 1
     assert summary.status is RunState.FAILED
     events = services.list_events(run.id)
     assert all("sk-composition-secret" not in event.model_dump_json() for event in events)
+
+
+def test_local_composition_runs_repository_tool_and_declared_validation(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "answer.txt").write_text("answer\n", encoding="utf-8")
+    (tmp_path / "harness.toml").write_text(
+        """
+[validation]
+commands = [["python", "-c", "print('ok')"]]
+
+[budgets]
+total_model_calls = 2
+""",
+        encoding="utf-8",
+    )
+    provider = ScriptedLLM(
+        (
+            LLMResponse(
+                actions=(
+                    ActionEnvelope(
+                        action=ToolCall(name="read_file", arguments={"path": "answer.txt"})
+                    ),
+                )
+            ),
+            LLMResponse(actions=(ActionEnvelope(action=FinishAction(summary="inspected")),)),
+        )
+    )
+    services = build_services(tmp_path, provider=provider)
+    run = services.run_service.create_run(RunRequest(task="inspect answer"))
+
+    summary = services.run_service.resume(run.id)
+
+    assert summary.status is RunState.COMPLETED
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert summary.validation_evidence

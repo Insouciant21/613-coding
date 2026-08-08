@@ -23,6 +23,7 @@ from coding_harness.adapters.llm.credentialed import (
 from coding_harness.adapters.storage.lancedb_index import LanceMemoryIndex
 from coding_harness.adapters.storage.memory import MemoryRepository
 from coding_harness.adapters.storage.sqlite import SqliteEventStore
+from coding_harness.adapters.tools.repository import build_repository_tools
 from coding_harness.application.approvals import ApprovalService
 from coding_harness.application.budgets import BudgetLimits
 from coding_harness.application.context import ContextAssembler
@@ -30,8 +31,6 @@ from coding_harness.application.feedback import FeedbackClassifier
 from coding_harness.application.loop import AgentLoop, LoopDependencies
 from coding_harness.application.policy import PolicyEngine
 from coding_harness.application.run_service import RunRequest, RunService
-from coding_harness.application.tool_registry import ToolRegistry
-from coding_harness.application.validation import ValidationKind, ValidationResult
 from coding_harness.config import load_config
 from coding_harness.domain.events import Event
 from coding_harness.domain.models import Project, Run
@@ -47,17 +46,6 @@ class DeferredLLMProvider(LLMProvider):
         del context, tools
         raise ProviderConfigurationError(
             "no LLM provider is configured; inject an LLMProvider before resuming this run"
-        )
-
-
-class _UnavailableValidator:
-    def validate(self) -> ValidationResult:
-        return ValidationResult(
-            command=("provider-not-configured",),
-            kind=ValidationKind.OTHER,
-            exit_code=1,
-            stderr="validation is unavailable until an LLM provider is configured",
-            duration_seconds=0,
         )
 
 
@@ -114,12 +102,15 @@ def build_services(
             client_factory=client_factory,
         )
     provider = provider or DeferredLLMProvider()
+    tools, validator, changed_files = build_repository_tools(
+        root, config.validation_commands
+    )
 
     def dependencies(run: Run) -> LoopDependencies:
         return LoopDependencies(
             context_builder=context,
             provider=provider,
-            tools=ToolRegistry(),
+            tools=tools,
             policy=policy,
             policy_config=config.policy,
             permission_mode=run.permission_mode,
@@ -127,11 +118,11 @@ def build_services(
             events=store,
             iterations=store,
             sessions=store,
-            validator=_UnavailableValidator(),
+            validator=validator,
             classifier=FeedbackClassifier(),
             budget_limits=BudgetLimits.model_validate(config.budgets.model_dump()),
             revision=lambda: _repository_revision(root, state_root),
-            changed_files=lambda: (),
+            changed_files=lambda: tuple(changed_files),
             clock=lambda: datetime.now(UTC),
         )
 
