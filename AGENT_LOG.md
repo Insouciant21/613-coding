@@ -459,5 +459,5 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation: added strict non-secret `LLMConfig` metadata, URL credential/query rejection, keyring `read_secret` limited to ephemeral provider composition, lazy `CredentialedOpenAICompatibleLLM`, injectable provider/client seams, and composition selection for configured OpenAI-compatible providers.
 - Security evidence: composition MockTransport observed the Authorization header only in the HTTP client; the key was absent from all persisted event JSON; missing/reader failures map to a generic provider credential error.
 - GREEN: focused provider/config/composition tests passed 13; full `uv run pytest -q` passed 231 tests; Ruff, mypy across 81 source files, `uv lock --check`, `git diff --check`, and `uv build` passed.
-- Commit: pending in this task; no real provider request, API key, or external network call was used.
+- Commit: `cf252e0`; no real provider request, API key, or external network call was used.
 - Lesson: credential status metadata is not enough to make a provider runnable; the secret-reading boundary must remain lazy, injectable, and outside domain persistence.

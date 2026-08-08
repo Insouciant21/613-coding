@@ -308,6 +308,7 @@ Every completed plan task must link a commit and fresh verification output here.
 ## Provider-backed Composition Evidence
 
 - Verification timestamp: `2026-08-09 07:00:59 Asia/Shanghai`.
+- Implementation commit: `cf252e0`.
 - TDD evidence: config/adapter/composition focused tests passed 13 after expected RED failures.
 - Fresh gates: full suite `231 passed`; Ruff passed; mypy passed for 81 source files; `uv lock --check`, `git diff --check`, and `uv build` passed.
 - Security boundary: provider metadata is non-secret; the keyring secret is read lazily and is absent from persisted event JSON. No real provider request or deployment claim is made.

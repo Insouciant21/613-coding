@@ -109,7 +109,7 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 
 ## Provider-backed Composition Evidence
 
-- Status: implementation complete; configured OpenAI-compatible provider metadata now selects a lazy keyring-backed provider while preserving deferred behavior when `[llm]` is absent.
+- Status: implementation complete in `cf252e0`; configured OpenAI-compatible provider metadata now selects a lazy keyring-backed provider while preserving deferred behavior when `[llm]` is absent.
 - TDD: config, adapter, injection, and composition-backed persistence-redaction tests followed RED/GREEN cycles.
 - Verification: focused provider/config/composition tests passed 13; full suite passed 231 tests; Ruff, mypy across 81 source files, `uv lock --check`, `git diff --check`, and `uv build` passed.
 - Boundary: no real provider request was made; key material exists only inside the ephemeral HTTP client and is never serialized.
