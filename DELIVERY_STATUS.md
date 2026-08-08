@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 02:59:19 (Asia/Shanghai)
-Responsible actor: `/root/core_final_fix`; Core final-review fixes and review repair verified, commit pending.
+Last updated: 2026-08-09 03:05:54 (Asia/Shanghai)
+Responsible actor: `/root/core_final_fix`; Core final review complete at `9af4f03`.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -14,7 +14,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | `PLAN.md` | approved with bootstrap revision | `PLAN.md`, `docs/superpowers/plans/`; commits `a2909c7`, `fc7bf53`; user selected Subagent-Driven on 2026-08-08 | begin CORE-01 |
 | `AGENT_LOG.md` | active | `AGENT_LOG.md` | append every significant task |
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
-| Source implementation | CORE-01 through CORE-11 complete; Core final-review fixes and review repair verified, commit pending | task evidence in `PLAN.md` and `AGENT_LOG.md`; final-fix report under `.superpowers/sdd/2026-08-08-613-coding-core/` | record implementation hash |
+| Source implementation | Core complete after final-review repair | task evidence in `PLAN.md` and `AGENT_LOG.md`; final-review implementation/evidence commit `9af4f03`; final-fix report under `.superpowers/sdd/2026-08-08-613-coding-core/` | begin sandbox subsystem |
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
 | Container sandbox | not started | no Docker runtime yet | run lifecycle/security tests |
 | Multi-agent orchestration | not started | no Supervisor yet | run task-graph/worker tests |
@@ -104,7 +104,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 ## Core Final-Review Fix Evidence
 
 - Verification timestamp: `2026-08-09 02:59:19 Asia/Shanghai`.
-- Base: `b26833f31336d75166dda3b6e0be6f8b9780d01b`; implementation commit pending.
+- Base: `b26833f31336d75166dda3b6e0be6f8b9780d01b`; implementation/evidence commit: `9af4f03`.
 - Findings: SQLite connections were not closed by transaction context exit; stale `RunService` status writes could replace a newer terminal row and return a stale summary.
 - TDD RED: required focused command produced 6 failed and 42 passed, covering success/exception connection leaks, absent SQLite run CAS, and deterministic `resume`/`cancel` races. Review repair RED produced 2 failed and 33 deselected for terminal entry points returning stale summaries and re-entering the loop.
 - GREEN: terminal-entry regression passed 2 tests; required focused command passed 50 tests; full suite passed 126 tests.

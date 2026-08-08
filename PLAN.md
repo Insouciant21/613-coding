@@ -25,7 +25,7 @@
 
 | Plan | Scope | Depends on | Status |
 | --- | --- | --- | --- |
-| `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | CORE-01 through CORE-11 complete; final review pending |
+| `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | complete after final-review repair at `9af4f03` |
 | `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
@@ -118,3 +118,12 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Verification: `uv run pytest tests/adapters/credentials/test_keyring.py -q` passed with 6 tests; `uv run pytest -q` passed with 116 tests; Ruff, mypy, `uv lock --check`, and `git diff --check` passed.
 - Boundaries: status and `SecretReference` are metadata-only; OS keyring access is injectable; provider entries are isolated; environment fallback is opt-in; raw-secret provider injection remains a separately governed future integration boundary.
 - Review: independent review found two Important issues in backend double-fault handling and source type narrowing. Fix round 1 addressed both; scoped re-review found no new Critical/Important breakage. Two Minor findings remain in the Core ledger for final review.
+
+## Core Final-Review Evidence
+
+- Status: complete after whole-branch review repair.
+- Implementation/evidence commit: `9af4f03` (`fix: close core final review findings`).
+- Findings repaired: SQLite connections now close after successful and exceptional repository operations; run-state persistence uses atomic full-snapshot compare-and-set; stale races and later terminal entry points return authoritative terminal state and stop reason without re-entering mutating loop paths.
+- TDD evidence: initial focused RED produced 6 failed and 42 passed; review-repair RED produced 2 failed and 33 deselected. Final required focused suite passed 50 tests.
+- Verification: `uv run pytest -q` passed with 126 tests; `uv run ruff check .`, `uv run mypy src`, `uv lock --check`, and `git diff --check` passed.
+- Review: independent reviewer found no Critical/Minor issues and one Important terminal-entry gap; the gap was addressed through a separate RED/GREEN cycle. Full evidence is in `.superpowers/sdd/2026-08-08-613-coding-core/core-final-review-fix-report.md`.

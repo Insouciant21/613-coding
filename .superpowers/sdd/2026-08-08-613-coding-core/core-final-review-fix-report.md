@@ -3,12 +3,13 @@
 Date: 2026-08-09 (Asia/Shanghai)
 Actor: `/root/core_final_fix`
 Base: `b26833f31336d75166dda3b6e0be6f8b9780d01b`
+Implementation/evidence commit: `9af4f03`
 Scope source: `core-final-review-findings.md`
 
 ## Status
 
-Implementation, review repair, and verification are complete. The implementation
-commit is pending and will be recorded in the delivery-record follow-up.
+Implementation, review repair, and verification are complete in `9af4f03`. This
+report and `PLAN.md` record that hash in the required delivery-record follow-up.
 
 The authorized current-workspace fallback was used because Git ref locks prevented
 worktree creation. The user-owned untracked `.claude/` directory and the two untracked
