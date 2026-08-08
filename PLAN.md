@@ -85,3 +85,8 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 - Status: complete; commit `44a4a9a`; scoped tool/security review clean.
 - Verification: 8 focused repository-tool tests and all 32 project tests passed; Ruff, mypy, and `uv lock --check` passed.
+
+## CORE-07 Task Evidence
+
+- Status: implementation complete; commit hash is recorded after commit.
+- Verification: 17 focused policy/approval tests and all 49 project tests passed; Ruff and mypy passed.

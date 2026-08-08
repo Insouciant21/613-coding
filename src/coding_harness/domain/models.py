@@ -79,13 +79,15 @@ class ApprovalStatus(StrEnum):
 
 class ApprovalRequest(DomainModel):
     id: UUID = Field(default_factory=uuid4)
+    run_id: UUID | None = None
     action: ToolCall
     reason: str = Field(min_length=1)
     status: ApprovalStatus = ApprovalStatus.PENDING
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime | None = None
     resolved_at: datetime | None = None
 
-    @field_validator("created_at", "resolved_at")
+    @field_validator("created_at", "expires_at", "resolved_at")
     @classmethod
     def require_aware_timestamp(cls, value: datetime | None) -> datetime | None:
         if value is not None and value.tzinfo is None:

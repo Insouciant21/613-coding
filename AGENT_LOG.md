@@ -142,3 +142,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation: canonical-root filesystem reads/edits/search, bounded UTF-8 handling, pure-Python Git diff, and JSON Schema validated dispatch.
 - Dependencies: added and uv-locked Dulwich, jsonschema, and types-jsonschema to implement the specified low-level boundaries without shell Git or ad hoc schema parsing.
 - GREEN: 8 focused tests and all 32 project tests passed; Ruff, mypy, and lock check passed.
+
+### 2026-08-08 22:37:12 Asia/Shanghai — CORE-07 policy and approvals
+
+- Task: CORE-07; triggered `test-driven-development`, `systematic-debugging`, and `verification-before-completion`.
+- TDD RED: modules were absent; a focused review RED later exposed shell-wrapped destructive commands and missing approval run ownership.
+- Implementation: deterministic hard-rule/config/mode policy precedence plus exact, expiring, one-time approval state.
+- Security coverage: repository/symlink/credential escape, Docker socket, privileged containers, destructive argv/shell commands, memory override attempts, install/network/Git writes, stale/rejected approvals.
+- GREEN: 17 focused tests and all 49 project tests passed; Ruff and mypy passed.

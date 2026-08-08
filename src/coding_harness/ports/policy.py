@@ -22,6 +22,7 @@ class PolicyDecision(DomainModel):
     effect: PolicyEffect
     rule_id: str = Field(min_length=1)
     reason: str = Field(min_length=1)
+    action: ToolCall | None = None
 
 
 class PolicyEvaluator(Protocol):
