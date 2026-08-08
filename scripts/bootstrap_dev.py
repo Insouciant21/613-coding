@@ -7,7 +7,6 @@ import importlib.util
 import shutil
 import sys
 
-
 REQUIRED_IMPORTS = ("pydantic", "pytest")
 REQUIRED_COMMANDS = ("uv", "ruff", "mypy")
 

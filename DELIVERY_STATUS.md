@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-08 15:11:30 (Asia/Shanghai)
-Responsible actor: `/root` controller; implementation commit `4d51108` by `core01_implementer`; review repair is pending commit.
+Last updated: 2026-08-08 21:59:19 (Asia/Shanghai)
+Responsible actor: `/root` controller; implementation commit `4d51108` by `core01_implementer`; review repair commit `3b0ea0e`; verification follow-up pending.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -46,8 +46,16 @@ Every completed plan task must link a commit and fresh verification output here.
 
 ## CORE-01 Review Repair Evidence
 
-- Verification timestamp: `2026-08-08 15:11:30 Asia/Shanghai`.
+- Verification timestamp: `2026-08-08 18:14:08 Asia/Shanghai`.
 - `uv lock`: passed with 54 resolved packages after registry access was approved.
 - Bootstrap command: `uv run python scripts/bootstrap_dev.py` is now the documented probe so imports and commands resolve from the managed environment.
 - Review status: important findings addressed; generated Python bytecode is ignored and removed from the repair commit.
-- Provisioning remains blocked: `uv sync --all-extras --frozen --offline` failed because `lancedb==0.36.0` was not cached; no third-party check is marked as passing.
+- Full runtime provisioning remains blocked: `uv sync --all-extras --frozen` cannot finish while the `lancedb==0.36.0` and `pyarrow==25.0.0` wheels are unavailable; the development toolchain itself is provisioned and its `--no-sync` checks pass.
+
+## CORE-01 Development-Tool Verification
+
+- Verification timestamp: `2026-08-08 21:59:19 Asia/Shanghai`.
+- `uv run --no-sync python scripts/bootstrap_dev.py`: `DEPENDENCIES_PROVISIONED`.
+- `PYTHONPATH=src uv run --no-sync pytest -q`: 1 passed.
+- `uv run --no-sync ruff check .`: passed.
+- `uv run --no-sync mypy src`: passed.

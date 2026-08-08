@@ -59,4 +59,4 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Status: complete after task review and bootstrap repair.
 - Commit: `4d51108` scaffold; repair commit is recorded in the task ledger and delivery status.
 - Verification: focused standard-library unittest and `py_compile` passed; `uv lock --check` passed for 54 packages; `uv sync --all-extras --frozen --offline` is blocked by the uncached `lancedb==0.36.0` wheel, so canonical third-party checks remain unrun.
-- Gate: CORE-02 remains blocked until `uv run python scripts/bootstrap_dev.py` reports `DEPENDENCIES_PROVISIONED`.
+- Gate: `uv run --no-sync python scripts/bootstrap_dev.py` now reports `DEPENDENCIES_PROVISIONED`; CORE-02 may start. Full LanceDB/PyArrow sync remains a later memory-task gate.

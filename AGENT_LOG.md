@@ -79,3 +79,14 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - `uv lock --check`: passed against the 54-package lockfile.
 - `uv sync --all-extras --frozen --offline`: failed with `lancedb==0.36.0` missing from the local cache.
 - Decision: retain `DEPENDENCY_PROVISIONING_BLOCKED`; do not start CORE-02 or claim pytest/Ruff/mypy results until a cache or wheelhouse is supplied.
+
+### 2026-08-08 18:14:08 Asia/Shanghai — CORE-01 repair commit
+
+- Commit: `3b0ea0e` (`fix: close CORE-01 bootstrap review findings`).
+- Verification: `uv lock --check` passed; focused unittest passed; `py_compile` passed; third-party provisioning remains blocked by the uncached LanceDB wheel.
+
+### 2026-08-08 21:59:19 Asia/Shanghai — CORE-01 development-tool verification
+
+- Provisioning: installed Pydantic, pytest, Ruff, and mypy into `.venv` with `uv pip install`; full project sync remains blocked by uncached LanceDB/PyArrow wheels.
+- Verification: `uv run --no-sync python scripts/bootstrap_dev.py` reported `DEPENDENCIES_PROVISIONED`; `PYTHONPATH=src uv run --no-sync pytest -q` passed (1 test); `uv run --no-sync ruff check .` passed; `uv run --no-sync mypy src` passed.
+- Human intervention: none beyond earlier registry access approval; no real LLM or secret was used.
