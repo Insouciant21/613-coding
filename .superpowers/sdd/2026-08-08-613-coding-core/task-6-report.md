@@ -2,7 +2,7 @@
 
 Status: implementation complete; scoped verification clean.
 
-Commit: pending at report creation.
+Commit: `44a4a9a` (`feat: implement scoped coding tools`).
 
 TDD RED: tool tests failed during collection because repository tool and registry modules did not exist.
 

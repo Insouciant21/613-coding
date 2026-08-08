@@ -56,7 +56,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 ## CORE-06 Evidence
 
 - Verification timestamp: `2026-08-08 22:31:15 Asia/Shanghai`.
-- Status: implementation complete; commit pending at evidence creation.
+- Status: complete; commit `44a4a9a`.
 - Tests: 8 focused repository-tool tests and all 32 project tests passed.
 - Security boundary: path/symlink escape, size, UTF-8, unknown tool, and invalid JSON Schema arguments are rejected before execution.
 
