@@ -468,5 +468,5 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: the composition test for `read_file` followed by declared validation and `finish` returned `FAILED` because `build_services` registered no repository tools.
 - Implementation: added bounded `list_files`, `search_files`, `read_file`, `edit_file`, `git_diff`, and `run_validation` executors; validation runs only exact commands from configuration, and its result is reused by the loop's validator boundary. Policy now treats `run_validation` as a declared command tool.
 - GREEN: composition and policy focused tests passed 20; full-suite and static verification are pending this task's final run.
-- Commit: pending in this task; no real provider request or secret was used.
+- Commit: `cf25473`; no real provider request or secret was used.
 - Lesson: a provider adapter alone is not a runnable coding harness; the composition root must register the same validated tools and objective validator used by the loop.

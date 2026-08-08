@@ -317,5 +317,6 @@ Every completed plan task must link a commit and fresh verification output here.
 ## Repository Tool Composition Evidence
 
 - Verification timestamp: `2026-08-09 07:08:18 Asia/Shanghai` (focused RED/GREEN).
+- Implementation commit: `cf25473`.
 - TDD evidence: the composition workflow test failed before repository tool registration and passed after the toolset/validator wiring.
 - Security boundary: tool schemas and policy are still enforced by the owned loop; validation accepts only exact configured argv commands.

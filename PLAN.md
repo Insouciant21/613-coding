@@ -116,7 +116,7 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 
 ## Repository Tool Composition Evidence
 
-- Status: implementation complete in the current task; local composition now registers bounded repository tools and a declared-command validator.
+- Status: implementation complete in `cf25473`; local composition now registers bounded repository tools and a declared-command validator.
 - TDD: the end-to-end `read_file` → validation → `finish` test failed before registration and passed after wiring the toolset.
 - Boundary: filesystem paths remain canonical-root constrained, validation commands remain argv-only and exact-match policy checked, and tool/validation failures return deterministic loop feedback.
 
