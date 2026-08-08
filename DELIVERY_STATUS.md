@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
 Last updated: 2026-08-09 03:33:03 (Asia/Shanghai)
-Responsible actor: `/root`; SANDBOX-01 implemented and verification-passing, pending independent review and commit.
+Responsible actor: `/root`; SANDBOX-01 committed at `024925a`, pending independent review.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -16,7 +16,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
 | Source implementation | Core complete after final-review repair | task evidence in `PLAN.md` and `AGENT_LOG.md`; final-review implementation/evidence commit `9af4f03`; final-fix report under `.superpowers/sdd/2026-08-08-613-coding-core/` | begin sandbox subsystem |
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
-| Container sandbox | in progress | SANDBOX-01 contracts and fake runtime implemented; 5 focused and 131 full tests passed; task report under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | complete independent task review, then implement workspace and Docker runtime |
+| Container sandbox | in progress | SANDBOX-01 contracts and fake runtime at `024925a`; 5 focused and 131 full tests passed; task report under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | complete independent task review, then implement workspace and Docker runtime |
 | Multi-agent orchestration | not started | no Supervisor yet | run task-graph/worker tests |
 | README and distribution | not started | no package or Dockerfile yet | verify `uv tool install` and Docker demo |
 | GitLab CI `unit-test` job | not started | no `.gitlab-ci.yml` yet | last pipeline must pass |
@@ -115,7 +115,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 ## SANDBOX-01 Evidence
 
 - Verification timestamp: `2026-08-09 03:33:03 Asia/Shanghai`.
-- Status: implementation and controller gates passed; independent task review and commit are pending.
+- Status: implementation committed at `024925a`; controller gates passed; independent task review is pending.
 - TDD RED: focused collection failed with the sandbox adapter package missing.
 - GREEN: focused contracts passed 5 tests; full offline suite passed 131 tests.
 - Static gates: Ruff, mypy across 48 source files, `uv lock --check`, and `git diff --check` passed.

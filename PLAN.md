@@ -26,7 +26,7 @@
 | Plan | Scope | Depends on | Status |
 | --- | --- | --- | --- |
 | `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | complete after final-review repair at `9af4f03` |
-| `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | pending |
+| `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | in progress; SANDBOX-01 at `024925a`, review pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
 
@@ -127,3 +127,12 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - TDD evidence: initial focused RED produced 6 failed and 42 passed; review-repair RED produced 2 failed and 33 deselected. Final required focused suite passed 50 tests.
 - Verification: `uv run pytest -q` passed with 126 tests; `uv run ruff check .`, `uv run mypy src`, `uv lock --check`, and `git diff --check` passed.
 - Review: independent reviewer found no Critical/Minor issues and one Important terminal-entry gap; the gap was addressed through a separate RED/GREEN cycle. Full evidence is in `.superpowers/sdd/2026-08-08-613-coding-core/core-final-review-fix-report.md`.
+
+## SANDBOX-01 Task Evidence
+
+- Status: implementation committed; independent spec-compliance and code-quality review pending.
+- Commit: `024925a` (`feat: define sandbox runtime contract`).
+- TDD evidence: focused collection failed before implementation because `coding_harness.adapters.sandbox` was absent.
+- Verification: focused sandbox contracts passed 5 tests; the full offline suite passed 131 tests; Ruff, mypy across 48 source files, `uv lock --check`, and `git diff --check` passed.
+- Boundaries: specs enforce pinned SHA-256 image digests, non-root/read-only/capability-free workers, default-deny network, finite resources, and validated environment names. Handles expose only an opaque UUID and workspace path; the fake runtime records create/execute/export/destroy and rejects destroyed handles.
+- Workflow note: the external implementer's nested bwrap test process did not exit after the suite; the controller reproduced the same worktree successfully outside that nested sandbox and recorded the deviation in `AGENT_LOG.md` and the task report.

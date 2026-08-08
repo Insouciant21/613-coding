@@ -236,5 +236,6 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: focused collection failed with `ModuleNotFoundError: No module named 'coding_harness.adapters.sandbox'` and one collection error before implementation.
 - Implementation: added strict sandbox/resource/command/artifact models, the injectable `SandboxRuntime` port, and a deterministic fake runtime that records lifecycle calls and rejects destroyed handles.
 - Verification: focused sandbox contracts passed 5 tests; the full offline suite passed 131 tests; Ruff, mypy across 48 source files, `uv lock --check`, and `git diff --check` passed.
+- Commit: `024925a` (`feat: define sandbox runtime contract`); independent task review remains pending.
 - Workflow deviation: the external Codex implementer stalled after more than six minutes while exiting a successful full-suite run inside its nested bwrap sandbox. The controller reproduced the same tree outside that nested sandbox (`131 passed in 1.59s`), interrupted the stalled process, preserved its files, and reconstructed the task report from observed output. No user-owned untracked files were touched.
 - Human intervention: the user confirmed continuous execution. Lesson: nested sandbox process shutdown can differ from the product test environment; controller verification and repository evidence remain authoritative.
