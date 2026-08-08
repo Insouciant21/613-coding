@@ -451,3 +451,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - GREEN: focused Docker configuration and timeout tests passed 2; final `uv run pytest -q` passed 225 tests; Ruff, mypy, `uv lock --check`, `git diff --check`, and `uv build` passed.
 - Commit: `287202a`.
 - Human intervention: none; protected user-owned untracked paths.
+
+### 2026-08-09 07:00:59 Asia/Shanghai - provider-backed local composition
+
+- Task: close the real `LLMProvider` composition boundary without persisting credentials.
+- TDD RED: config rejected `[llm]`, the credentialed adapter module was absent, and `build_services` rejected provider injection; the composition-backed test then failed on the missing client-factory seam.
+- Implementation: added strict non-secret `LLMConfig` metadata, URL credential/query rejection, keyring `read_secret` limited to ephemeral provider composition, lazy `CredentialedOpenAICompatibleLLM`, injectable provider/client seams, and composition selection for configured OpenAI-compatible providers.
+- Security evidence: composition MockTransport observed the Authorization header only in the HTTP client; the key was absent from all persisted event JSON; missing/reader failures map to a generic provider credential error.
+- GREEN: focused provider/config/composition tests passed 13; full `uv run pytest -q` passed 231 tests; Ruff, mypy across 81 source files, `uv lock --check`, `git diff --check`, and `uv build` passed.
+- Commit: pending in this task; no real provider request, API key, or external network call was used.
+- Lesson: credential status metadata is not enough to make a provider runnable; the secret-reading boundary must remain lazy, injectable, and outside domain persistence.

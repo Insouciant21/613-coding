@@ -40,6 +40,18 @@ class KeyringCredentialStore:
     def update(self, provider: str, value: str) -> None:
         self.set(provider, value)
 
+    def read_secret(self, provider: str) -> str:
+        """Read secret material for an ephemeral provider client only."""
+
+        value = self._keyring_value(provider)
+        if value:
+            return value
+        if self._allow_env_fallback:
+            value = os.environ.get(self._env_name(provider))
+            if value:
+                return value
+        raise CredentialError(f"no credential configured for provider {provider}")
+
     def clear(self, provider: str) -> None:
         try:
             self._keyring.delete_password(self._service_name, provider)

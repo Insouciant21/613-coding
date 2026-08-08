@@ -2,9 +2,31 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import httpx
+
 from coding_harness.application.composition import build_services
 from coding_harness.application.run_service import RunRequest
 from coding_harness.domain.models import RunState, StopReason
+
+
+class _ProbeProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def complete(self, context: object, tools: object) -> object:
+        del context, tools
+        self.calls += 1
+        raise RuntimeError("probe provider failure")
+
+
+class _SecretStore:
+    def __init__(self, value: str) -> None:
+        self.value = value
+        self.providers: list[str] = []
+
+    def read_secret(self, provider: str) -> str:
+        self.providers.append(provider)
+        return self.value
 
 
 def test_local_composition_persists_runs_and_can_cancel_without_provider(tmp_path: Path) -> None:
@@ -27,3 +49,62 @@ def test_local_composition_reports_provider_boundary_on_resume(tmp_path: Path) -
 
     assert summary.status is RunState.FAILED
     assert summary.stop_reason is StopReason.PROVIDER_ERROR
+
+
+def test_local_composition_accepts_an_injected_provider(tmp_path: Path) -> None:
+    provider = _ProbeProvider()
+    services = build_services(tmp_path, provider=provider)  # type: ignore[arg-type]
+    run = services.run_service.create_run(RunRequest(task="call the provider"))
+
+    summary = services.run_service.resume(run.id)
+
+    assert provider.calls == 1
+    assert summary.status is RunState.FAILED
+    assert summary.stop_reason is StopReason.PROVIDER_ERROR
+
+
+def test_local_composition_builds_configured_provider_without_persisting_key(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "harness.toml").write_text(
+        """
+[llm]
+provider = "openai-compatible"
+base_url = "https://api.example.test/v1"
+model = "coding-model"
+credential = "openai"
+
+[budgets]
+total_model_calls = 1
+""",
+        encoding="utf-8",
+    )
+    secrets = _SecretStore("sk-composition-secret")
+    captured: dict[str, str] = {}
+
+    def client_factory(headers: dict[str, str], timeout: float) -> httpx.Client:
+        del timeout
+        captured.update(headers)
+        return httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200,
+                    json={"choices": [{"message": {"content": "", "tool_calls": []}}]},
+                )
+            ),
+            headers=headers,
+        )
+
+    services = build_services(
+        tmp_path,
+        credential_store=secrets,  # type: ignore[arg-type]
+        client_factory=client_factory,
+    )
+    run = services.run_service.create_run(RunRequest(task="use configured provider"))
+    summary = services.run_service.resume(run.id)
+
+    assert secrets.providers == ["openai"]
+    assert captured["Authorization"] == "Bearer sk-composition-secret"
+    assert summary.status is RunState.FAILED
+    events = services.list_events(run.id)
+    assert all("sk-composition-secret" not in event.model_dump_json() for event in events)

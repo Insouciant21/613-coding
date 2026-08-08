@@ -10,6 +10,7 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from pydantic import Field, field_validator
 
@@ -17,6 +18,38 @@ from coding_harness.application.budgets import BudgetLimits
 from coding_harness.application.policy import RepositoryPolicyConfig
 from coding_harness.domain.models import PermissionMode
 from coding_harness.domain.models_base import DomainModel
+
+
+class LLMConfig(DomainModel):
+    """Non-secret metadata for one lower-level OpenAI-compatible provider."""
+
+    provider: str = "openai-compatible"
+    base_url: str = "https://api.openai.com/v1"
+    model: str = "gpt-4o-mini"
+    credential: str = "openai"
+    timeout_seconds: float = Field(default=60.0, gt=0, allow_inf_nan=False)
+
+    @field_validator("provider")
+    @classmethod
+    def validate_provider(cls, value: str) -> str:
+        if value != "openai-compatible":
+            raise ValueError("provider must be openai-compatible")
+        return value
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("base_url must be an HTTP(S) URL without credentials or query data")
+        return value.rstrip("/")
 
 
 class HarnessConfig(DomainModel):
@@ -31,6 +64,7 @@ class HarnessConfig(DomainModel):
     allow_writes: bool = True
     denied_tools: frozenset[str] = Field(default_factory=frozenset)
     budgets: BudgetLimits = Field(default_factory=BudgetLimits)
+    llm: LLMConfig | None = None
 
     @field_validator("repository_root")
     @classmethod
@@ -122,6 +156,7 @@ def load_config(repo_root: str | Path) -> HarnessConfig:
     run = _section(raw, "run")
     budgets = _section(raw, "budgets", "budget")
     validation = _section(raw, "validation")
+    llm = _section(raw, "llm")
 
     mode_value = (
         raw.get("permission_mode", raw.get("mode"))
@@ -144,7 +179,7 @@ def load_config(repo_root: str | Path) -> HarnessConfig:
         "allow_writes",
         "denied_tools",
     }
-    unknown = (set(raw) - {"policy", "run", "budgets", "budget", "validation", *allowed})
+    unknown = (set(raw) - {"policy", "run", "budgets", "budget", "validation", "llm", *allowed})
     unknown |= set(run) - allowed
     unknown |= set(policy) - allowed
     unknown |= set(validation) - {"commands"}
@@ -161,6 +196,7 @@ def load_config(repo_root: str | Path) -> HarnessConfig:
         permission_mode=PermissionMode(mode_value),
         **policy_values,
         budgets=BudgetLimits.model_validate(budgets),
+        llm=LLMConfig.model_validate(llm) if "llm" in raw else None,
     )
     validate_config(config)
     return config

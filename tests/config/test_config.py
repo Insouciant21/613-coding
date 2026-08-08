@@ -62,6 +62,39 @@ def test_unattended_config_requires_a_finite_budget(tmp_path: Path) -> None:
         load_config(tmp_path)
 
 
+def test_load_config_parses_openai_compatible_provider_metadata(tmp_path: Path) -> None:
+    (tmp_path / "harness.toml").write_text(
+        """
+[llm]
+provider = "openai-compatible"
+base_url = "https://api.example.test/v1"
+model = "coding-model"
+credential = "openai"
+timeout_seconds = 45.0
+""",
+        encoding="utf-8",
+    )
+
+    config = load_config(tmp_path)
+
+    assert config.llm is not None
+    assert config.llm.provider == "openai-compatible"
+    assert config.llm.base_url == "https://api.example.test/v1"
+    assert config.llm.model == "coding-model"
+    assert config.llm.credential == "openai"
+    assert config.llm.timeout_seconds == 45.0
+
+
+def test_llm_provider_url_cannot_contain_credentials(tmp_path: Path) -> None:
+    (tmp_path / "harness.toml").write_text(
+        '[llm]\nbase_url = "https://user:secret@example.test/v1"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="base_url"):
+        load_config(tmp_path)
+
+
 def test_validate_config_rejects_nonexistent_repository() -> None:
     config = HarnessConfig.model_construct(repository_root=Path("/does/not/exist"))
 

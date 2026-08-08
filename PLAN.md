@@ -107,6 +107,13 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - Status: complete; local composition is covered by `tests/application/test_composition.py` and commit `d657369`.
 - Verification: real CLI create/cancel and FastAPI create/health/events smoke passed; no provider credential or fabricated model response is used.
 
+## Provider-backed Composition Evidence
+
+- Status: implementation complete; configured OpenAI-compatible provider metadata now selects a lazy keyring-backed provider while preserving deferred behavior when `[llm]` is absent.
+- TDD: config, adapter, injection, and composition-backed persistence-redaction tests followed RED/GREEN cycles.
+- Verification: focused provider/config/composition tests passed 13; full suite passed 231 tests; Ruff, mypy across 81 source files, `uv lock --check`, `git diff --check`, and `uv build` passed.
+- Boundary: no real provider request was made; key material exists only inside the ephemeral HTTP client and is never serialized.
+
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 
 ## CORE-01 Task Evidence

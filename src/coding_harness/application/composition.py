@@ -14,7 +14,12 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from coding_harness.adapters.credentials.keyring import KeyringCredentialStore
 from coding_harness.adapters.embeddings.mock import DeterministicEmbedding
+from coding_harness.adapters.llm.credentialed import (
+    ClientFactory,
+    CredentialedOpenAICompatibleLLM,
+)
 from coding_harness.adapters.storage.lancedb_index import LanceMemoryIndex
 from coding_harness.adapters.storage.memory import MemoryRepository
 from coding_harness.adapters.storage.sqlite import SqliteEventStore
@@ -76,7 +81,13 @@ class LocalServices:
         return self._events.list_for_run(run_id)
 
 
-def build_services(repo_root: str | Path) -> LocalServices:
+def build_services(
+    repo_root: str | Path,
+    *,
+    provider: LLMProvider | None = None,
+    credential_store: KeyringCredentialStore | None = None,
+    client_factory: ClientFactory | None = None,
+) -> LocalServices:
     root = Path(repo_root).expanduser().resolve(strict=True)
     config = load_config(root)
     state_root = root / ".613-coding"
@@ -92,7 +103,17 @@ def build_services(repo_root: str | Path) -> LocalServices:
     index = LanceMemoryIndex(state_root / "vectors", dimension=8)
     context = ContextAssembler(memory, index, embedding)
     policy = PolicyEngine()
-    provider: LLMProvider = DeferredLLMProvider()
+    if provider is None and config.llm is not None:
+        store_for_credentials = credential_store or KeyringCredentialStore()
+        provider = CredentialedOpenAICompatibleLLM(
+            provider=config.llm.credential,
+            base_url=config.llm.base_url,
+            model=config.llm.model,
+            read_secret=store_for_credentials.read_secret,
+            timeout_seconds=config.llm.timeout_seconds,
+            client_factory=client_factory,
+        )
+    provider = provider or DeferredLLMProvider()
 
     def dependencies(run: Run) -> LoopDependencies:
         return LoopDependencies(

@@ -67,6 +67,9 @@ class OpenAICompatibleLLM:
             raise ProviderHTTPError(f"provider returned HTTP {response.status_code}")
         return self._parse_response(response)
 
+    def close(self) -> None:
+        self._http_client.close()
+
     @staticmethod
     def _messages(context: ModelContext) -> list[dict[str, str]]:
         if context.messages:

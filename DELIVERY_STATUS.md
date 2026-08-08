@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 06:43:06 (Asia/Shanghai)
+Last updated: 2026-08-09 07:00:59 (Asia/Shanghai)
 Responsible actor: `/root`; implementation and local delivery verification complete; remote CI/deployment evidence remains external.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -20,6 +20,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Multi-agent orchestration | complete | MULTI-01 `9744339`; MULTI-02 `5910d7b`; MULTI-03 `43f51fc`; MULTI-04 `11eaef8`; MULTI-05 `376fd41`; reports under `.superpowers/sdd/2026-08-08-613-coding-multi-agent/` | retain regression gate |
 | README and distribution | implemented; locally verified | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata; commits `773bc2a`, `a0f55b4`, `d657369` | Docker build/smoke requires registry access and approved image |
 | GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
+| Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
 | Public WebUI URL | not verified | `docs/deployment.md` explicitly records no deployed URL | deploy isolated demonstration with user-controlled infrastructure |
 | Reflection | reserved for student | `REFLECTION.md` contains an explicit student-authored boundary and no AI-written narrative | student writes the final report |
 | Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |
@@ -303,3 +304,10 @@ Every completed plan task must link a commit and fresh verification output here.
 - Commit: `287202a`.
 - TDD evidence: hardened-container test failed before `storage_opt` wiring and passed after the fix.
 - Security boundary: validated `disk_bytes` is passed to Docker storage quota configuration; unsupported storage drivers fail creation and trigger workspace cleanup. Real Docker smoke remains unverified because no approved image was available locally.
+
+## Provider-backed Composition Evidence
+
+- Verification timestamp: `2026-08-09 07:00:59 Asia/Shanghai`.
+- TDD evidence: config/adapter/composition focused tests passed 13 after expected RED failures.
+- Fresh gates: full suite `231 passed`; Ruff passed; mypy passed for 81 source files; `uv lock --check`, `git diff --check`, and `uv build` passed.
+- Security boundary: provider metadata is non-secret; the keyring secret is read lazily and is absent from persisted event JSON. No real provider request or deployment claim is made.

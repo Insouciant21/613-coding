@@ -20,6 +20,19 @@ The Docker demonstration uses `docker build -t 613-coding .` and `docker run --r
 
 `.env` is an explicit development fallback only. It is ignored by Git and Docker, remains plaintext, and can leak through process environments. Never put a provider key in `harness.toml`, SQLite, LanceDB, prompts, event payloads, CI files, or worker containers.
 
+Configure a real OpenAI-compatible provider with metadata only:
+
+```toml
+[llm]
+provider = "openai-compatible"
+base_url = "https://api.openai.com/v1"
+model = "gpt-4o-mini"
+credential = "openai"
+timeout_seconds = 60.0
+```
+
+Then run `coding-harness credentials set openai`. The provider reads the key lazily from the OS keyring on its first call and keeps it only in the ephemeral HTTP client. Missing credentials remain a controlled provider error; no key is written to repository configuration, SQLite, LanceDB, events, prompts, subprocess arguments, or container environments.
+
 ## Runtime Boundary
 
 The public WebUI calls only the API and must be limited to an example repository or isolated upload. It must never accept an arbitrary host path. Worker execution uses short-lived non-root containers with read-only roots, dropped capabilities, default-deny network, finite CPU/memory/PID/disk/time/output limits, and no Docker socket mount. The Docker adapter passes the disk bound through `storage_opt`; the host Docker storage driver must support project quotas, otherwise container creation fails and its workspace is cleaned up. These controls reduce ordinary untrusted-code impact but do not guarantee protection from kernel or runtime vulnerabilities.
