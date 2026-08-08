@@ -27,6 +27,10 @@ class SupervisorSummary(DomainModel):
     total_calls: int = 0
     artifacts: dict[str, WorkArtifact] = Field(default_factory=dict)
     events: tuple[str, ...] = ()
+    feedback_repaired: bool = False
+    approval_granted: bool = False
+    integration_applied: bool = False
+    final_validation_passed: bool = False
 
 
 class Supervisor:
