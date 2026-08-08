@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-08 21:59:19 (Asia/Shanghai)
-Responsible actor: `/root` controller; implementation commit `4d51108` by `core01_implementer`; review repair commit `3b0ea0e`; verification follow-up pending.
+Last updated: 2026-08-08 22:07:39 (Asia/Shanghai)
+Responsible actor: `/root` controller; CORE-01 implementation/review commits `4d51108`, `3b0ea0e`; CORE-02 implementation commit pending.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 

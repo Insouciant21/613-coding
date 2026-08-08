@@ -90,3 +90,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Provisioning: installed Pydantic, pytest, Ruff, and mypy into `.venv` with `uv pip install`; full project sync remains blocked by uncached LanceDB/PyArrow wheels.
 - Verification: `uv run --no-sync python scripts/bootstrap_dev.py` reported `DEPENDENCIES_PROVISIONED`; `PYTHONPATH=src uv run --no-sync pytest -q` passed (1 test); `uv run --no-sync ruff check .` passed; `uv run --no-sync mypy src` passed.
 - Human intervention: none beyond earlier registry access approval; no real LLM or secret was used.
+
+### 2026-08-08 22:07:39 Asia/Shanghai — CORE-02 domain contracts
+
+- Task: CORE-02; triggered `test-driven-development` and `verification-before-completion`.
+- TDD RED: domain test collection failed with missing `coding_harness.domain.events` and `coding_harness.domain.actions` before implementation.
+- GREEN: 7 domain tests passed; Ruff and mypy passed for the domain scope.
+- Implementation: added strict Pydantic enums/models, discriminated actions, terminal-state rules, timezone validation, versioned events, and recursive sensitive-key redaction.
+- Workflow deviation: the prior implementation agent had terminated and the collaboration namespace was unavailable in this continuation, so the controller implemented the task and recorded that deviation explicitly.
