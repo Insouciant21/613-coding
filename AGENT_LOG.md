@@ -362,6 +362,15 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commit pending: implementation and this evidence will be committed together.
 - Protected unrelated untracked paths remain untouched.
 
+### 2026-08-09 06:10:00 Asia/Shanghai - DELIVERY-06 CI and delivery recorder
+
+- Task: DELIVERY-06; followed `test-driven-development` and `verification-before-completion`.
+- TDD RED: recorder tests failed during collection because the `scripts` package/module was absent.
+- Implementation: added `scripts.record_delivery` with commit validation, Asia/Shanghai timestamping, append-only/idempotent markers, and visible failure results; added GitLab stages `unit-test`, `lint`, `typecheck`, `demo`, and `build`.
+- Verification: recorder suite passed 3 tests; full suite passed 219 tests; Ruff/mypy passed.
+- Commit pending: implementation and evidence will be committed together.
+- Protected unrelated untracked paths remain untouched.
+
 ### 2026-08-09 06:00:00 Asia/Shanghai - DELIVERY-05 package and Docker distribution
 
 - Task: DELIVERY-05; followed `test-driven-development` and `verification-before-completion`.

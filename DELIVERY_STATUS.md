@@ -265,3 +265,10 @@ Every completed plan task must link a commit and fresh verification output here.
 - Verification: distribution suite passed 4; full suite passed 216; `uv build`, Ruff, and mypy passed.
 - Boundary: image is non-root with healthcheck and no socket mount; no unverified Docker smoke result is recorded.
 - Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-5-report.md`.
+
+## DELIVERY-06 Evidence
+
+- Status: complete pending commit; recorder and GitLab CI are implemented.
+- Verification: recorder suite passed 3 tests; full suite passed 219 tests; Ruff and mypy passed.
+- Boundary: commit references are validated, duplicate records are suppressed, and failed results remain visible.
+- Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-6-report.md`.

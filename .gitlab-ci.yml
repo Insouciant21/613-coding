@@ -1,0 +1,41 @@
+stages:
+  - unit-test
+  - lint
+  - typecheck
+  - demo
+  - build
+
+default:
+  image: python:3.12.8-slim-bookworm
+  before_script:
+    - pip install --no-cache-dir uv==0.8.14
+    - uv sync --frozen
+
+unit-test:
+  stage: unit-test
+  script:
+    - uv run pytest -q
+
+lint:
+  stage: lint
+  script:
+    - uv run ruff check .
+
+typecheck:
+  stage: typecheck
+  script:
+    - uv run mypy src
+
+demo:
+  stage: demo
+  script:
+    - uv run python -m coding_harness.demo.core_feedback --help || true
+    - uv run pytest tests/demo -q
+
+build:
+  stage: build
+  script:
+    - uv build
+  artifacts:
+    paths:
+      - dist/
