@@ -118,3 +118,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation: added typed Protocol boundaries for LLMs, embeddings, tools, event storage, and policy; added strict immutable-shaped context/result models.
 - GREEN: 4 focused port tests and 11 combined domain/port tests passed; Ruff and mypy passed.
 - Human intervention: none; tests use fakes only and no provider/network calls.
+
+### 2026-08-08 22:21:23 Asia/Shanghai — CORE-04 SQLite storage
+
+- Task: CORE-04; triggered `test-driven-development` and `verification-before-completion`.
+- TDD RED: storage tests failed during collection because the SQLite adapter package was absent.
+- Implementation: added the complete initial schema, Run model, transactional run/event/iteration writes, ordered event reads, and mandatory persistence-boundary redaction.
+- GREEN: 5 focused storage tests and 16 combined core tests passed; Ruff and mypy passed; a 20-event, 4-thread temporary-database check passed.
+- Human intervention: none; all storage tests use temporary SQLite databases.

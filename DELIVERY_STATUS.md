@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-08 22:17:38 (Asia/Shanghai)
+Last updated: 2026-08-08 22:21:23 (Asia/Shanghai)
 Responsible actor: `/root` controller; CORE-01 implementation/review commits `4d51108`, `3b0ea0e`; CORE-02 commits `59bc4f2`, `2934063`, `69b1c59`.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -38,6 +38,13 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - Status: complete; commit `e8b938f`.
 - Tests: 4 focused port tests passed; 11 combined domain/port tests passed.
 - Ruff and mypy: passed for domain and ports.
+
+## CORE-04 Evidence
+
+- Verification timestamp: `2026-08-08 22:21:23 Asia/Shanghai`.
+- Status: implementation complete; commit pending at evidence creation.
+- Tests: 5 focused SQLite tests and 16 combined core tests passed, including foreign-key rollback and concurrent append checks.
+- Persistence: direct raw-secret event payloads are redacted before SQLite insertion.
 
 ## Recording Rules
 

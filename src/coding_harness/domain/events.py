@@ -21,16 +21,16 @@ def _is_sensitive_key(key: str) -> bool:
     return bool(parts & _SENSITIVE_PARTS) or ("key" in parts and bool(parts & _KEY_QUALIFIERS))
 
 
-def _redact(value: Any, key: str | None = None) -> Any:
+def redact_payload(value: Any, key: str | None = None) -> Any:
     if key is not None and _is_sensitive_key(key):
         return "[REDACTED]"
     if isinstance(value, dict):
         return {
-            str(item_key): _redact(item_value, str(item_key))
+            str(item_key): redact_payload(item_value, str(item_key))
             for item_key, item_value in value.items()
         }
     if isinstance(value, (list, tuple)):
-        return [_redact(item) for item in value]
+        return [redact_payload(item) for item in value]
     return value
 
 
@@ -60,6 +60,6 @@ class Event(DomainModel):
         return cls(
             event_type=event_type,
             run_id=run_id,
-            payload=_redact(payload),
+            payload=redact_payload(payload),
             timestamp=timestamp,
         )

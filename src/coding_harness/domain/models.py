@@ -122,3 +122,31 @@ class IterationRecord(DomainModel):
         if not self.state_after.is_terminal and self.stop_reason is not None:
             raise ValueError("non-terminal state cannot have stop_reason")
         return self
+
+
+class Run(DomainModel):
+    id: UUID = Field(default_factory=uuid4)
+    project_id: UUID | None = None
+    task: str = Field(min_length=1)
+    permission_mode: PermissionMode = PermissionMode.BALANCED
+    state: RunState = RunState.RUNNING
+    stop_reason: StopReason | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @field_validator("created_at", "updated_at")
+    @classmethod
+    def require_aware_run_timestamp(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("timestamp must be timezone-aware")
+        return value
+
+    @model_validator(mode="after")
+    def validate_run_state(self) -> Run:
+        if self.state.is_terminal and self.stop_reason is None:
+            raise ValueError("terminal run requires stop_reason")
+        if not self.state.is_terminal and self.stop_reason is not None:
+            raise ValueError("non-terminal run cannot have stop_reason")
+        if self.updated_at < self.created_at:
+            raise ValueError("updated_at cannot precede created_at")
+        return self
