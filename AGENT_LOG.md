@@ -320,3 +320,10 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation: added role-specific tool policies and injected WorkerRuntime lifecycle with sandbox create/export/destroy, read-only enforcement, node write-set checks, and failure cleanup.
 - Verification: focused tests passed 5; full suite passed 181; Ruff, mypy across 59 source files, `uv lock --check`, and `git diff --check` passed.
 - Commit: `5910d7b`; proceed to MULTI-03 Supervisor scheduling.
+
+### 2026-08-09 05:25:00 Asia/Shanghai — MULTI-03 Supervisor scheduling and budgets
+
+- TDD RED: focused collection failed because scheduling and Supervisor modules were absent.
+- Implementation: added stable ready-node scheduling, asyncio dependency waves, per-node retry transitions, total-call budget exhaustion, failure propagation, and pause/resume/cancel state gates with event records.
+- Verification: focused scheduler/Supervisor tests passed 7; full suite passed 188; Ruff, mypy across 61 source files, `uv lock --check`, and `git diff --check` passed.
+- Commit: `43f51fc`; proceed to MULTI-04 artifact integration.

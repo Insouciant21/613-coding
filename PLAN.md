@@ -27,7 +27,7 @@
 | --- | --- | --- | --- |
 | `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | complete after final-review repair at `9af4f03` |
 | `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | complete through `fb1c222` |
-| `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | in progress; MULTI-02 complete through `5910d7b` |
+| `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | in progress; MULTI-03 complete through `43f51fc` |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
 
 The implementation critical path is `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. Core storage and domain work can proceed before sandbox; delivery documentation and test harness scaffolding can proceed after core interfaces are stable.
