@@ -361,3 +361,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Verification: focused CLI/config/credential suite passed 11 tests; full suite passed 205 tests; Ruff and mypy passed; root `--help` listed all five command groups.
 - Commit pending: implementation and this evidence will be committed together.
 - Protected unrelated untracked paths remain untouched.
+
+### 2026-08-09 05:42:00 Asia/Shanghai - DELIVERY-03 FastAPI API
+
+- Task: DELIVERY-03; followed `test-driven-development` and `verification-before-completion`.
+- TDD RED: API test collection failed on the absent `coding_harness.api` package.
+- Implementation: added dependency-injected FastAPI app, run lifecycle routes, approval decision route, bounded ordered event retrieval, and health endpoint with safe error mapping.
+- Verification: API suite passed 5 tests; full suite passed 210 tests; Ruff and mypy passed; no secret-bearing error text is returned.
+- Commit pending: implementation and evidence will be committed together.
+- Protected unrelated untracked paths remain untouched.
