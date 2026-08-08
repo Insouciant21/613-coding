@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-08 22:37:12 (Asia/Shanghai)
+Last updated: 2026-08-08 22:44:36 (Asia/Shanghai)
 Responsible actor: `/root` controller; CORE-01 implementation/review commits `4d51108`, `3b0ea0e`; CORE-02 commits `59bc4f2`, `2934063`, `69b1c59`.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -66,6 +66,13 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - Status: complete; commit `8956821`.
 - Tests: 17 focused policy/approval tests and all 49 project tests passed.
 - Governance: hard denials remain unapprovable; sensitive actions use exact, expiring, single-use approvals.
+
+## CORE-08 Evidence
+
+- Verification timestamp: `2026-08-08 22:44:36 Asia/Shanghai`.
+- Status: implementation complete; commit pending at evidence creation.
+- Tests: 19 focused feedback/budget/runner tests and all 68 project tests passed.
+- Feedback boundary: objective outputs, exit status, resources, changes, repetition, and freshness determine classification; no LLM classification is used.
 
 ## Recording Rules
 

@@ -90,3 +90,8 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 - Status: complete; commit `8956821`; scoped governance review clean.
 - Verification: 17 focused policy/approval tests and all 49 project tests passed; Ruff and mypy passed.
+
+## CORE-08 Task Evidence
+
+- Status: implementation complete; commit hash is recorded after commit.
+- Verification: 19 focused feedback/budget/runner tests and all 68 project tests passed; Ruff and mypy passed.

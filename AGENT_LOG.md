@@ -150,3 +150,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation: deterministic hard-rule/config/mode policy precedence plus exact, expiring, one-time approval state.
 - Security coverage: repository/symlink/credential escape, Docker socket, privileged containers, destructive argv/shell commands, memory override attempts, install/network/Git writes, stale/rejected approvals.
 - GREEN: 17 focused tests and all 49 project tests passed; Ruff and mypy passed.
+
+### 2026-08-08 22:44:36 Asia/Shanghai — CORE-08 feedback and budgets
+
+- Task: CORE-08; triggered `test-driven-development`, `systematic-debugging`, and `verification-before-completion`.
+- TDD RED: missing modules, then focused REDs for combined stdout/stderr cap overflow and retryable repeated failure.
+- Implementation: objective feedback classifier, repeated fingerprints, validation freshness, four independent budgets, and bounded argv-only subprocess runner.
+- Safety: no `shell=True`; allowlisted environment; timeout kills the process group; stdout/stderr share one cap; optional memory/process limits use `prlimit` without unsafe `preexec_fn`.
+- GREEN: 19 focused tests and all 68 project tests passed; Ruff and mypy passed.
