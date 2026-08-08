@@ -195,3 +195,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Independent scoped re-review: all original findings plus fix-round boundary checks were `ADDRESSED`; no new Critical/Important breakage. The reviewer recorded stale concurrent `RunService._persist_status` as out-of-scope because that code was unchanged in the fix diff; retain it for the final whole-branch review.
 - Controller verification: `uv run pytest -q`, `uv run ruff check .`, `uv run mypy src`, `uv lock --check`, and `git diff --check f154bba..f9394d7` passed. Direct offline demo returned `completed/success`, observed feedback/guardrail/memory, and wrote `answer.py` with `return 2`; SQLite persisted `runs.state=completed` in the regression test.
 - Decision: CORE-10 complete; proceed to CORE-11 Keyring Credentials. The demo's `total_model_calls=5` remains configuration-only and is not a product-wide turn cap.
+
+### 2026-08-09 01:21:53 Asia/Shanghai — CORE-11 keyring credentials
+
+- Task: CORE-11; triggered `test-driven-development` and `verification-before-completion`.
+- TDD RED: focused credential tests failed during collection with `ModuleNotFoundError: No module named 'coding_harness.adapters.credentials'`.
+- Implementation: injected `CredentialStore` boundary, secret-free `CredentialStatus`/`SecretReference`, OS keyring adapter, provider isolation, idempotent clear, and explicit opt-in `CODING_HARNESS_<PROVIDER>_API_KEY` fallback.
+- GREEN: focused suite 4 passed; full suite 114 passed; Ruff and mypy passed. Captured-output assertions contain no key-like values.
+- Report: `.superpowers/sdd/2026-08-08-613-coding-core/task-11-report.md`.
+- Lesson: keep credential references opaque and defer any raw-secret injection to a separately governed provider boundary.
