@@ -122,7 +122,7 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 
 ## CI and Deployment Manifest Evidence
 
-- Status: repository configuration complete in the current task; Docker source-copy order fixed, GitLab/GitHub CI container jobs added, and `render.yaml` declares an operator-controlled Web Service.
+- Status: repository configuration complete in `0d8d63a`; Docker source-copy order fixed, GitLab/GitHub CI container jobs added, and `render.yaml` declares an operator-controlled Web Service.
 - Verification: distribution-focused suite passed 7; Docker build attempt failed at external Docker Hub token retrieval, so no Docker or deployment success is claimed.
 - Boundary: remote CI final status and public URL require a configured forge/deployment account.
 

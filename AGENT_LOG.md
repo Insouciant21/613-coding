@@ -477,5 +477,5 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Finding: Docker build order copied `src/` after `uv sync`; GitLab CI did not build the selected container; no GitHub Actions or operator deployment manifest existed.
 - Implementation: copied `src/` before project sync, added GitLab `docker-build`, added GitHub push/PR jobs for tests/quality/demo/package/container, and added `render.yaml` with Docker health check metadata.
 - Verification: distribution-focused suite passed 7; full `uv run pytest -q` passed 235 tests; Ruff, mypy, `uv lock --check`, `git diff --check`, and `uv build` passed. Docker build was attempted and remains blocked by Docker Hub token connection reset.
-- Commit: pending in this task; no public URL or remote pipeline result is claimed.
+- Commit: `0d8d63a`; no public URL or remote pipeline result is claimed.
 - Lesson: CI/deployment declarations improve reproducibility but are not substitutes for a recorded remote pass or deployed endpoint.

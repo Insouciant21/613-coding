@@ -325,6 +325,7 @@ Every completed plan task must link a commit and fresh verification output here.
 ## CI and Deployment Manifest Evidence
 
 - Verification timestamp: `2026-08-09 07:14:20 Asia/Shanghai`.
+- Implementation commit: `0d8d63a`.
 - Distribution-focused suite passed 7; Ruff, mypy, and `git diff --check` passed.
 - Docker build was attempted and failed only while fetching the Docker Hub OAuth token due to connection reset; no image smoke pass is claimed.
 - GitLab/GitHub workflow files and Render manifest are configuration evidence only; no remote CI result or public URL is claimed.
