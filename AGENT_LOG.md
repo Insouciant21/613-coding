@@ -439,5 +439,15 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: `uv run pytest -q tests/sandbox/test_docker_runtime.py::test_execute_enforces_runtime_timeout` failed because no `kill` event was emitted.
 - Fix: timeout paths now call the container `kill` API, mark the runtime record terminated, and make cleanup skip redundant `stop` while still force-removing the container.
 - GREEN: the focused timeout pair passed 2 tests; full `uv run pytest -q` passed 225 tests; Ruff, mypy, `uv lock --check`, and `git diff --check` passed.
-- Commit: pending in this task; no credentials, network calls, or user-owned untracked files were touched.
+- Commit: `f5d62a9`; no credentials, network calls, or user-owned untracked files were touched.
 - Lesson: a host timeout result is insufficient evidence of sandbox enforcement; the worker lifecycle must be terminated at the runtime boundary.
+
+### 2026-08-09 06:47:21 Asia/Shanghai - SANDBOX-03 disk quota wiring
+
+- Task: close the Docker runtime disk-limit gap found during the delivery audit.
+- Root cause: `ResourceLimits.disk_bytes` was validated by policy but omitted from `containers.create` options.
+- TDD RED: the hardened-container test failed with `KeyError: storage_opt`.
+- Fix: Docker options now pass `storage_opt={"size": str(disk_bytes)}`; deployment documentation records the required storage-driver project-quota support and cleanup behavior on unsupported daemons.
+- GREEN: focused Docker configuration and timeout tests passed 2; final `uv run pytest -q` passed 225 tests; Ruff, mypy, `uv lock --check`, `git diff --check`, and `uv build` passed.
+- Commit: `b5cff85`.
+- Human intervention: none; protected user-owned untracked paths.

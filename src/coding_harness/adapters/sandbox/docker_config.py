@@ -26,5 +26,7 @@ def container_options(spec: SandboxSpec, workspace_path: Path) -> dict[str, Any]
         "pids_limit": limits.pids,
         "mem_limit": limits.memory_bytes,
         "nano_cpus": 1_000_000_000,
+        # Requires a Docker storage driver with project-quota support.
+        "storage_opt": {"size": str(limits.disk_bytes)},
         "volumes": {str(workspace_path): {"bind": "/workspace", "mode": "rw"}},
     }

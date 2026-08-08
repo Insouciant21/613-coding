@@ -117,6 +117,7 @@ def test_create_configures_hardened_container_and_start_order(tmp_path: Path) ->
     assert docker.create_options["read_only"] is True
     assert docker.create_options["network_disabled"] is True
     assert docker.create_options["cap_drop"] == ["ALL"]
+    assert docker.create_options["storage_opt"] == {"size": str(2 * 1024 * 1024 * 1024)}
     assert "/var/run/docker.sock" not in str(docker.create_options)
     runtime.destroy(handle)
 
