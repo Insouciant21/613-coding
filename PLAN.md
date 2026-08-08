@@ -26,7 +26,7 @@
 | Plan | Scope | Depends on | Status |
 | --- | --- | --- | --- |
 | `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | complete after final-review repair at `9af4f03` |
-| `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | in progress; SANDBOX-01 complete at `9df471d` |
+| `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | in progress; SANDBOX-02 implementation at `698863c`, review pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
 
@@ -137,3 +137,11 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Boundaries: specs enforce pinned SHA-256 image digests, non-root/read-only/capability-free workers, default-deny network, finite resources, and validated environment names. Handles expose only an opaque UUID and workspace path; the fake runtime records create/execute/export/destroy and rejects destroyed handles.
 - Workflow note: the external implementer's nested bwrap test process did not exit after the suite; the controller reproduced the same worktree successfully outside that nested sandbox and recorded the deviation in `AGENT_LOG.md` and the task report.
 - Review fix: positive infinity was accepted for CPU and timeout limits. Focused RED produced 2 failed and 7 passed; the finite-value constraint then passed 9 focused and 135 full-suite tests. Ruff, mypy, lock, and diff checks passed. Scoped re-review marked the finding `ADDRESSED` with no new Critical/Important breakage or out-of-scope observations.
+
+## SANDBOX-02 Task Evidence
+
+- Status: implementation complete; independent spec-compliance and code-quality review pending.
+- Commit: `698863c` (`feat: isolate task workspaces and export artifacts`).
+- TDD evidence: initial focused collection failed with two missing-module errors. Controller hardening reproduced and fixed incomplete temporary-root cleanup, dotfile allowlist corruption, empty-allowlist fail-open behavior, ignored explicit empty baselines, and missing mode-only changes.
+- Verification: 12 focused workspace/artifact tests, 21 sandbox tests, and all 147 project tests passed. Ruff, mypy across 50 source files, `uv lock --check`, and `git diff --check` passed.
+- Boundaries: complete repository-shaped copies retain ignored/untracked files; canonical snapshots reject symlink escape; empty write sets deny changes; deterministic redacted artifacts include text, binary summaries, deletions, and Git mode changes; cleanup removes only complete manager-owned temporary roots.
