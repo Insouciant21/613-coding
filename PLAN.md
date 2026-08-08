@@ -38,8 +38,9 @@ The implementation critical path is `CORE → SANDBOX → MULTI_AGENT → DELIVE
 - [x] Root specification and process records created for review.
 - [x] Specification, root plan, four subsystem plans, and initial evidence records committed as `a2909c7`.
 - [x] User reviewed `SPEC.md` and `PLAN.md` without requested changes and selected Subagent-Driven execution on 2026-08-08.
-- [ ] A different agent type cold-starts one or two tasks with only `SPEC.md` and `PLAN.md` and records questions in `SPEC_PROCESS.md`.
-- [ ] Core implementation begins only after the cold-start findings are incorporated.
+- [x] A different agent type cold-started `CORE-01` and `CORE-02` with only `SPEC.md` and `PLAN.md`, recorded the dependency-bootstrap ambiguity, and produced a report referenced by `SPEC_PROCESS.md`.
+- [x] The cold-start findings were incorporated: standard-library package baseline, explicit dependency provisioning, air-gapped cache/wheelhouse requirement, and a `DEPENDENCY_PROVISIONING_BLOCKED` stop condition.
+- [ ] A fresh-agent recheck confirms the revised CORE-01 bootstrap instructions are unambiguous before implementation begins.
 - [ ] Each task receives spec-compliance review, code-quality review, fresh verification, a commit, and record updates.
 
 ## Task Index

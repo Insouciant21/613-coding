@@ -40,3 +40,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Human intervention: user selected Subagent-Driven execution and requested no changes to the submitted specification or plans.
 - Action: added `.worktrees/` to `.gitignore` before creating an isolated worktree, preserving the existing ignored documentation and scratch paths.
 - Next evidence: a different-model, no-history agent will receive only `SPEC.md` and `PLAN.md`, attempt selected planned tasks, and stop on ambiguity.
+
+### Cold-start trial and revision
+
+- Agent: fresh different-model agent in `/tmp/613-cold-start.T1D2Hh`; main workspace was not modified.
+- Requested tasks: `CORE-01` and `CORE-02` using only `SPEC.md` and linked plan files.
+- Result: CORE-01 reached package scaffolding; `uv run pytest` failed because the fresh environment had no pytest, Pydantic, Ruff, or mypy and no network cache. The report also identified an unspecified build-backend bootstrap path.
+- Evidence: `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`.
+- Human/agent response: revised `SPEC.md`, the approved design, and CORE-01/CORE-02 plan instructions to distinguish dependency provisioning from offline test execution; added a standard-library baseline test and an explicit `DEPENDENCY_PROVISIONING_BLOCKED` stop condition.

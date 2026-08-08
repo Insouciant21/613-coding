@@ -369,6 +369,8 @@ WebUI 展示：
 
 使用临时 Git 仓库和临时数据库验证真实文件、Git diff、子进程、超时、脱敏、容器生命周期和补丁集成。测试默认无网络、无真实 LLM。
 
+“测试默认无网络”指依赖已经通过 `uv sync --all-extras --frozen` 预置后的运行阶段，而不是声称一个没有 pytest、Pydantic 或 wheel cache 的全新离线环境可以自动完成首次安装。首次安装可使用 registry；气隙环境必须提供预置 uv cache 或 wheelhouse，并使用 `uv sync --all-extras --frozen --offline`。第一个包结构测试只使用标准库 `unittest`，用来验证第三方开发依赖安装前的源目录和版本导出。
+
 ### 17.3 确定性机制演示
 
 mock 场景固定复现：

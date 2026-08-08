@@ -66,7 +66,28 @@ This file records the human decisions and evidence that produced the approved 61
 
 ## Cold-Start Validation
 
-Status: not yet performed. Before implementation code is written, a different agent type must receive only `SPEC.md` and `PLAN.md`, choose one or two tasks, stop on ambiguity, and produce evidence. Findings and before/after revisions must be recorded here.
+### Trial
+
+- Date: 2026-08-08.
+- Agent: fresh different-model agent, with no conversation history.
+- Supplied material: only `SPEC.md`, `PLAN.md`, and the detailed plan files linked from `PLAN.md` in a temporary `/tmp` archive of commit `66f3bce`.
+- Requested tasks: `CORE-01` and `CORE-02`.
+- Isolation note: `git worktree add` was blocked because the environment could not create Git ref lock files. The trial therefore used the temporary archive and did not modify the main workspace.
+- Report: `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`.
+
+### Findings
+
+1. The plan used `uv run pytest` before defining how a fresh, network-restricted environment obtains pytest.
+2. CORE-02 required Pydantic, but the bootstrap path did not say whether Pydantic is preinstalled, cached, vendored, or fetched.
+3. `uv` could not build the temporary project without an explicitly documented build-backend/bootstrap decision.
+
+### Revision After Trial
+
+- Before: the specification said tests run offline and CORE-01 immediately ran `uv run pytest`.
+- After: the specification distinguishes first-time dependency provisioning from offline test execution. `uv sync --all-extras --frozen` is the online bootstrap; `uv sync --all-extras --frozen --offline` requires a populated uv cache or wheelhouse and fails clearly otherwise.
+- Before: the first test assumed pytest was installed.
+- After: CORE-01 uses standard-library `unittest` with `PYTHONPATH=src` and introduces `scripts/bootstrap_dev.py` plus `docs/development.md`. CORE-02 now has a hard prerequisite that Pydantic and pytest be provisioned.
+- Result: the plan now tells a fresh agent exactly which check to run, how to distinguish an environment block from a code failure, and when to pause rather than guess.
 
 ## Reflection Notes
 

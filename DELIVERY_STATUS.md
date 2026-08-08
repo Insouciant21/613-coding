@@ -9,7 +9,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Approved design | complete | `docs/superpowers/specs/2026-08-07-613-coding-design.md`; commits `6ad0eec`, `c4fd219`, `ba03b70` | none |
 | `AGENTS.md` workflow rules | complete | `AGENTS.md`; commit `ba03b70` | keep updated per task |
 | `SPEC.md` | approved | `SPEC.md`; commit `a2909c7`; user selected Subagent-Driven on 2026-08-08 | complete cold-start validation |
-| `SPEC_PROCESS.md` | in progress | `SPEC_PROCESS.md` | add cold-start evidence |
+| `SPEC_PROCESS.md` | in progress | `SPEC_PROCESS.md`; `/tmp/613-cold-start.T1D2Hh/cold-start-report.md` | cold-start revision review |
 | `PLAN.md` | approved | `PLAN.md`, `docs/superpowers/plans/`; commit `a2909c7`; user selected Subagent-Driven on 2026-08-08 | complete cold-start validation |
 | `AGENT_LOG.md` | active | `AGENT_LOG.md` | append every significant task |
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
@@ -21,7 +21,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | GitLab CI `unit-test` job | not started | no `.gitlab-ci.yml` yet | last pipeline must pass |
 | Public WebUI URL | not started | no deployment yet | deploy isolated demonstration |
 | Reflection | not started | no `REFLECTION.md` yet | student-authored final report |
-| Cold-start implementation trial | pending gate | required by `AGENTS.md` | use a different agent type with only SPEC + PLAN |
+| Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision recorded in `SPEC_PROCESS.md` | recheck revised bootstrap instructions |
 
 ## Recording Rules
 

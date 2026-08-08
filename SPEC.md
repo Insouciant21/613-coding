@@ -74,7 +74,8 @@ The public WebUI runs only a packaged example repository or isolated uploaded co
 ## 4. Non-Functional Requirements
 
 - Python 3.12 or newer, dependencies and builds managed by `uv`.
-- Core unit tests run offline with no real LLM, embedding service, Docker daemon, or API key.
+- Core unit tests run offline with no real LLM, embedding service, Docker daemon, or API key after dependencies have been provisioned.
+- First-time dependency provisioning is explicit: `uv sync --all-extras --frozen` may use a registry; an air-gapped environment must provide a populated uv cache or documented wheelhouse. `uv sync --all-extras --frozen --offline` fails fast with remediation when neither is available.
 - Tool calls, state transitions, feedback, approvals, worker artifacts, and resource use are structured and auditable.
 - Persisted output is redacted before storage; API keys never enter source, databases, logs, prompts, subprocess arguments, or containers.
 - Subprocesses have explicit working directories, environment allowlists, timeouts, output caps, and resource limits.
@@ -109,6 +110,8 @@ Feedback classification is the main contribution because it is objective, determ
 ## 9. Testing And Mechanism Demonstration
 
 Unit tests cover loop transitions, tool schemas, policy, approvals, classifiers, no-progress detection, budgets, SQLite/LanceDB retrieval, credentials, task scheduling, artifacts, and sandbox lifecycle. Integration tests use temporary Git repositories and controlled subprocess/container fixtures.
+
+The initial package-scaffold test uses only the Python standard-library `unittest` runner so a fresh environment can verify the source layout before third-party development tools are installed. Pydantic, pytest, Ruff, mypy, FastAPI, LanceDB, Docker, and provider adapters begin only after the documented dependency-provisioning check succeeds.
 
 The offline demo must reproduce: planner task graph creation; wrong coder patch; tester `test_failure`; feedback-driven repair; reviewer approval; Supervisor integration; dangerous-action blocking; strict/balanced/autonomous differences; vector-memory retrieval; and worker cleanup. A real LLM run is supplementary evidence only.
 
