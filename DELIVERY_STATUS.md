@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-08 23:14:22 (Asia/Shanghai)
-Responsible actor: `/root` controller; latest implementation commit `2dd32f9` (CORE-10, task review pending).
+Last updated: 2026-08-09 00:28:57 (Asia/Shanghai)
+Responsible actor: `/root` controller; latest CORE-10 fix commit `d705637` (scoped re-review pending).
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -14,8 +14,8 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | `PLAN.md` | approved with bootstrap revision | `PLAN.md`, `docs/superpowers/plans/`; commits `a2909c7`, `fc7bf53`; user selected Subagent-Driven on 2026-08-08 | begin CORE-01 |
 | `AGENT_LOG.md` | active | `AGENT_LOG.md` | append every significant task |
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
-| Source implementation | CORE-01 through CORE-09 complete; CORE-10 under review | task evidence in `PLAN.md` and `AGENT_LOG.md`; CORE-10 commit `2dd32f9` | complete independent CORE-10 review |
-| Mock-LLM mechanism tests | core demo complete, review pending | scripted adapter tests plus offline feedback/repair demo in `tests/demo`; commit `2dd32f9` | complete CORE-10 task review |
+| Source implementation | CORE-01 through CORE-09 complete; CORE-10 fix round review pending | task evidence in `PLAN.md` and `AGENT_LOG.md`; CORE-10 commits `2dd32f9`, `d705637` | complete independent CORE-10 re-review |
+| Mock-LLM mechanism tests | persisted core demo complete, review pending | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9`, `d705637` | complete CORE-10 task review |
 | Container sandbox | not started | no Docker runtime yet | run lifecycle/security tests |
 | Multi-agent orchestration | not started | no Supervisor yet | run task-graph/worker tests |
 | README and distribution | not started | no package or Dockerfile yet | verify `uv tool install` and Docker demo |
@@ -83,12 +83,12 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 
 ## CORE-10 Evidence
 
-- Verification timestamp: `2026-08-08 23:14:22 Asia/Shanghai`.
-- Status: implementation complete; independent task review pending; commit `2dd32f9`.
-- Tests: 12 focused approval/loop/demo tests and all 84 project tests passed.
+- Verification timestamp: `2026-08-09 00:28:57 Asia/Shanghai`.
+- Status: implementation plus persistence/audit fix round complete; independent scoped re-review pending; commits `2dd32f9`, `d705637`.
+- Tests: 36 focused approval/loop/storage/demo/model tests and all 98 project tests passed.
 - Static gates: Ruff, mypy, and `uv lock --check` passed.
-- Mechanism: invalid actions, policy deny/ask/allow, exact approval resume/reject/expiry, objective validation freshness, no progress, cancellation, and four budget types remain deterministic and injectable.
-- Demo boundary: scripted mock LLM only; explicit `total_model_calls=5` is demo configuration, not a product-wide limit; no credentials or network calls.
+- Mechanism: invalid actions, policy deny/ask/allow, cross-process exact approval resume/reject/expiry, persisted budget limits/usage and validation freshness, objective completion blockers, terminal audit records, no progress, cancellation, and four budget types remain deterministic and injectable.
+- Demo check: direct SQLite inspection observed `completed/success`, `runs.state=completed`, three iterations, and one loop-session snapshot. Scripted mock LLM only; explicit `total_model_calls=5` is demo configuration, not a product-wide limit; no credentials or network calls.
 
 ## Recording Rules
 

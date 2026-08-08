@@ -33,3 +33,7 @@ Task 7: complete (commit 8956821; 49 full-suite tests, Ruff, and mypy clean)
 Task 8: complete (commit 1e01249; 68 full-suite tests, Ruff, and mypy clean)
 
 Task 9: complete (commit 86c4633; 75 full-suite tests, Ruff, mypy, and lock check clean)
+
+Task 10: fix round 1/5 (task review: 2 Critical, 5 Important, 2 spec-required Minor findings open; review head f154bba)
+
+- Implemented in `d705637`; focused 36-test and full 98-test gates, Ruff, mypy, and lock check clean. The controller verified the demo's SQLite terminal state directly. Scoped re-review is pending because this resumed environment did not expose a dispatch path after the reviewer completed; do not mark Task 10 complete until that gate runs.

@@ -103,8 +103,8 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 ## CORE-10 Task Evidence
 
-- Status: implementation complete; independent task review pending.
-- Commit: `2dd32f9` (`feat: implement feedback-driven agent loop`).
-- TDD evidence: focused REDs exposed ignored post-provider cost exhaustion, eager dependency-factory evaluation, rejected approvals waiting forever, and missing expiry termination.
-- Verification: 12 focused approval/loop/demo tests and all 84 project tests passed; Ruff, mypy, and `uv lock --check` passed.
-- Boundaries: the repository owns the state machine; objective validation controls `finish`; the offline demo uses a scripted LLM and an explicit five-call demo budget only.
+- Status: implementation plus fix round complete; independent scoped re-review pending.
+- Commits: `2dd32f9` (`feat: implement feedback-driven agent loop`); `d705637` (`fix: persist and audit agent loop state`).
+- TDD evidence: focused REDs exposed ignored post-provider cost exhaustion, eager dependency-factory evaluation, rejected/expired approvals waiting forever, process-local sessions/approvals/budgets, inaccurate iteration transitions, unhandled dependency exceptions, terminal cancellation mutation, unresolved-feedback finish, and an unpersisted demo terminal state.
+- Verification: 36 focused approval/loop/storage/demo/model tests and all 98 project tests passed; Ruff, mypy, and `uv lock --check` passed.
+- Boundaries: SQLite persists serializable loop session, approval, budget, validation, and audit state; runtime dependencies are reconstructed through the factory. The repository owns the loop; objective validation controls `finish`; the offline demo uses a scripted LLM and an explicit five-call demo budget only.

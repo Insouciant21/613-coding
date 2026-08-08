@@ -176,3 +176,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commit: `2dd32f9` (`feat: implement feedback-driven agent loop`).
 - Verification: 12 focused tests passed; all 84 project tests passed; Ruff, mypy, and `uv lock --check` passed. No real LLM, network request, API key, or high-level agent framework was used.
 - Human intervention: the user confirmed continuing the approved CORE-10 review criteria. Lesson: budget checks must gate actions after provider accounting, and approval resumption must inspect request state rather than infer it from token consumption alone.
+
+### 2026-08-09 00:28:57 Asia/Shanghai — CORE-10 persistence and audit fix round
+
+- Task: CORE-10 fix round 1; triggered `receiving-code-review`, `systematic-debugging`, `test-driven-development`, and `verification-before-completion`.
+- Review findings addressed: moved resumable session/approval state from process-local dictionaries to SQLite; restored exact pending actions, budget limits/usage, validation freshness, evidence, blockers, and iteration counters after a new `RunService`; added policy/schema evidence and accurate terminal records; mapped dependency exceptions to terminal states; made terminal cancellation immutable; blocked finish until feedback is resolved; and routed the demo through `RunService`.
+- TDD RED/GREEN: 36 focused tests cover persistent approval/resume/reject, terminal records, exception boundaries, completion blocking, terminal immutability, budget configuration reconstruction, and demo run persistence. Full offline suite: 98 passed. Ruff, mypy, and lock check passed.
+- Commit: `d705637` (`fix: persist and audit agent loop state`). Direct demo inspection produced `completed/success`, `stored_run_state=completed`, three iterations, one loop-session snapshot, and zero approval records for the balanced-mode scenario.
+- Workflow deviation: the assigned fix implementer experienced one transient 503, resumed, then continued writing a valid budget-limit persistence test after the controller's first commit but did not report or commit. The controller preserved that change, re-ran all gates, amended `d705637`, and completed the audit. The scoped re-review dispatch is unavailable in this resumed tool context, so this task remains review-pending rather than complete.
+- Lesson: persistence correctness requires keeping both limits and consumption state; restoring only counters lets a restarted dependency factory silently alter a run's budget semantics.
