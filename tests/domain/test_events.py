@@ -13,7 +13,10 @@ def test_event_new_sets_version_uuid_and_redacts_sensitive_payload() -> None:
     event = Event.new(
         "tool.completed",
         uuid4(),
-        {"api_key": "secret-value", "nested": {"password": "pw", "ok": "value"}},
+        {
+            "api_key": "secret-value",
+            "nested": {"password": "pw", "ok": "value", "monkey": "banana"},
+        },
         datetime.now(UTC),
     )
     assert event.version == 1
@@ -21,6 +24,7 @@ def test_event_new_sets_version_uuid_and_redacts_sensitive_payload() -> None:
     assert event.payload["api_key"] == "[REDACTED]"
     assert event.payload["nested"]["password"] == "[REDACTED]"
     assert event.payload["nested"]["ok"] == "value"
+    assert event.payload["nested"]["monkey"] == "banana"
 
 
 def test_event_rejects_naive_timestamp_and_round_trips_json() -> None:

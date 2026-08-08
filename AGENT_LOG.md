@@ -103,3 +103,10 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 
 - Commit: `59bc4f2` (`feat: define harness domain contracts`).
 - Fresh verification after commit: 7 domain tests passed; Ruff and mypy passed; unrelated user files remain untouched.
+
+### 2026-08-08 22:14:24 Asia/Shanghai — CORE-02 review fix
+
+- Finding: sensitive-key redaction used substring matching and incorrectly redacted the ordinary key `monkey`.
+- TDD RED: the focused event test failed with `[REDACTED] != banana`.
+- Fix: tokenize snake/camel/hyphenated keys and redact only explicit secret parts or qualified key names; require the explicit event timestamp specified by CORE-02.
+- GREEN: 7 domain tests passed; Ruff and mypy passed.

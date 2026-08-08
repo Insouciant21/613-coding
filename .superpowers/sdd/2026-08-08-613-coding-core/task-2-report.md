@@ -10,4 +10,6 @@ Checks: `uv run --no-sync ruff check src/coding_harness/domain tests/domain` pas
 
 Scope: strict domain models, discriminated tool/finish actions, terminal-state validation, timezone-aware timestamps, versioned UUID events, recursive sensitive-key redaction, and JSON round trips.
 
+Review fix: a focused RED test proved that the initial sensitive-key matcher incorrectly redacted `monkey`. The matcher now tokenizes keys, the focused test and full domain suite pass, and `Event.new` requires its explicit timestamp as specified.
+
 Provisioning note: development tools are provisioned in `.venv`; full runtime sync remains blocked by uncached LanceDB/PyArrow wheels.

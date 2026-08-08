@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-08 22:08:51 (Asia/Shanghai)
+Last updated: 2026-08-08 22:14:24 (Asia/Shanghai)
 Responsible actor: `/root` controller; CORE-01 implementation/review commits `4d51108`, `3b0ea0e`; CORE-02 implementation commit `59bc4f2`.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -30,6 +30,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - Commit: `59bc4f2`.
 - Domain tests: 7 passed with `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src uv run --no-sync pytest tests/domain -q`.
 - Ruff and mypy: passed for `src/coding_harness/domain` and `tests/domain`.
+- Scoped review fix: false-positive `monkey` redaction reproduced and fixed; explicit event timestamp enforced.
 
 ## Recording Rules
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -11,11 +11,18 @@ from pydantic import Field, field_validator
 
 from .models_base import DomainModel
 
-_SENSITIVE_KEY = re.compile(r"(?:key|token|secret|password|credential)", re.IGNORECASE)
+_SENSITIVE_PARTS = {"credential", "password", "secret", "token"}
+_KEY_QUALIFIERS = {"api", "encryption", "private", "secret", "signing"}
+
+
+def _is_sensitive_key(key: str) -> bool:
+    snake_case = re.sub(r"(?<!^)(?=[A-Z])", "_", key).lower()
+    parts = set(filter(None, re.split(r"[-_\s]+", snake_case)))
+    return bool(parts & _SENSITIVE_PARTS) or ("key" in parts and bool(parts & _KEY_QUALIFIERS))
 
 
 def _redact(value: Any, key: str | None = None) -> Any:
-    if key is not None and _SENSITIVE_KEY.search(key):
+    if key is not None and _is_sensitive_key(key):
         return "[REDACTED]"
     if isinstance(value, dict):
         return {
@@ -48,11 +55,11 @@ class Event(DomainModel):
         event_type: str,
         run_id: UUID,
         payload: dict[str, Any],
-        timestamp: datetime | None = None,
+        timestamp: datetime,
     ) -> Event:
         return cls(
             event_type=event_type,
             run_id=run_id,
             payload=_redact(payload),
-            timestamp=timestamp or datetime.now(UTC),
+            timestamp=timestamp,
         )
