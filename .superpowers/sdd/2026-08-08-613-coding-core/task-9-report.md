@@ -2,7 +2,7 @@
 
 Status: implementation complete; scoped verification clean.
 
-Commit: pending at report creation.
+Commit: `86c4633` (`feat: add structured and vector memory`).
 
 TDD RED: memory/context tests failed during collection because embedding, memory, LanceDB, and context modules did not exist. Focused REDs later exposed missing permission filters in the vector query and single-word-only SQLite fallback.
 

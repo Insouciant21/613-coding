@@ -98,5 +98,5 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 ## CORE-09 Task Evidence
 
-- Status: implementation complete; commit hash is recorded after commit.
+- Status: complete; commit `86c4633`; scoped memory/privacy review clean.
 - Verification: 7 focused real SQLite/LanceDB/context tests and all 75 project tests passed; Ruff, mypy, and `uv lock --check` passed.

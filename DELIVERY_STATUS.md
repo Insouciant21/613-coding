@@ -77,7 +77,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 ## CORE-09 Evidence
 
 - Verification timestamp: `2026-08-08 22:56:36 Asia/Shanghai`.
-- Status: implementation complete; commit pending at evidence creation.
+- Status: complete; commit `86c4633`.
 - Tests: 7 focused SQLite/LanceDB/context tests and all 75 project tests passed.
 - Memory boundary: SQLite stores authoritative redacted text; LanceDB stores rebuildable IDs, filters, and vectors only; final permission filtering occurs after SQLite reload.
 
