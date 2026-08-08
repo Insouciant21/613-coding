@@ -76,6 +76,12 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - Verification: WebUI/API suite passed 7 tests; full suite passed 212 tests; Ruff and mypy passed; `/`, CSS, and JS smoke returned 200.
 - Boundaries: the responsive console consumes API routes only and exposes no credential material; Open Design MCP was unavailable and was not installed.
 
+## DELIVERY-05 Task Evidence
+
+- Status: complete for package artifacts; commit `a0f55b4`; report `.superpowers/sdd/2026-08-08-613-coding-delivery/task-5-report.md`.
+- Verification: distribution suite passed 4 tests; full suite passed 216 tests; `uv build`, Ruff, and mypy passed. Docker build was attempted and blocked by Docker Hub token network reset.
+- Boundaries: installed `coding-harness` entrypoint and `web` command are present; Docker image runs non-root with healthcheck and no socket mount.
+
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 
 ## CORE-01 Task Evidence
