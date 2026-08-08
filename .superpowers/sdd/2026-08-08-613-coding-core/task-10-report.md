@@ -23,3 +23,15 @@ TDD RED: 14 new loop/storage/demo behaviors initially failed because session and
 GREEN: `uv run pytest tests/application/test_loop.py tests/application/test_approvals.py tests/demo/test_core_feedback.py tests/domain/test_models.py tests/adapters/storage/test_sqlite.py -q` passed with 36 tests. `uv run pytest -q` passed with 98 tests. `uv run ruff check .`, `uv run mypy src`, and `uv lock --check` passed.
 
 Workflow concern: the fix implementer encountered a transient 503, resumed once, then stopped responding after reaching a green working tree without writing its report or commit. The controller preserved its changes, independently reran focused/full/static gates, audited the diff, and completed the report and commit. No unrelated user files were staged.
+
+## CORE-10 Fix Round 1 - Recovery Hardening
+
+Review base: `aceee71`.
+
+Findings addressed: redaction for iteration/session/approval payloads; atomic approval claims and iteration/session/approval completion; current-policy re-evaluation before approved execution; execution-uncertainty pause behavior; cancellation invalidation; persisted classifier and budget-limit state; unresolved policy blockers; validated dependency return values; and exact model-call accounting.
+
+TDD RED: `uv run pytest tests/application/test_approvals.py tests/application/test_loop.py tests/adapters/storage/test_sqlite.py -q` failed with 11 failures and 28 passes, covering non-atomic claims, leaked payloads, stale approvals, policy bypass, cleared policy risk, malformed dependency returns, and rejected budget usage. Additional focused RED tests for atomic loop-state rollback, classifier restoration, and secret-bearing action denial failed 3 of 3 before implementation.
+
+GREEN: `uv run pytest tests/application/test_approvals.py tests/application/test_feedback.py tests/application/test_policy.py tests/application/test_loop.py tests/adapters/storage/test_sqlite.py -q` passed with 66 tests. `uv run pytest -q` passed with 110 tests. `uv run ruff check .`, `uv run mypy src`, `uv lock --check`, and `git diff --check` passed.
+
+Implementation commit: `06b397e` (`fix: harden persisted agent loop recovery`). Unrelated untracked user and course files were not staged.
