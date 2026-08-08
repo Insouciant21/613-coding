@@ -13,9 +13,9 @@ Task 1: fix round 1/5 (4 addressed, 0 open; commits 4d51108..3b0ea0e)
 
 Task 1: complete (commits 4d51108..3b0ea0e, review repair applied; scoped evidence verified)
 
-Task 2: fix round 1/5 (1 addressed, 0 open; commit pending)
+Task 2: fix round 1/5 (1 addressed, 0 open; commit 69b1c59)
 
 - Addressed false-positive sensitive-key redaction (`monkey`) with a focused RED test and token-aware matcher.
 - Aligned `Event.new` with the required explicit timestamp parameter.
 
-Task 2: complete (implementation commit 59bc4f2; review-fix commit pending; scoped verification clean)
+Task 2: complete (commits 59bc4f2..69b1c59; scoped verification clean)

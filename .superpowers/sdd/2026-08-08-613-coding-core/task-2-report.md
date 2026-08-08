@@ -2,7 +2,7 @@
 
 Status: implementation complete; controller-local review evidence recorded because the finished implementation agent could not be re-triggered in this continuation.
 
-Commit: `59bc4f2` (`feat: define harness domain contracts`); evidence follow-up commit pending.
+Commits: `59bc4f2` (`feat: define harness domain contracts`), `2934063` (delivery evidence), and `69b1c59` (`fix: tighten event payload redaction`).
 
 TDD evidence: `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src uv run --no-sync pytest tests/domain -q` first failed during collection with missing `coding_harness.domain.events` and `coding_harness.domain.actions`; after implementation, 7 tests passed.
 
