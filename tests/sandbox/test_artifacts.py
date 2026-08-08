@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -136,6 +137,26 @@ def test_collect_rejects_fabricated_workspace_before_reading_host_path(tmp_path:
 
     with pytest.raises(WorkspacePathError, match="created by manager"):
         ArtifactExporter(manager).collect(foreign, foreign.baseline)
+
+
+def test_collect_rejects_workspace_directory_replaced_by_external_symlink(tmp_path: Path) -> None:
+    source = _repo(tmp_path)
+    manager = WorkspaceManager(tmp_path / "workspaces")
+    workspace = manager.create(source, "run", "worker")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.txt").write_text("do-not-export")
+    workspace_path = workspace.path
+    manager_temp = workspace_path.parent
+    shutil.rmtree(workspace_path)
+    workspace_path.symlink_to(outside, target_is_directory=True)
+
+    try:
+        with pytest.raises(WorkspacePathError, match="canonical|symlink"):
+            ArtifactExporter(manager).collect(workspace, workspace.baseline)
+    finally:
+        workspace_path.unlink()
+        shutil.rmtree(manager_temp)
 
 
 def test_collect_redacts_changed_paths_mapping_keys_and_bytes(tmp_path: Path) -> None:

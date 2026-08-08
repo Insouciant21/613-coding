@@ -89,7 +89,12 @@ def _validate_symlinks(root: Path) -> None:
 def snapshot_tree(root: Path) -> dict[str, FileSnapshot]:
     """Return a stable snapshot of all working-tree files, including ignored files."""
 
-    root = _canonical(root)
+    requested_root = root.expanduser().absolute()
+    if requested_root.is_symlink():
+        raise WorkspacePathError("workspace root must not be a symlink")
+    root = _canonical(requested_root)
+    if root != requested_root:
+        raise WorkspacePathError("workspace root must be canonical")
     _validate_symlinks(root)
     snapshots: dict[str, FileSnapshot] = {}
     for path in sorted(root.rglob("*")):
@@ -181,3 +186,10 @@ class WorkspaceManager:
         record = self._owned.get(id(workspace))
         if record is None or record[0] is not workspace:
             raise WorkspaceIntegrityError("workspace was not created by manager")
+        path = workspace.path
+        if path.is_symlink():
+            raise WorkspaceIntegrityError("workspace root must not be a symlink")
+        if not path.is_dir():
+            raise WorkspaceIntegrityError("workspace root must be an existing directory")
+        if path.resolve(strict=True) != path:
+            raise WorkspaceIntegrityError("workspace root is not canonical")
