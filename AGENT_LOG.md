@@ -431,3 +431,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - External boundary: no Git remote, GitLab pipeline, deployment credential, or public URL is available in this workspace, so none is claimed.
 - Human intervention: none; protected `.claude/` and the two user-owned requirement documents.
 - Lesson: delivery indexes must not lag behind implementation evidence, and unverified remote state must remain explicitly open.
+
+### 2026-08-09 06:43:06 Asia/Shanghai - SANDBOX-03 timeout termination hardening
+
+- Task: audit and repair the Docker sandbox command-timeout boundary.
+- Root cause: `DockerSandboxRuntime` returned a timed-out result after cancelling only the host-side future; the container-side exec could continue running.
+- TDD RED: `uv run pytest -q tests/sandbox/test_docker_runtime.py::test_execute_enforces_runtime_timeout` failed because no `kill` event was emitted.
+- Fix: timeout paths now call the container `kill` API, mark the runtime record terminated, and make cleanup skip redundant `stop` while still force-removing the container.
+- GREEN: the focused timeout pair passed 2 tests; full `uv run pytest -q` passed 225 tests; Ruff, mypy, `uv lock --check`, and `git diff --check` passed.
+- Commit: pending in this task; no credentials, network calls, or user-owned untracked files were touched.
+- Lesson: a host timeout result is insufficient evidence of sandbox enforcement; the worker lifecycle must be terminated at the runtime boundary.

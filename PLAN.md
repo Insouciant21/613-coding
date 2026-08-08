@@ -95,6 +95,13 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - Boundaries: README/deployment docs state package, Docker, keyring, `.env`, public-demo, CI, SQLite/LanceDB, and runtime limitations; deployed URL remains explicitly unverified; `REFLECTION.md` contains no AI-written student narrative.
 - Final delivery index cleanup: `63c3646` records all DELIVERY statuses as complete and links the final verification evidence.
 
+## SANDBOX-03 Timeout Hardening Evidence
+
+- Status: complete; Docker runtime timeout termination repaired after audit.
+- TDD: the focused timeout test first failed because the container was not killed, then passed after the lifecycle fix.
+- Verification: focused timeout pair passed 2 tests; full suite passed 225 tests; Ruff, mypy, `uv lock --check`, and `git diff --check` passed.
+- Boundary: timed-out commands now terminate the container and cleanup force-removes it without a redundant stop call.
+
 ## Runtime Composition Repair Evidence
 
 - Status: complete; local composition is covered by `tests/application/test_composition.py` and commit `d657369`.

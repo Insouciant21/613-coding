@@ -50,6 +50,9 @@ class FakeContainer:
     def stop(self, **kwargs: object) -> None:
         self.events.append("stop")
 
+    def kill(self, **kwargs: object) -> None:
+        self.events.append("kill")
+
     def remove(self, **kwargs: object) -> None:
         self.events.append("remove")
 
@@ -163,6 +166,7 @@ def test_execute_enforces_runtime_timeout(tmp_path: Path) -> None:
     result = runtime.execute(handle, ("sleep", "10"))
 
     assert result.timed_out is True
+    assert "kill" in docker.container.events
     runtime.destroy(handle)
 
 

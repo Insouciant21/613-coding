@@ -23,12 +23,13 @@ class SandboxRuntimeError(RuntimeError):
 _TIMED_OUT = object()
 
 
-@dataclass(frozen=True)
+@dataclass
 class _RuntimeRecord:
     handle: SandboxHandle
     container: Any
     workspace: Workspace
     spec: SandboxSpec
+    terminated: bool = False
 
 
 class DockerSandboxRuntime:
@@ -80,6 +81,7 @@ class DockerSandboxRuntime:
         try:
             raw = self._exec_with_timeout(record, list(command_tuple))
         except TimeoutError:
+            self._terminate(record)
             return CommandResult(
                 command=command_tuple,
                 duration_seconds=time.monotonic() - started,
@@ -116,10 +118,11 @@ class DockerSandboxRuntime:
     def destroy(self, handle: SandboxHandle) -> None:
         record = self._record(handle)
         errors: list[Exception] = []
-        try:
-            record.container.stop()
-        except Exception as exc:  # noqa: BLE001
-            errors.append(exc)
+        if not record.terminated:
+            try:
+                record.container.stop()
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
         try:
             record.container.remove(force=True)
         except Exception as exc:  # noqa: BLE001
@@ -151,9 +154,17 @@ class DockerSandboxRuntime:
             return future.result(timeout=record.spec.resource_limits.timeout_seconds)
         except FutureTimeout:
             future.cancel()
+            DockerSandboxRuntime._terminate(record)
             return _TIMED_OUT
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
+
+    @staticmethod
+    def _terminate(record: _RuntimeRecord) -> None:
+        if record.terminated:
+            return
+        record.container.kill()
+        record.terminated = True
 
     @staticmethod
     def _output_bytes(output: Any) -> tuple[bytes, bytes]:

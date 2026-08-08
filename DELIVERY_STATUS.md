@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 06:32:20 (Asia/Shanghai)
+Last updated: 2026-08-09 06:43:06 (Asia/Shanghai)
 Responsible actor: `/root`; implementation and local delivery verification complete; remote CI/deployment evidence remains external.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -289,3 +289,10 @@ Every completed plan task must link a commit and fresh verification output here.
 - Current-state correction: the requirement table now marks package/Docker files and GitLab CI as implemented/configured with local evidence, while keeping remote pipeline, public URL, Docker registry access, and student reflection as explicitly unverified or reserved.
 - Docker boundary: an offline dependency-order simulation was blocked by the uncached `pyarrow==25.0.0` wheel; no Docker build or container smoke pass is claimed.
 - No remote CI/deployment claim is made because this workspace has no configured Git remote or deployment credentials.
+
+## SANDBOX-03 Timeout Hardening Evidence
+
+- Verification timestamp: `2026-08-09 06:43:06 Asia/Shanghai`.
+- TDD evidence: the timeout test failed before the fix because no container kill occurred; the focused timeout pair passed after the fix.
+- Fresh gates: full suite `225 passed`; Ruff, mypy, `uv lock --check`, and `git diff --check` passed.
+- Security boundary: Docker command timeout now kills the worker container before returning `timed_out`; cleanup force-removes the terminated container.
