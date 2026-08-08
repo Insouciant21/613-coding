@@ -63,5 +63,5 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 ## CORE-02 Task Evidence
 
-- Status: implementation complete; commit hash and review status are recorded after commit.
+- Status: implementation complete; commit `59bc4f2`; controller-local scoped review recorded in the task report.
 - Verification: `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src uv run --no-sync pytest tests/domain -q` passed with 7 tests; `uv run --no-sync ruff check src/coding_harness/domain tests/domain` passed; `uv run --no-sync mypy src/coding_harness/domain` passed.

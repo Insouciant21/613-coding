@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-08 22:07:39 (Asia/Shanghai)
-Responsible actor: `/root` controller; CORE-01 implementation/review commits `4d51108`, `3b0ea0e`; CORE-02 implementation commit pending.
+Last updated: 2026-08-08 22:08:51 (Asia/Shanghai)
+Responsible actor: `/root` controller; CORE-01 implementation/review commits `4d51108`, `3b0ea0e`; CORE-02 implementation commit `59bc4f2`.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -23,6 +23,13 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Public WebUI URL | not started | no deployment yet | deploy isolated demonstration |
 | Reflection | not started | no `REFLECTION.md` yet | student-authored final report |
 | Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |
+
+## CORE-02 Evidence
+
+- Verification timestamp: `2026-08-08 22:08:51 Asia/Shanghai`.
+- Commit: `59bc4f2`.
+- Domain tests: 7 passed with `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src uv run --no-sync pytest tests/domain -q`.
+- Ruff and mypy: passed for `src/coding_harness/domain` and `tests/domain`.
 
 ## Recording Rules
 

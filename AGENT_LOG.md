@@ -98,3 +98,8 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - GREEN: 7 domain tests passed; Ruff and mypy passed for the domain scope.
 - Implementation: added strict Pydantic enums/models, discriminated actions, terminal-state rules, timezone validation, versioned events, and recursive sensitive-key redaction.
 - Workflow deviation: the prior implementation agent had terminated and the collaboration namespace was unavailable in this continuation, so the controller implemented the task and recorded that deviation explicitly.
+
+### 2026-08-08 22:08:51 Asia/Shanghai — CORE-02 commit
+
+- Commit: `59bc4f2` (`feat: define harness domain contracts`).
+- Fresh verification after commit: 7 domain tests passed; Ruff and mypy passed; unrelated user files remain untouched.
