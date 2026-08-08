@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 05:55:00 (Asia/Shanghai)
-Responsible actor: `/root`; MULTI_AGENT phase complete through `376fd41`; proceed to DELIVERY.
+Last updated: 2026-08-09 06:32:20 (Asia/Shanghai)
+Responsible actor: `/root`; implementation and local delivery verification complete; remote CI/deployment evidence remains external.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -10,7 +10,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Approved design | complete | `docs/superpowers/specs/2026-08-07-613-coding-design.md`; commits `6ad0eec`, `c4fd219`, `ba03b70` | none |
 | `AGENTS.md` workflow rules | complete | `AGENTS.md`; commit `ba03b70` | keep updated per task |
 | `SPEC.md` | approved with bootstrap revision | `SPEC.md`; commits `a2909c7`, `fc7bf53`; cold-start report incorporated | begin CORE-01 |
-| `SPEC_PROCESS.md` | in progress | `SPEC_PROCESS.md`; `/tmp/613-cold-start.T1D2Hh/cold-start-report.md` | cold-start revision review |
+| `SPEC_PROCESS.md` | complete | `SPEC_PROCESS.md`; `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision `fc7bf53` | none |
 | `PLAN.md` | approved with bootstrap revision | `PLAN.md`, `docs/superpowers/plans/`; commits `a2909c7`, `fc7bf53`; user selected Subagent-Driven on 2026-08-08 | begin CORE-01 |
 | `AGENT_LOG.md` | active | `AGENT_LOG.md` | append every significant task |
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
@@ -18,10 +18,10 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
 | Container sandbox | complete | SANDBOX-01 `9df471d`; SANDBOX-02 `aa3600a`; SANDBOX-03 `3ec6ac1`; SANDBOX-04 `439540f`; SANDBOX-05 `fb1c222`; reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | retain regression gate |
 | Multi-agent orchestration | complete | MULTI-01 `9744339`; MULTI-02 `5910d7b`; MULTI-03 `43f51fc`; MULTI-04 `11eaef8`; MULTI-05 `376fd41`; reports under `.superpowers/sdd/2026-08-08-613-coding-multi-agent/` | retain regression gate |
-| README and distribution | not started | no package or Dockerfile yet | verify `uv tool install` and Docker demo |
-| GitLab CI `unit-test` job | not started | no `.gitlab-ci.yml` yet | last pipeline must pass |
-| Public WebUI URL | not started | no deployment yet | deploy isolated demonstration |
-| Reflection | not started | no `REFLECTION.md` yet | student-authored final report |
+| README and distribution | implemented; locally verified | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata; commits `773bc2a`, `a0f55b4`, `d657369` | Docker build/smoke requires registry access and approved image |
+| GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
+| Public WebUI URL | not verified | `docs/deployment.md` explicitly records no deployed URL | deploy isolated demonstration with user-controlled infrastructure |
+| Reflection | reserved for student | `REFLECTION.md` contains an explicit student-authored boundary and no AI-written narrative | student writes the final report |
 | Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |
 
 ## DELIVERY-01 Evidence
@@ -281,3 +281,11 @@ Every completed plan task must link a commit and fresh verification output here.
 - Repair commit: `d657369` wires the local service bundle and repository-scoped lifecycle commands.
 - Boundary: no deployed URL is claimed; Docker network failure remains visible; reflection narrative is reserved for the student.
 - Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-7-report.md`.
+
+## Delivery Audit Evidence
+
+- Verification timestamp: `2026-08-09 06:32:20 Asia/Shanghai`.
+- Fresh gates: `uv run pytest -q` passed 225 tests (one existing Starlette deprecation warning); Ruff passed; mypy passed for 80 source files; `uv lock --check` passed; `uv build` produced both distribution artifacts. `uv tool install . --offline` and its CLI help smoke passed; a live WebUI smoke returned `/healthz` 200 and `/` 200.
+- Current-state correction: the requirement table now marks package/Docker files and GitLab CI as implemented/configured with local evidence, while keeping remote pipeline, public URL, Docker registry access, and student reflection as explicitly unverified or reserved.
+- Docker boundary: an offline dependency-order simulation was blocked by the uncached `pyarrow==25.0.0` wheel; no Docker build or container smoke pass is claimed.
+- No remote CI/deployment claim is made because this workspace has no configured Git remote or deployment credentials.

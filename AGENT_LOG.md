@@ -420,3 +420,14 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Verification: API suite passed 5 tests; full suite passed 210 tests; Ruff and mypy passed; no secret-bearing error text is returned.
 - Commits: implementation `a8b1f63`; index `5c1b550`.
 - Protected unrelated untracked paths remain untouched.
+
+### 2026-08-09 06:32:20 Asia/Shanghai - delivery requirement audit
+
+- Task: audit the current delivery state against `AGENTS.md`, `SPEC.md`, `PLAN.md`, and both course requirement documents.
+- Finding: implementation files and `.gitlab-ci.yml` were present, but the top-level delivery index still contained stale `not started` entries for CI, distribution, and `SPEC_PROCESS.md`.
+- Action: corrected `DELIVERY_STATUS.md` to distinguish implemented/local evidence from remote CI and deployment evidence; preserved the explicit student-authored boundary in `REFLECTION.md`.
+- Fresh verification: `uv run pytest -q` passed 225 tests (one existing Starlette deprecation warning); `uv run ruff check .` passed; `uv run mypy src` passed for 80 source files; `uv lock --check` passed; `uv build` produced the sdist and wheel; `uv tool install . --offline` and the installed `coding-harness --help` smoke passed; a live `coding-harness web` smoke returned `/healthz` 200 and `/` 200.
+- Distribution boundary: a Docker dependency-order simulation could not complete offline because `pyarrow==25.0.0` was absent from the temporary cache; this is recorded as a provisioning limitation, not a Docker smoke pass.
+- External boundary: no Git remote, GitLab pipeline, deployment credential, or public URL is available in this workspace, so none is claimed.
+- Human intervention: none; protected `.claude/` and the two user-owned requirement documents.
+- Lesson: delivery indexes must not lag behind implementation evidence, and unverified remote state must remain explicitly open.
