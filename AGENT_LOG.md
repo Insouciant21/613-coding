@@ -362,6 +362,15 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commit pending: implementation and this evidence will be committed together.
 - Protected unrelated untracked paths remain untouched.
 
+### 2026-08-09 05:50:00 Asia/Shanghai - DELIVERY-04 operations WebUI
+
+- Task: DELIVERY-04; loaded `brainstorming` and `open-design-mode` as required for the interface work. Open Design MCP was unavailable, so no external artifact or install was attempted.
+- TDD RED: WebUI asset tests failed because the template/static assets were absent.
+- Implementation: added a responsive operations console, API-only state/event rendering, approval/resume/cancel controls, and FastAPI static/root serving; added README usage boundary.
+- Verification: WebUI/API focused tests passed 7; full suite passed 212 tests; Ruff and mypy passed; root/CSS/JS smoke returned HTTP 200.
+- Commit pending: implementation and evidence will be committed together.
+- Protected unrelated untracked paths remain untouched.
+
 ### 2026-08-09 05:42:00 Asia/Shanghai - DELIVERY-03 FastAPI API
 
 - Task: DELIVERY-03; followed `test-driven-development` and `verification-before-completion`.
