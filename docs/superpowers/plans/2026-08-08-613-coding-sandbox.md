@@ -16,7 +16,7 @@
 - Every lifecycle and resource decision is an event and is tested with a fake runtime without a Docker daemon.
 - Before each task commit, append actual task evidence to `AGENT_LOG.md` and `DELIVERY_STATUS.md`; after the commit, update `PLAN.md` with the hash.
 
-### Task SANDBOX-01: Sandbox Models And Runtime Port
+### Task 1: SANDBOX-01: Sandbox Models And Runtime Port
 
 **Files:**
 - Create: `src/coding_harness/domain/sandbox.py`
@@ -42,7 +42,7 @@ class SandboxRuntime(Protocol):
 - [ ] **Step 4: Run tests and type-check the sandbox port.**
 - [ ] **Step 5: Commit.** `git add src/coding_harness/domain/sandbox.py src/coding_harness/ports/sandbox.py src/coding_harness/adapters/sandbox/fake.py tests/sandbox && git commit -m "feat: define sandbox runtime contract"`.
 
-### Task SANDBOX-02: Task Workspace Copy And Artifact Export
+### Task 2: SANDBOX-02: Task Workspace Copy And Artifact Export
 
 **Files:**
 - Create: `src/coding_harness/adapters/sandbox/workspace.py`
@@ -58,7 +58,7 @@ class SandboxRuntime(Protocol):
 - [ ] **Step 4: Run tests on temporary repositories with symlinks and untracked files.**
 - [ ] **Step 5: Commit.** `git add src/coding_harness/adapters/sandbox/workspace.py src/coding_harness/adapters/sandbox/artifacts.py tests/sandbox && git commit -m "feat: isolate task workspaces and export artifacts"`.
 
-### Task SANDBOX-03: Docker Container Lifecycle
+### Task 3: SANDBOX-03: Docker Container Lifecycle
 
 **Files:**
 - Create: `src/coding_harness/adapters/sandbox/docker_runtime.py`
@@ -73,7 +73,7 @@ class SandboxRuntime(Protocol):
 - [ ] **Step 4: Run fake-client tests and a guarded local smoke test only when Docker is available.**
 - [ ] **Step 5: Commit.** `git add src/coding_harness/adapters/sandbox/docker_runtime.py src/coding_harness/adapters/sandbox/docker_config.py tests/sandbox && git commit -m "feat: run workers in temporary docker containers"`.
 
-### Task SANDBOX-04: Network, Resource, And Image Policy
+### Task 4: SANDBOX-04: Network, Resource, And Image Policy
 
 **Files:**
 - Modify: `src/coding_harness/application/policy.py`
@@ -88,7 +88,7 @@ class SandboxRuntime(Protocol):
 - [ ] **Step 4: Run tests and inspect event payloads for host paths/secrets.**
 - [ ] **Step 5: Commit.** `git add src/coding_harness/application/sandbox_policy.py src/coding_harness/application/policy.py tests/sandbox && git commit -m "feat: enforce sandbox resource and network policy"`.
 
-### Task SANDBOX-05: Sandbox Mechanism Demonstration And Verification
+### Task 5: SANDBOX-05: Sandbox Mechanism Demonstration And Verification
 
 **Files:**
 - Create: `src/coding_harness/demo/sandbox.py`

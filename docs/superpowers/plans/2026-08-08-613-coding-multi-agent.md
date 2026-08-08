@@ -17,7 +17,7 @@
 - Multi-agent tests use scripted mock workers and no real LLM or network.
 - Before each task commit, append actual task evidence to `AGENT_LOG.md` and `DELIVERY_STATUS.md`; after the commit, update `PLAN.md` with the hash.
 
-### Task MULTI-01: TaskGraph And Worker Contracts
+### Task 1: MULTI-01: TaskGraph And Worker Contracts
 
 **Files:**
 - Create: `src/coding_harness/domain/tasks.py`
@@ -49,7 +49,7 @@ class TaskScheduler(Protocol):
 - [ ] **Step 4: Run tests and type-check the orchestration ports.**
 - [ ] **Step 5: Commit.** `git add src/coding_harness/domain/tasks.py src/coding_harness/domain/worker.py src/coding_harness/ports/orchestration.py tests/multi_agent && git commit -m "feat: define multi-agent task and worker contracts"`.
 
-### Task MULTI-02: Role Policies And Worker Runtime
+### Task 2: MULTI-02: Role Policies And Worker Runtime
 
 **Files:**
 - Create: `src/coding_harness/application/worker_runtime.py`
@@ -66,7 +66,7 @@ class TaskScheduler(Protocol):
 - [ ] **Step 4: Run fake-loop/fake-sandbox tests and inspect emitted worker events.**
 - [ ] **Step 5: Commit.** `git add src/coding_harness/application/worker_runtime.py src/coding_harness/application/role_policies.py src/coding_harness/adapters/orchestration tests/multi_agent && git commit -m "feat: run role-specific coding workers"`.
 
-### Task MULTI-03: Supervisor Scheduling And Budgets
+### Task 3: MULTI-03: Supervisor Scheduling And Budgets
 
 **Files:**
 - Create: `src/coding_harness/application/supervisor.py`
@@ -82,7 +82,7 @@ class TaskScheduler(Protocol):
 - [ ] **Step 4: Run deterministic tests with scripted workers and assert stable scheduling order.**
 - [ ] **Step 5: Commit.** `git add src/coding_harness/application/supervisor.py src/coding_harness/application/scheduling.py tests/multi_agent && git commit -m "feat: schedule multi-agent task graphs"`.
 
-### Task MULTI-04: Artifact Integration And Conflict Feedback
+### Task 4: MULTI-04: Artifact Integration And Conflict Feedback
 
 **Files:**
 - Create: `src/coding_harness/application/artifact_integrator.py`
@@ -97,7 +97,7 @@ class TaskScheduler(Protocol):
 - [ ] **Step 4: Run tests with two artifacts touching the same file and assert `merge_conflict`.**
 - [ ] **Step 5: Commit.** `git add src/coding_harness/application/artifact_integrator.py src/coding_harness/adapters/orchestration/integration_workspace.py tests/multi_agent && git commit -m "feat: integrate worker artifacts safely"`.
 
-### Task MULTI-05: Deterministic Multi-Agent Demonstration
+### Task 5: MULTI-05: Deterministic Multi-Agent Demonstration
 
 **Files:**
 - Create: `src/coding_harness/demo/multi_agent.py`

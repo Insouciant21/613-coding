@@ -17,7 +17,7 @@
 - Every delivery change updates `AGENT_LOG.md`, `PLAN.md`, and `DELIVERY_STATUS.md` with fresh evidence.
 - Before each task commit, append actual task evidence to `AGENT_LOG.md` and `DELIVERY_STATUS.md`; after the commit, update `PLAN.md` with the hash.
 
-### Task DELIVERY-01: Configuration And Credential Commands
+### Task 1: DELIVERY-01: Configuration And Credential Commands
 
 **Files:**
 - Create: `src/coding_harness/config.py`
@@ -34,7 +34,7 @@
 - [ ] **Step 4: Run tests while capturing output and assert no secret appears.**
 - [ ] **Step 5: Commit.** `git add src/coding_harness/config.py src/coding_harness/cli tests/cli tests/config && git commit -m "feat: add configuration and credential commands"`.
 
-### Task DELIVERY-02: Core CLI Run And Approval Commands
+### Task 2: DELIVERY-02: Core CLI Run And Approval Commands
 
 **Files:**
 - Create: `src/coding_harness/cli/main.py`
@@ -49,7 +49,7 @@
 - [ ] **Step 4: Run CLI tests and manual `--help`; record exact output.**
 - [ ] **Step 5: Commit.** `git add src/coding_harness/cli tests/cli && git commit -m "feat: expose harness runs through cli"`.
 
-### Task DELIVERY-03: FastAPI API And Event Streaming
+### Task 3: DELIVERY-03: FastAPI API And Event Streaming
 
 **Files:**
 - Create: `src/coding_harness/api/app.py`
@@ -67,7 +67,7 @@
 - [ ] **Step 4: Run API tests with fake services and assert no secrets in JSON.**
 - [ ] **Step 5: Commit.** `git add src/coding_harness/api tests/api && git commit -m "feat: expose harness services through api"`.
 
-### Task DELIVERY-04: WebUI With Open Design Workflow
+### Task 4: DELIVERY-04: WebUI With Open Design Workflow
 
 **Files:**
 - Create: `src/coding_harness/web/templates/index.html`
@@ -84,7 +84,7 @@
 - [ ] **Step 4: Run asset tests and browser smoke tests at desktop/mobile widths; verify no overlapping text and visible failure/approval states.**
 - [ ] **Step 5: Commit.** `git add src/coding_harness/web tests/web README.md && git commit -m "feat: add harness operations webui"`.
 
-### Task DELIVERY-05: Package, Entry Points, And Docker Demonstration
+### Task 5: DELIVERY-05: Package, Entry Points, And Docker Demonstration
 
 **Files:**
 - Modify: `pyproject.toml`
@@ -101,7 +101,7 @@
 - [ ] **Step 4: Run `uv build`, `uv tool install .`, and `docker build`; start a local demo when Docker is available and verify `/healthz`.**
 - [ ] **Step 5: Commit.** `git add pyproject.toml Dockerfile .dockerignore docker tests/test_distribution.py && git commit -m "build: package and containerize demonstration"`.
 
-### Task DELIVERY-06: GitLab CI And Evidence Automation
+### Task 6: DELIVERY-06: GitLab CI And Evidence Automation
 
 **Files:**
 - Create: `.gitlab-ci.yml`
@@ -119,7 +119,7 @@
 - [ ] **Step 4: Run the recorder tests, local CI-equivalent commands, and inspect generated records. Never write a pass result without command exit evidence.**
 - [ ] **Step 5: Commit.** `git add .gitlab-ci.yml scripts tests/scripts AGENT_LOG.md DELIVERY_STATUS.md && git commit -m "ci: automate delivery evidence and checks"`.
 
-### Task DELIVERY-07: README, Deployment, And Final Evidence
+### Task 7: DELIVERY-07: README, Deployment, And Final Evidence
 
 **Files:**
 - Modify: `README.md`
