@@ -166,3 +166,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: missing memory modules; later focused REDs for absent permission query tags and first-word-only fallback.
 - Implementation: SQLite-authoritative redacted text, rebuildable LanceDB ID/vector index, deterministic and HTTP embedding adapters, permission-filtered bounded context, multi-term fallback, and deletion cleanup.
 - GREEN: 7 focused real SQLite/LanceDB tests and all 75 project tests passed; Ruff, mypy, and lock check passed.
+
+### 2026-08-08 23:14:22 Asia/Shanghai — CORE-10 feedback-driven AgentLoop
+
+- Task: CORE-10; triggered `subagent-driven-development`, `test-driven-development`, `systematic-debugging`, and `verification-before-completion`.
+- Workflow context: resumed a controller-owned, uncommitted CORE-10 implementation after context compaction; preserved the existing SDD ledger and user-owned untracked files. The controller completed the in-progress implementation because no fresh implementer had produced this partial working tree; an independent task reviewer remains required before completion.
+- TDD RED: the initial focused suite exposed ignored provider-cost exhaustion and eager `dict.setdefault` dependency creation. The next focused RED exposed rejected approvals remaining in `WAITING_APPROVAL`; an added expiry test proved stale requests also waited forever.
+- Implementation: added the owned state machine, injectable dependencies, run service, persisted summaries/events/iterations, exact approval resume/reject/expiry handling, post-call budget enforcement, SQLite run updates, and the deterministic wrong-edit/feedback/repair/pass demo with memory and hard-guardrail checks.
+- Commit: `2dd32f9` (`feat: implement feedback-driven agent loop`).
+- Verification: 12 focused tests passed; all 84 project tests passed; Ruff, mypy, and `uv lock --check` passed. No real LLM, network request, API key, or high-level agent framework was used.
+- Human intervention: the user confirmed continuing the approved CORE-10 review criteria. Lesson: budget checks must gate actions after provider accounting, and approval resumption must inspect request state rather than infer it from token consumption alone.

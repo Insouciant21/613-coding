@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-08 22:56:36 (Asia/Shanghai)
-Responsible actor: `/root` controller; CORE-01 implementation/review commits `4d51108`, `3b0ea0e`; CORE-02 commits `59bc4f2`, `2934063`, `69b1c59`.
+Last updated: 2026-08-08 23:14:22 (Asia/Shanghai)
+Responsible actor: `/root` controller; latest implementation commit `2dd32f9` (CORE-10, task review pending).
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -14,8 +14,8 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | `PLAN.md` | approved with bootstrap revision | `PLAN.md`, `docs/superpowers/plans/`; commits `a2909c7`, `fc7bf53`; user selected Subagent-Driven on 2026-08-08 | begin CORE-01 |
 | `AGENT_LOG.md` | active | `AGENT_LOG.md` | append every significant task |
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
-| Source implementation | CORE-01 complete | focused unittest, py_compile, complete `uv.lock`, and review repair in `AGENT_LOG.md`; scaffold commit `4d51108` plus repair commit | proceed to CORE-02 after bootstrap verification |
-| Mock-LLM mechanism tests | adapter complete | scripted order/snapshot/exhaustion tests in `tests/adapters/llm`; task commit pending | connect mock to AgentLoop demo in CORE-10 |
+| Source implementation | CORE-01 through CORE-09 complete; CORE-10 under review | task evidence in `PLAN.md` and `AGENT_LOG.md`; CORE-10 commit `2dd32f9` | complete independent CORE-10 review |
+| Mock-LLM mechanism tests | core demo complete, review pending | scripted adapter tests plus offline feedback/repair demo in `tests/demo`; commit `2dd32f9` | complete CORE-10 task review |
 | Container sandbox | not started | no Docker runtime yet | run lifecycle/security tests |
 | Multi-agent orchestration | not started | no Supervisor yet | run task-graph/worker tests |
 | README and distribution | not started | no package or Dockerfile yet | verify `uv tool install` and Docker demo |
@@ -80,6 +80,15 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - Status: complete; commit `86c4633`.
 - Tests: 7 focused SQLite/LanceDB/context tests and all 75 project tests passed.
 - Memory boundary: SQLite stores authoritative redacted text; LanceDB stores rebuildable IDs, filters, and vectors only; final permission filtering occurs after SQLite reload.
+
+## CORE-10 Evidence
+
+- Verification timestamp: `2026-08-08 23:14:22 Asia/Shanghai`.
+- Status: implementation complete; independent task review pending; commit `2dd32f9`.
+- Tests: 12 focused approval/loop/demo tests and all 84 project tests passed.
+- Static gates: Ruff, mypy, and `uv lock --check` passed.
+- Mechanism: invalid actions, policy deny/ask/allow, exact approval resume/reject/expiry, objective validation freshness, no progress, cancellation, and four budget types remain deterministic and injectable.
+- Demo boundary: scripted mock LLM only; explicit `total_model_calls=5` is demo configuration, not a product-wide limit; no credentials or network calls.
 
 ## Recording Rules
 

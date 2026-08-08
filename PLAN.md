@@ -25,7 +25,7 @@
 
 | Plan | Scope | Depends on | Status |
 | --- | --- | --- | --- |
-| `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | CORE-01 through CORE-09 complete |
+| `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | CORE-01 through CORE-09 complete; CORE-10 implementation under review |
 | `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
@@ -100,3 +100,11 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 - Status: complete; commit `86c4633`; scoped memory/privacy review clean.
 - Verification: 7 focused real SQLite/LanceDB/context tests and all 75 project tests passed; Ruff, mypy, and `uv lock --check` passed.
+
+## CORE-10 Task Evidence
+
+- Status: implementation complete; independent task review pending.
+- Commit: `2dd32f9` (`feat: implement feedback-driven agent loop`).
+- TDD evidence: focused REDs exposed ignored post-provider cost exhaustion, eager dependency-factory evaluation, rejected approvals waiting forever, and missing expiry termination.
+- Verification: 12 focused approval/loop/demo tests and all 84 project tests passed; Ruff, mypy, and `uv lock --check` passed.
+- Boundaries: the repository owns the state machine; objective validation controls `finish`; the offline demo uses a scripted LLM and an explicit five-call demo budget only.
