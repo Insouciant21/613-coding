@@ -258,3 +258,10 @@ Every completed plan task must link a commit and fresh verification output here.
 - Verification: focused WebUI/API suite passed 7 tests; full suite passed 212 tests; Ruff and mypy passed; root/static smoke returned 200.
 - Open Design boundary: the local MCP was unavailable, so implementation followed the approved operations-console design without external generation.
 - Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-4-report.md`.
+
+## DELIVERY-05 Evidence
+
+- Status: complete for package/files; Docker build blocked by external Docker Hub authorization network reset.
+- Verification: distribution suite passed 4; full suite passed 216; `uv build`, Ruff, and mypy passed.
+- Boundary: image is non-root with healthcheck and no socket mount; no unverified Docker smoke result is recorded.
+- Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-5-report.md`.

@@ -7,6 +7,7 @@ name = "coding-harness"
 version = "0.1.0"
 description = "613 Coding local coding agent harness"
 requires-python = ">=3.12"
+scripts = { coding-harness = "coding_harness.cli.entrypoint:main" }
 dependencies = [
     "pydantic>=2.11,<3",
     "httpx>=0.28,<1",

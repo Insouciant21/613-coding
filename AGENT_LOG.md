@@ -362,6 +362,15 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commit pending: implementation and this evidence will be committed together.
 - Protected unrelated untracked paths remain untouched.
 
+### 2026-08-09 06:00:00 Asia/Shanghai - DELIVERY-05 package and Docker distribution
+
+- Task: DELIVERY-05; followed `test-driven-development` and `verification-before-completion`.
+- TDD RED: distribution tests failed on missing package script and Docker files.
+- Implementation: added `coding-harness` console entrypoint, `web` command, Dockerfile, non-root image user, healthcheck, entrypoint, and secret/local-state `.dockerignore` rules.
+- Verification: distribution tests passed 4; full suite passed 216; `uv build`, Ruff, mypy, and diff checks passed. Docker build was attempted but Docker Hub token retrieval failed with a network reset; no image pull or smoke pass was claimed.
+- Commit pending: implementation and evidence will be committed together.
+- Protected unrelated untracked paths remain untouched.
+
 ### 2026-08-09 05:50:00 Asia/Shanghai - DELIVERY-04 operations WebUI
 
 - Task: DELIVERY-04; loaded `brainstorming` and `open-design-mode` as required for the interface work. Open Design MCP was unavailable, so no external artifact or install was attempted.

@@ -1,0 +1,14 @@
+.env
+.env.*
+.git
+.gitignore
+.venv
+*.sqlite
+*.sqlite3
+.claude
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests
+docs
+.superpowers
