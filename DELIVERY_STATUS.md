@@ -300,6 +300,6 @@ Every completed plan task must link a commit and fresh verification output here.
 ## SANDBOX-03 Disk Quota Evidence
 
 - Verification timestamp: `2026-08-09 06:47:21 Asia/Shanghai` (focused RED/GREEN).
-- Commit: `b5cff85`.
+- Commit: `287202a`.
 - TDD evidence: hardened-container test failed before `storage_opt` wiring and passed after the fix.
 - Security boundary: validated `disk_bytes` is passed to Docker storage quota configuration; unsupported storage drivers fail creation and trigger workspace cleanup. Real Docker smoke remains unverified because no approved image was available locally.

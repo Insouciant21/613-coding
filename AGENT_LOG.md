@@ -449,5 +449,5 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - TDD RED: the hardened-container test failed with `KeyError: storage_opt`.
 - Fix: Docker options now pass `storage_opt={"size": str(disk_bytes)}`; deployment documentation records the required storage-driver project-quota support and cleanup behavior on unsupported daemons.
 - GREEN: focused Docker configuration and timeout tests passed 2; final `uv run pytest -q` passed 225 tests; Ruff, mypy, `uv lock --check`, `git diff --check`, and `uv build` passed.
-- Commit: `b5cff85`.
+- Commit: `287202a`.
 - Human intervention: none; protected user-owned untracked paths.

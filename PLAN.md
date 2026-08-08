@@ -213,7 +213,7 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 ### SANDBOX-03 Audit Repairs
 
 - Timeout hardening: commit `f5d62a9`; timed-out commands kill the worker before returning and cleanup force-removes terminated containers. Focused timeout pair and full suite passed.
-- Disk quota wiring: commit `b5cff85` adds `storage_opt={"size": str(ResourceLimits.disk_bytes)}` after a focused RED/GREEN cycle. Docker storage-driver project-quota support remains an explicit runtime prerequisite.
+- Disk quota wiring: commit `287202a` adds `storage_opt={"size": str(ResourceLimits.disk_bytes)}` after a focused RED/GREEN cycle. Docker storage-driver project-quota support remains an explicit runtime prerequisite.
 
 ## SANDBOX-04 Task Evidence
 
