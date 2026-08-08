@@ -6,4 +6,4 @@ Task 1: complete (`9744339`)
 Task 2: complete (`5910d7b`)
 Task 3: complete (`43f51fc`)
 Task 4: complete (`11eaef8`)
-Task 5: pending
+Task 5: complete (`376fd41`; offline demo clean)

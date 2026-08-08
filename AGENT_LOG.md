@@ -335,3 +335,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Hardening RED/GREEN: a patch with a secret path header but an allowed `changed_files` metadata entry initially applied; path agreement validation now rejects it before Git.
 - Verification: focused integration tests passed 5; full suite passed 193; Ruff, mypy across 64 source files, `uv lock --check`, and `git diff --check` passed.
 - Commit: `11eaef8`; proceed to MULTI-05 deterministic demonstration.
+
+### 2026-08-09 05:55:00 Asia/Shanghai — MULTI-05 Supervisor demonstration
+
+- TDD RED: focused collection failed because the deterministic multi-agent demo module was absent.
+- Implementation: added scripted planner/coder/tester/reviewer flow using real Supervisor retry events, SQLite-backed exact approval, ArtifactIntegrator, and final validation.
+- Demo output: `completed`, `total_calls=5`, `feedback_repaired=true`, `approval_granted=true`, `integration_applied=true`, `final_validation_passed=true`; events include graph creation, coder retry, and all node successes.
+- Verification: focused demo test passed 1; full suite passed 194; Ruff, mypy across 65 source files, `uv lock --check`, and `git diff --check` passed.
+- Commit: `376fd41`; MULTI_AGENT phase complete, proceed to DELIVERY.
