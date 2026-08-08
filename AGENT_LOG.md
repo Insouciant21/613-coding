@@ -55,3 +55,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Task: establish isolated worktree for Subagent-Driven implementation.
 - Result: `.worktrees/` was added to `.gitignore`, but `git worktree add` could not create a branch ref lock because `.git/refs/heads/*.lock` is read-only in this environment.
 - Decision: follow the worktree skill fallback and execute in the current sandboxed workspace. The failed worktree has no created branch or linked checkout; `git worktree list` contains only `main`.
+
+### CORE-01 package scaffold
+
+- Task: CORE-01 package and test scaffold.
+- Skill: `test-driven-development` (failing import test observed before implementation).
+- RED evidence: `PYTHONPATH=src python3 -m unittest tests.test_package.PackageTests.test_package_exposes_version` failed with `ModuleNotFoundError: No module named 'coding_harness'`.
+- Implementation: added `pyproject.toml`, package namespace initializers, standard-library package test, bootstrap probe, development bootstrap documentation, and `uv.lock`.
+- GREEN evidence: the same focused unittest passed; `python3 -m py_compile` passed for scaffold modules.
+- Provisioning evidence: `python3 scripts/bootstrap_dev.py` returned `DEPENDENCY_PROVISIONING_BLOCKED` with missing imports `pydantic, pytest` and commands `ruff, mypy`; online lock retry with `UV_CACHE_DIR=/tmp/613-uv-cache uv lock` failed after DNS retries, and offline lock failed because FastAPI was not cached.
+- Human intervention: none. Worktree creation remained blocked by read-only Git ref locks, so changes were made in the current workspace per fallback.
