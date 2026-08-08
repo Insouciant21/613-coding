@@ -12,7 +12,13 @@ from coding_harness.adapters.sandbox.docker_runtime import (
     SandboxRuntimeError,
 )
 from coding_harness.adapters.sandbox.workspace import WorkspaceManager
-from coding_harness.domain.sandbox import CommandResult, NetworkPolicy, ResourceLimits, SandboxSpec
+from coding_harness.domain.sandbox import (
+    CommandResult,
+    NetworkPolicy,
+    ResourceLimits,
+    SandboxHandle,
+    SandboxSpec,
+)
 
 
 def _repo(tmp_path: Path) -> Path:
@@ -201,3 +207,14 @@ def test_container_start_failure_removes_container_and_workspace(tmp_path: Path)
     assert docker.events == ["create"]
     assert docker.container.events == ["start", "remove"]
     assert not any((tmp_path / "workspaces").iterdir())
+
+
+def test_forged_handle_with_same_id_cannot_access_live_container(tmp_path: Path) -> None:
+    docker = FakeDocker()
+    runtime = _runtime(tmp_path, docker)
+    handle = runtime.create(_spec(_repo(tmp_path)))
+    forged = SandboxHandle(id=handle.id, workspace_path=handle.workspace_path)
+
+    with pytest.raises(SandboxRuntimeError, match="unknown"):
+        runtime.export(forged)
+    runtime.destroy(handle)

@@ -25,6 +25,7 @@ _TIMED_OUT = object()
 
 @dataclass(frozen=True)
 class _RuntimeRecord:
+    handle: SandboxHandle
     container: Any
     workspace: Workspace
     spec: SandboxSpec
@@ -40,7 +41,7 @@ class DockerSandboxRuntime:
         self._docker = docker_client
         self._workspaces = workspace_manager
         self._artifacts = artifact_exporter
-        self._records: dict[str, _RuntimeRecord] = {}
+        self._records: dict[int, _RuntimeRecord] = {}
 
     def create(self, spec: SandboxSpec) -> SandboxHandle:
         workspace = self._workspaces.create(
@@ -53,7 +54,7 @@ class DockerSandboxRuntime:
             container = self._docker.containers.create(**container_options(spec, workspace.path))
             container.start()
             handle = SandboxHandle(workspace_path=workspace.path)
-            self._records[str(handle.id)] = _RuntimeRecord(container, workspace, spec)
+            self._records[id(handle)] = _RuntimeRecord(handle, container, workspace, spec)
             return handle
         except Exception as exc:
             cleanup_error: Exception | None = None
@@ -127,13 +128,13 @@ class DockerSandboxRuntime:
             self._workspaces.cleanup(record.workspace)
         except Exception as exc:  # noqa: BLE001
             errors.append(exc)
-        self._records.pop(str(handle.id), None)
+        self._records.pop(id(handle), None)
         if errors:
             raise SandboxRuntimeError("sandbox cleanup failed") from errors[0]
 
     def _record(self, handle: SandboxHandle) -> _RuntimeRecord:
-        record = self._records.get(str(handle.id))
-        if record is None:
+        record = self._records.get(id(handle))
+        if record is None or record.handle is not handle:
             raise SandboxRuntimeError("sandbox handle is unknown or destroyed")
         return record
 

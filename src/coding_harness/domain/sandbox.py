@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from .models_base import DomainModel
 
@@ -73,6 +73,8 @@ class SandboxSpec(DomainModel):
 
 class SandboxHandle(DomainModel):
     """Opaque runtime identity; host/container metadata is deliberately absent."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
 
     id: UUID = Field(default_factory=uuid4)
     workspace_path: Path
