@@ -58,3 +58,10 @@ Task 11: fix round 1/5 (2 addressed, 0 open; commits 552593e..d748a0e)
 - Re-review out-of-scope notes for final review: the missing-delete idempotency test was a characterization that passed before the fix; double-fault explicit cause omits the delete error while preserving it as context; the narrow fake backend may need maintenance if the adapter grows.
 
 Task 11: complete (commits a513c95..d748a0e, review clean)
+
+Core final-review fix wave: complete (commits 9af4f03, 8789026; review clean)
+
+- Findings fixed: both SQLite-backed repositories now close connections on success and exception; run status persistence uses atomic full-snapshot CAS and reconciles stale `resume`/`cancel` results to the authoritative terminal row; already-terminal entry points do not re-enter mutating loop paths.
+- TDD evidence: initial focused RED `6 failed, 42 passed`; terminal-entry repair RED `2 failed, 33 deselected`; final focused GREEN `50 passed`.
+- Controller verification: `uv run pytest -q` `126 passed`; Ruff, mypy (44 source files), `uv lock --check`, and `git diff --check` passed. GC-disabled diagnostic observed `event_delta=0` and `memory_delta=0` after 100 reads each.
+- Independent scoped re-review verdict: SQLite connection lifecycle `ADDRESSED`; atomic/CAS status persistence, terminal immutability, and authoritative reconciliation `ADDRESSED`; no new Critical/Important breakage; no out-of-scope observations.
