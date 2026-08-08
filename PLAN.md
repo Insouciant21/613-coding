@@ -26,7 +26,7 @@
 | Plan | Scope | Depends on | Status |
 | --- | --- | --- | --- |
 | `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | complete after final-review repair at `9af4f03` |
-| `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | in progress; SANDBOX-04 complete through `439540f` |
+| `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | complete through `fb1c222` |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
 
@@ -161,3 +161,11 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - TDD evidence: focused collection failed before implementation because `SandboxPolicyConfig` was absent; final focused policy suite passed 8 tests.
 - Verification: all 168 project tests passed; Ruff, mypy across 53 source files, `uv lock --check`, and `git diff --check` passed.
 - Boundaries: hard rules precede mode, autonomous cannot override root/capability/read-only/image/credential/resource denials, network allowlists are exact and recorded, and resource violations map to deterministic `resource_exhausted` decisions.
+
+## SANDBOX-05 Task Evidence
+
+- Status: complete; commit `fb1c222` (`test: demonstrate container sandbox boundaries`).
+- TDD evidence: focused demo collection failed before implementation because `coding_harness.demo.sandbox` was absent; final demo test passed 1.
+- Demonstration output: all seven summary boundaries were `true`: two isolated workers, privileged command denial, Docker socket denial, default-deny network, timeout/resource mapping, artifact export, and cleanup.
+- Verification: full project suite passed 169 tests; Ruff, mypy across 54 source files, `uv lock --check`, and `git diff --check` passed.
+- Real Docker smoke was guarded and skipped without pulling an unapproved image because no pinned worker image was local.

@@ -297,3 +297,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation: added policy configuration and deterministic validation for pinned/approved images, non-root/read-only/capability-free workers, credential-free environment names, exact network approvals, and per-field resource bounds. Result evaluation maps timeout, explicit exhaustion, and output overflow to `resource_exhausted` decisions.
 - Verification: focused policy tests passed 8; full suite passed 168; Ruff, mypy across 53 source files, `uv lock --check`, and `git diff --check` passed.
 - Review decision: hard rules precede mode; autonomous mode cannot bypass them. Proceed to SANDBOX-05 demonstration.
+
+### 2026-08-09 04:50:00 Asia/Shanghai — SANDBOX-05 sandbox demonstration
+
+- Task: SANDBOX-05; TDD RED was the expected missing `coding_harness.demo.sandbox` module collection error.
+- Implementation: added an offline fake-runtime demonstration covering two worker handles, privileged command and Docker socket hard denials, default-deny network, timeout/resource mapping, artifact export, and destroy verification. Commit: `fb1c222`.
+- Demo output: `isolated_workers=true`, `dangerous_mount_blocked=true`, `docker_socket_blocked=true`, `network_denied=true`, `resource_timeout_mapped=true`, `artifact_exported=true`, `cleanup_completed=true`.
+- Verification: demo test passed 1; full suite passed 169; Ruff, mypy across 54 source files, `uv lock --check`, and `git diff --check` passed.
+- Real Docker smoke remained guarded because no approved pinned worker image was local; no image was pulled.
+- Review decision: SANDBOX phase complete; proceed to MULTI_AGENT.
