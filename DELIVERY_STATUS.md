@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-08 22:44:36 (Asia/Shanghai)
+Last updated: 2026-08-08 22:56:36 (Asia/Shanghai)
 Responsible actor: `/root` controller; CORE-01 implementation/review commits `4d51108`, `3b0ea0e`; CORE-02 commits `59bc4f2`, `2934063`, `69b1c59`.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -74,6 +74,13 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - Tests: 19 focused feedback/budget/runner tests and all 68 project tests passed.
 - Feedback boundary: objective outputs, exit status, resources, changes, repetition, and freshness determine classification; no LLM classification is used.
 
+## CORE-09 Evidence
+
+- Verification timestamp: `2026-08-08 22:56:36 Asia/Shanghai`.
+- Status: implementation complete; commit pending at evidence creation.
+- Tests: 7 focused SQLite/LanceDB/context tests and all 75 project tests passed.
+- Memory boundary: SQLite stores authoritative redacted text; LanceDB stores rebuildable IDs, filters, and vectors only; final permission filtering occurs after SQLite reload.
+
 ## Recording Rules
 
 Every completed plan task must link a commit and fresh verification output here. Failures, pauses, rejected approvals, user changes, and CI failures remain visible until superseded by new evidence.
@@ -100,7 +107,7 @@ Every completed plan task must link a commit and fresh verification output here.
 - `uv lock`: passed with 54 resolved packages after registry access was approved.
 - Bootstrap command: `uv run python scripts/bootstrap_dev.py` is now the documented probe so imports and commands resolve from the managed environment.
 - Review status: important findings addressed; generated Python bytecode is ignored and removed from the repair commit.
-- Full runtime provisioning remains blocked: `uv sync --all-extras --frozen` cannot finish while the `lancedb==0.36.0` and `pyarrow==25.0.0` wheels are unavailable; the development toolchain itself is provisioned and its `--no-sync` checks pass.
+- Full runtime provisioning: resolved; LanceDB/PyArrow wheel hashes matched `uv.lock`, and `uv sync --all-extras --frozen` completed successfully.
 
 ## CORE-01 Development-Tool Verification
 

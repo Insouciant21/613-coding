@@ -25,7 +25,7 @@
 
 | Plan | Scope | Depends on | Status |
 | --- | --- | --- | --- |
-| `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | CORE-01 through CORE-04 complete |
+| `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | CORE-01 through CORE-09 complete |
 | `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
@@ -58,8 +58,8 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 - Status: complete after task review and bootstrap repair.
 - Commit: `4d51108` scaffold; repair commit is recorded in the task ledger and delivery status.
-- Verification: focused standard-library unittest and `py_compile` passed; `uv lock --check` passed for 54 packages; `uv sync --all-extras --frozen --offline` is blocked by the uncached `lancedb==0.36.0` wheel, so canonical third-party checks remain unrun.
-- Gate: `uv run --no-sync python scripts/bootstrap_dev.py` now reports `DEPENDENCIES_PROVISIONED`; CORE-02 may start. Full LanceDB/PyArrow sync remains a later memory-task gate.
+- Verification: focused standard-library unittest and `py_compile` passed; the current 61-package lock passes; full `uv sync --all-extras --frozen` and canonical checks now pass.
+- Gate: `uv run python scripts/bootstrap_dev.py` reports `DEPENDENCIES_PROVISIONED`; full LanceDB/PyArrow sync is complete.
 
 ## CORE-02 Task Evidence
 
@@ -95,3 +95,8 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 - Status: complete; commit `1e01249`; scoped feedback/budget review clean.
 - Verification: 19 focused feedback/budget/runner tests and all 68 project tests passed; Ruff and mypy passed.
+
+## CORE-09 Task Evidence
+
+- Status: implementation complete; commit hash is recorded after commit.
+- Verification: 7 focused real SQLite/LanceDB/context tests and all 75 project tests passed; Ruff, mypy, and `uv lock --check` passed.

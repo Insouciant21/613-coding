@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -152,3 +153,63 @@ class Run(DomainModel):
         if self.updated_at < self.created_at:
             raise ValueError("updated_at cannot precede created_at")
         return self
+
+
+class Project(DomainModel):
+    id: UUID = Field(default_factory=uuid4)
+    canonical_root: Path
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @field_validator("canonical_root")
+    @classmethod
+    def require_canonical_directory(cls, value: Path) -> Path:
+        root = value.resolve(strict=True)
+        if not root.is_dir():
+            raise ValueError("canonical_root must be a directory")
+        return root
+
+    @field_validator("created_at")
+    @classmethod
+    def require_aware_project_timestamp(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("timestamp must be timezone-aware")
+        return value
+
+
+class MemoryType(StrEnum):
+    PROJECT_CONVENTION = "project_convention"
+    VALIDATION_CONFIG = "validation_config"
+    GOVERNANCE_DECISION = "governance_decision"
+    TASK_SUMMARY = "task_summary"
+    FAILURE_PATTERN = "failure_pattern"
+
+
+class EmbeddingStatus(StrEnum):
+    PENDING = "pending"
+    INDEXED = "indexed"
+    FAILED = "failed"
+
+
+class MemoryEntry(DomainModel):
+    id: UUID = Field(default_factory=uuid4)
+    project_id: UUID
+    memory_type: MemoryType
+    text: str = Field(min_length=1)
+    permission_tags: frozenset[str] = Field(default_factory=frozenset)
+    embedding_status: EmbeddingStatus = EmbeddingStatus.PENDING
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @field_validator("permission_tags")
+    @classmethod
+    def validate_permission_tags(cls, value: frozenset[str]) -> frozenset[str]:
+        if any(not tag or not tag.replace("-", "").replace("_", "").isalnum() for tag in value):
+            raise ValueError("permission tags must be alphanumeric identifiers")
+        return value
+
+    @field_validator("created_at", "updated_at")
+    @classmethod
+    def require_aware_memory_timestamp(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("timestamp must be timezone-aware")
+        return value

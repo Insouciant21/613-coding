@@ -158,3 +158,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation: objective feedback classifier, repeated fingerprints, validation freshness, four independent budgets, and bounded argv-only subprocess runner.
 - Safety: no `shell=True`; allowlisted environment; timeout kills the process group; stdout/stderr share one cap; optional memory/process limits use `prlimit` without unsafe `preexec_fn`.
 - GREEN: 19 focused tests and all 68 project tests passed; Ruff and mypy passed.
+
+### 2026-08-08 22:56:36 Asia/Shanghai — CORE-09 structured/vector memory
+
+- Task: CORE-09; triggered `test-driven-development`, `systematic-debugging`, and `verification-before-completion`.
+- Provisioning: hash-verified LanceDB/PyArrow wheels; full frozen uv sync completed with 61 locked packages.
+- TDD RED: missing memory modules; later focused REDs for absent permission query tags and first-word-only fallback.
+- Implementation: SQLite-authoritative redacted text, rebuildable LanceDB ID/vector index, deterministic and HTTP embedding adapters, permission-filtered bounded context, multi-term fallback, and deletion cleanup.
+- GREEN: 7 focused real SQLite/LanceDB tests and all 75 project tests passed; Ruff, mypy, and lock check passed.

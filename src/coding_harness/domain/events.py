@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 from pydantic import Field, field_validator
 
 from .models_base import DomainModel
+from .redaction import redact_text
 
 _SENSITIVE_PARTS = {"credential", "password", "secret", "token"}
 _KEY_QUALIFIERS = {"api", "encryption", "private", "secret", "signing"}
@@ -31,6 +32,8 @@ def redact_payload(value: Any, key: str | None = None) -> Any:
         }
     if isinstance(value, (list, tuple)):
         return [redact_payload(item) for item in value]
+    if isinstance(value, str):
+        return redact_text(value)
     return value
 
 

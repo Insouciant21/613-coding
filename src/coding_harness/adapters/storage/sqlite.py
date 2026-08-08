@@ -12,6 +12,7 @@ from coding_harness.domain.events import Event, redact_payload
 from coding_harness.domain.models import (
     IterationRecord,
     PermissionMode,
+    Project,
     Run,
     RunState,
     StopReason,
@@ -50,6 +51,17 @@ class SqliteEventStore:
                     run.stop_reason.value if run.stop_reason else None,
                     run.created_at.isoformat(),
                     run.updated_at.isoformat(),
+                ),
+            )
+
+    def create_project(self, project: Project) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO projects (id, canonical_root, created_at) VALUES (?, ?, ?)",
+                (
+                    str(project.id),
+                    str(project.canonical_root),
+                    project.created_at.isoformat(),
                 ),
             )
 
