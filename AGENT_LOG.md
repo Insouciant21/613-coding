@@ -352,3 +352,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commit: `2a53a73` (`feat: add configuration and credential commands`). Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-1-report.md`.
 - Human intervention: none. Protected unrelated untracked paths (`.claude/` and the two requirement documents) were preserved. No real key, network call, or provider was used.
 - Lesson: keep configuration parsing and CLI presentation at the adapter boundary; reuse `CredentialService` so raw secret material never becomes command output or application state.
+
+### 2026-08-09 05:36:44 Asia/Shanghai - DELIVERY-02 core CLI
+
+- Task: DELIVERY-02; followed `test-driven-development` and `verification-before-completion`.
+- TDD RED: focused runner tests failed during collection because `coding_harness.cli.main` was absent.
+- Implementation: added Typer `run task`, `runs status/events/approve/reject/resume/cancel`, and `demo core/sandbox/multi-agent` adapters with injectable service factory, JSON/table output, and nonzero error exits.
+- Verification: focused CLI/config/credential suite passed 11 tests; full suite passed 205 tests; Ruff and mypy passed; root `--help` listed all five command groups.
+- Commit pending: implementation and this evidence will be committed together.
+- Protected unrelated untracked paths remain untouched.

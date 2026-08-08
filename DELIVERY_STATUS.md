@@ -237,3 +237,10 @@ Every completed plan task must link a commit and fresh verification output here.
 - `PYTHONPATH=src uv run --no-sync pytest -q`: 1 passed.
 - `uv run --no-sync ruff check .`: passed.
 - `uv run --no-sync mypy src`: passed.
+
+## DELIVERY-02 Evidence
+
+- Status: complete pending commit; implementation and focused tests are in the current delivery change.
+- TDD: focused runner tests first failed on the missing CLI module, then 11 CLI/config/credential tests passed.
+- Verification: full suite passed 205 tests; Ruff, mypy, and root Typer help smoke passed.
+- Detailed report: `.superpowers/sdd/2026-08-08-613-coding-delivery/task-2-report.md`.

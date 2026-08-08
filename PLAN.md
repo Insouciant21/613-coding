@@ -52,6 +52,12 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - `MULTI-01` through `MULTI-05`: task graph, worker runtime, Supervisor scheduling, artifact integration, and orchestration demo.
 - `DELIVERY-01` through `DELIVERY-07`: CLI, API, WebUI, distribution, CI, documentation, and delivery-record automation.
 
+## DELIVERY-01 Task Evidence
+
+- Status: complete; implementation commit `2a53a73`; evidence commit `37d9841`.
+- Verification: focused configuration/credential suite passed 7 tests; full suite passed 201 tests; scoped Ruff and mypy passed; `git diff --check` passed.
+- Boundaries: TOML paths are canonicalized, validation commands are argv-only, unattended runs require a finite budget, and credential CLI output is metadata-only with hidden input.
+
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 
 ## CORE-01 Task Evidence
