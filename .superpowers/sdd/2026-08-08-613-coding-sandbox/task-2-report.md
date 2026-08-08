@@ -49,7 +49,7 @@ passed
 ## Design Decisions
 
 - `WorkspaceManager.create` canonicalizes the source, requires a Git working tree, validates every source symlink, and copies the complete tree with `shutil.copytree(..., symlinks=True)`. This intentionally retains `.git`, ignored files, and untracked files instead of using a Git archive or clone that would omit working-tree data.
-- A workspace captures a `WorkspaceBaseline` manifest of non-`.git` files, including file bytes, Git modes, and symlink targets. `capture_baseline` is also exposed for callers that need a fresh explicit baseline.
+- A workspace captures an immutable `WorkspaceBaseline` manifest of non-`.git` files, including file bytes, Git modes, and symlink targets. Export accepts only that manager-issued baseline by identity.
 - Every later snapshot canonicalizes paths and rejects symlinks resolving outside the workspace. Cleanup deletes the complete manager-owned temporary root, refuses foreign/root deletion, tolerates repeated cleanup, and removes partially created directories on copy/snapshot failure.
 - Declared write sets are normalized to repository-relative POSIX paths and enforced against the complete changed-file set, including ignored/untracked additions and deletions. Exact paths, directory prefixes, and glob patterns are supported.
 - Export uses sorted manifest paths and Python unified diffs, so identical workspace state produces identical patches. Mode-only changes produce Git-compatible mode metadata. Binary or symlink changes emit only a deterministic `Binary files ... differ` marker and a metadata summary; binary bytes are never placed in the artifact patch.
@@ -73,4 +73,12 @@ passed
 
 ## Concerns
 
-- None before independent task review. The implementation intentionally uses a manifest rather than only Git's tracked diff so ignored and untracked task outputs remain exportable.
+- The implementation intentionally uses a manifest rather than only Git's tracked diff so ignored and untracked task outputs remain exportable.
+
+## Independent Review And Repairs
+
+- Initial independent review from `5302fed` through `1afe569` found one Critical fabricated-workspace export path, two Important forgeable cleanup/mutable-state paths, and one Minor incomplete redaction boundary.
+- Fix commit `840cc21` binds `ArtifactExporter` to a manager, validates exact manager-issued workspace identity, freezes workspace metadata, wraps baselines in immutable mappings, requires the manager-owned baseline, and redacts changed paths, mapping keys, and byte metadata. Focused regression: 16 passed; full suite: 151 passed.
+- Scoped re-review of `840cc21` closed the original Critical/Important findings but found one additional Critical filesystem replacement path: replacing the genuine workspace directory with an external symlink bypassed canonicalization in `snapshot_tree`.
+- Fix commit `aa3600a` rejects symlink/non-directory/non-canonical workspace roots in manager validation and snapshot entry, with a regression proving the external file is never exported. Final focused workspace/artifact tests: 17 passed; sandbox suite: 26 passed; full suite: 152 passed; Ruff, mypy, lock, and diff checks passed.
+- Final assessment: no Critical or Important finding remains in the SANDBOX-02 scope.

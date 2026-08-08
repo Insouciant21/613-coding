@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 04:10:07 (Asia/Shanghai)
-Responsible actor: `/root`; SANDBOX-02 hardened and fully verified, pending controller commit/review.
+Last updated: 2026-08-09 04:18:00 (Asia/Shanghai)
+Responsible actor: `/root`; SANDBOX-02 complete through `aa3600a` after independent review repair.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -16,7 +16,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
 | Source implementation | Core complete after final-review repair | task evidence in `PLAN.md` and `AGENT_LOG.md`; final-review implementation/evidence commit `9af4f03`; final-fix report under `.superpowers/sdd/2026-08-08-613-coding-core/` | begin sandbox subsystem |
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
-| Container sandbox | in progress | SANDBOX-01 complete through `9df471d`; SANDBOX-02 implementation evidence below; task reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | controller commit/review, then SANDBOX-03 |
+| Container sandbox | in progress | SANDBOX-01 complete through `9df471d`; SANDBOX-02 complete through `aa3600a`; task reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | implement SANDBOX-03 |
 | Multi-agent orchestration | not started | no Supervisor yet | run task-graph/worker tests |
 | README and distribution | not started | no package or Dockerfile yet | verify `uv tool install` and Docker demo |
 | GitLab CI `unit-test` job | not started | no `.gitlab-ci.yml` yet | last pipeline must pass |
@@ -125,13 +125,14 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 
 ## SANDBOX-02 Evidence
 
-- Verification timestamp: `2026-08-09 04:10:07 Asia/Shanghai`.
-- Status: implementation and controller hardening complete; commit and independent review remain pending.
+- Verification timestamp: `2026-08-09 04:18:00 Asia/Shanghai`.
+- Status: implementation, review repairs, and independent re-review complete through `aa3600a`.
 - TDD RED: focused workspace/artifact collection failed with two expected missing-module errors before implementation.
-- GREEN: 12 focused workspace/artifact tests, 21 sandbox tests, and the full 147-test suite passed.
+- GREEN: 17 focused workspace/artifact tests, 26 sandbox tests, and the full 152-test suite passed.
 - Static gates: full Ruff, mypy across 50 source files, `uv lock --check`, and `git diff --check` passed.
-- Boundary: complete working-tree copy retains `.git`, ignored, and untracked files; canonical manifests reject symlink/path escape; empty write sets deny changes; patches include mode-only changes and are deterministic/redacted; binary data is summarized without bytes; cleanup covers complete owned roots across success and failure paths.
+- Boundary: complete working-tree copy retains `.git`, ignored, and untracked files; manager-issued immutable workspaces reject forged and replaced roots; empty write sets deny changes; patches include mode-only changes and are deterministic/redacted; binary data is summarized without bytes; cleanup covers complete owned roots across success and failure paths.
 - Detailed source evidence: `.superpowers/sdd/2026-08-08-613-coding-sandbox/task-2-report.md`.
+- Review evidence: `.superpowers/sdd/2026-08-08-613-coding-sandbox/task-2-review.md`; repairs `840cc21` and `aa3600a`.
 
 ## Recording Rules
 

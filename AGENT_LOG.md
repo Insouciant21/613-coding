@@ -274,3 +274,10 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - RED evidence: workspace tests failed 3 cases before the cleanup/write-set fix; artifact tests failed 2 cases before baseline/mode support. GREEN: 12 focused workspace/artifact tests and 21 sandbox tests passed.
 - Full controller verification: 147 tests passed; Ruff passed; mypy passed across 50 source files; `uv lock --check` resolved 61 packages; `git diff --check` passed.
 - Scope: only SANDBOX-02 source, tests, and evidence were changed. Protected user-owned untracked paths remain untouched.
+
+### 2026-08-09 04:18:00 Asia/Shanghai — SANDBOX-02 independent review and repairs
+
+- Initial review found one Critical fabricated-workspace export path, two Important ownership/integrity issues, and one Minor redaction gap. Fix commit `840cc21` bound exporter access to exact manager-issued objects, froze workspace/baseline state, enforced baseline identity, and redacted all artifact field shapes.
+- Scoped re-review closed those findings but exposed a filesystem boundary: replacing a genuine workspace root with an external symlink bypassed snapshot canonicalization. Fix commit `aa3600a` rejects symlink, non-directory, and non-canonical roots before export and adds regression coverage.
+- Final verification: `uv run pytest tests/sandbox -q` passed 26 tests; full `uv run pytest -q` passed 152 tests; Ruff, mypy across 50 source files, `uv lock --check`, and `git diff --check` passed.
+- Review decision: SANDBOX-02 has no remaining Critical/Important findings and is complete. Next task: SANDBOX-03 Docker lifecycle.

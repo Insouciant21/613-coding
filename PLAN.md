@@ -26,7 +26,7 @@
 | Plan | Scope | Depends on | Status |
 | --- | --- | --- | --- |
 | `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | complete after final-review repair at `9af4f03` |
-| `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | in progress; SANDBOX-02 implementation at `698863c`, review pending |
+| `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | in progress; SANDBOX-02 complete through `aa3600a` |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
 
@@ -140,8 +140,9 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 ## SANDBOX-02 Task Evidence
 
-- Status: implementation complete; independent spec-compliance and code-quality review pending.
-- Commit: `698863c` (`feat: isolate task workspaces and export artifacts`).
+- Status: complete after independent review and filesystem-root repair.
+- Commits: `698863c` (`feat: isolate task workspaces and export artifacts`), `840cc21` (`fix: bind sandbox artifacts to owned workspaces`), `aa3600a` (`fix: reject replaced sandbox workspace roots`).
 - TDD evidence: initial focused collection failed with two missing-module errors. Controller hardening reproduced and fixed incomplete temporary-root cleanup, dotfile allowlist corruption, empty-allowlist fail-open behavior, ignored explicit empty baselines, and missing mode-only changes.
-- Verification: 12 focused workspace/artifact tests, 21 sandbox tests, and all 147 project tests passed. Ruff, mypy across 50 source files, `uv lock --check`, and `git diff --check` passed.
-- Boundaries: complete repository-shaped copies retain ignored/untracked files; canonical snapshots reject symlink escape; empty write sets deny changes; deterministic redacted artifacts include text, binary summaries, deletions, and Git mode changes; cleanup removes only complete manager-owned temporary roots.
+- Verification: 17 focused workspace/artifact tests, 26 sandbox tests, and all 152 project tests passed. Ruff, mypy across 50 source files, `uv lock --check`, and `git diff --check` passed.
+- Boundaries: complete repository-shaped copies retain ignored/untracked files; manager-issued immutable workspaces reject forged and replaced roots; empty write sets deny changes; deterministic redacted artifacts include text, binary summaries, deletions, and Git mode changes; cleanup removes only complete manager-owned temporary roots.
+- Review: initial Critical/Important findings were fixed in `840cc21`; scoped re-review found and `aa3600a` fixed external symlink-root replacement. No Critical/Important finding remains.
