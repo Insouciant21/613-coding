@@ -362,6 +362,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commits: implementation `bae307b`; index `4658c54`.
 - Protected unrelated untracked paths remain untouched.
 
+### 2026-08-09 runtime composition audit
+
+- Reproduced `coding-harness run task ... --json`: it exits with `run service is not configured for this CLI process`.
+- Root cause: delivery adapters expose `configure_run_service` but the installed entrypoint never supplies a provider-backed `RunService`; WebUI uses an explicit health-only service placeholder.
+- Decision: record the boundary rather than fabricate a provider or pass raw credentials through the CLI. The delivery registry now says runtime composition requires an injected provider/service bundle.
+
 ### 2026-08-09 06:25:00 Asia/Shanghai - DELIVERY-07 documentation and final evidence
 
 - Task: DELIVERY-07; followed `test-driven-development` and `verification-before-completion`.
