@@ -32,3 +32,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Verification: reserved-marker scan returned no matches; plan task index contains 28 task nodes (`CORE-01..11`, `SANDBOX-01..05`, `MULTI-01..05`, `DELIVERY-01..07`); no implementation source files exist.
 - Human intervention: the plan was split by subsystem because the approved spec contains three independent runtime areas plus delivery adapters.
 - Commit: `a2909c7` (`docs: add 613 Coding implementation plans`).
+
+### Subagent-driven cold-start setup
+
+- Task: prepare the required unfamiliar-agent cold-start trial before implementation.
+- Skills: `subagent-driven-development`, `using-git-worktrees`.
+- Human intervention: user selected Subagent-Driven execution and requested no changes to the submitted specification or plans.
+- Action: added `.worktrees/` to `.gitignore` before creating an isolated worktree, preserving the existing ignored documentation and scratch paths.
+- Next evidence: a different-model, no-history agent will receive only `SPEC.md` and `PLAN.md`, attempt selected planned tasks, and stop on ambiguity.

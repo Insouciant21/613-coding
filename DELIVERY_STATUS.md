@@ -8,9 +8,9 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | --- | --- | --- | --- |
 | Approved design | complete | `docs/superpowers/specs/2026-08-07-613-coding-design.md`; commits `6ad0eec`, `c4fd219`, `ba03b70` | none |
 | `AGENTS.md` workflow rules | complete | `AGENTS.md`; commit `ba03b70` | keep updated per task |
-| `SPEC.md` | draft | `SPEC.md`; commit `a2909c7` | user review |
+| `SPEC.md` | approved | `SPEC.md`; commit `a2909c7`; user selected Subagent-Driven on 2026-08-08 | complete cold-start validation |
 | `SPEC_PROCESS.md` | in progress | `SPEC_PROCESS.md` | add cold-start evidence |
-| `PLAN.md` | draft | `PLAN.md`, `docs/superpowers/plans/`; commit `a2909c7` | user review and cold-start |
+| `PLAN.md` | approved | `PLAN.md`, `docs/superpowers/plans/`; commit `a2909c7`; user selected Subagent-Driven on 2026-08-08 | complete cold-start validation |
 | `AGENT_LOG.md` | active | `AGENT_LOG.md` | append every significant task |
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
 | Source implementation | not started | no source package yet | complete approved plan tasks |

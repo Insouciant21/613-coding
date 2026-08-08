@@ -37,7 +37,7 @@ The implementation critical path is `CORE → SANDBOX → MULTI_AGENT → DELIVE
 - [x] Brainstorming design approved and committed.
 - [x] Root specification and process records created for review.
 - [x] Specification, root plan, four subsystem plans, and initial evidence records committed as `a2909c7`.
-- [ ] User reviews `SPEC.md` and `PLAN.md`.
+- [x] User reviewed `SPEC.md` and `PLAN.md` without requested changes and selected Subagent-Driven execution on 2026-08-08.
 - [ ] A different agent type cold-starts one or two tasks with only `SPEC.md` and `PLAN.md` and records questions in `SPEC_PROCESS.md`.
 - [ ] Core implementation begins only after the cold-start findings are incorporated.
 - [ ] Each task receives spec-compliance review, code-quality review, fresh verification, a commit, and record updates.
