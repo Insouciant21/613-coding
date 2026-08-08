@@ -249,3 +249,9 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Controller verification: focused sandbox contracts passed 9 tests; the full offline suite passed 135 tests; Ruff, mypy across 48 source files, `uv lock --check`, and `git diff --check` passed.
 - Commit: `5d4e787` (`fix: require finite sandbox duration limits`).
 - Workflow note: the isolated fix Agent used a writable `/tmp` uv cache and intentionally skipped its nested full suite; the controller ran the complete suite. Scoped re-review remains pending.
+
+### 2026-08-09 03:52:47 Asia/Shanghai — SANDBOX-01 scoped re-review
+
+- Independent read-only re-review marked finite CPU/time validation and its regression coverage `ADDRESSED`.
+- New breakage: none. Out-of-scope observations: none. No Critical/Important finding remains.
+- Decision: SANDBOX-01 complete through `9df471d`; proceed to SANDBOX-02 workspace and artifact isolation.

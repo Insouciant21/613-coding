@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 03:48:49 (Asia/Shanghai)
-Responsible actor: `/root`; SANDBOX-01 review fix committed at `5d4e787`, pending scoped re-review.
+Last updated: 2026-08-09 03:52:47 (Asia/Shanghai)
+Responsible actor: `/root`; SANDBOX-01 complete through `9df471d` after clean scoped re-review.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -16,7 +16,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
 | Source implementation | Core complete after final-review repair | task evidence in `PLAN.md` and `AGENT_LOG.md`; final-review implementation/evidence commit `9af4f03`; final-fix report under `.superpowers/sdd/2026-08-08-613-coding-core/` | begin sandbox subsystem |
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
-| Container sandbox | in progress | SANDBOX-01 at `024925a`; finite-limit fix `5d4e787`; 9 focused and 135 full tests passed; task report under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | scoped re-review the fix, then implement workspace and Docker runtime |
+| Container sandbox | in progress | SANDBOX-01 complete through `9df471d`; finite-limit finding addressed; 9 focused and 135 full tests passed; task and re-review reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | implement workspace and artifact export |
 | Multi-agent orchestration | not started | no Supervisor yet | run task-graph/worker tests |
 | README and distribution | not started | no package or Dockerfile yet | verify `uv tool install` and Docker demo |
 | GitLab CI `unit-test` job | not started | no `.gitlab-ci.yml` yet | last pipeline must pass |
@@ -115,13 +115,13 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 ## SANDBOX-01 Evidence
 
 - Verification timestamp: `2026-08-09 03:33:03 Asia/Shanghai`.
-- Status: implementation committed at `024925a`; controller gates passed; independent task review is pending.
+- Status: complete after independent review and fix round 1; commits `024925a`, `5d4e787`, and evidence commit `9df471d`.
 - TDD RED: focused collection failed with the sandbox adapter package missing.
 - GREEN: focused contracts passed 5 tests; full offline suite passed 131 tests.
 - Static gates: Ruff, mypy across 48 source files, `uv lock --check`, and `git diff --check` passed.
 - Boundary: strict specs require a pinned SHA-256 image digest, non-root execution, read-only root, no capabilities, default-deny network, finite resource limits, and an environment-name allowlist. The fake runtime records create/execute/export/destroy order and rejects use after destroy.
 - Workflow note: the external implementer's nested bwrap test process did not exit; the controller reproduced a clean full-suite run outside the nested sandbox and interrupted the stalled process. The exact evidence is in `.superpowers/sdd/2026-08-08-613-coding-sandbox/task-1-report.md`.
-- Review fix: one Important finding showed `float("inf")` was accepted for CPU/time limits. Focused RED was 2 failed and 7 passed; `allow_inf_nan=False` plus parameterized coverage produced 9 focused passes and 135 full-suite passes. Ruff, mypy, lock, and diff checks passed at `2026-08-09 03:48:49 Asia/Shanghai`; scoped re-review is pending.
+- Review fix: one Important finding showed `float("inf")` was accepted for CPU/time limits. Focused RED was 2 failed and 7 passed; `allow_inf_nan=False` plus parameterized coverage produced 9 focused passes and 135 full-suite passes. Ruff, mypy, lock, and diff checks passed at `2026-08-09 03:48:49 Asia/Shanghai`; scoped re-review marked the finding `ADDRESSED` with no new breakage or out-of-scope observations.
 
 ## Recording Rules
 
