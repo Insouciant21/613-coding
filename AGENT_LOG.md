@@ -216,3 +216,15 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Scoped re-review: both Important findings `ADDRESSED`; no new Critical/Important breakage.
 - Workflow deviation: the platform collaboration namespace was unavailable in this continuation. The first CLI fix agent stalled and left unreported changes, so the controller restored the production baseline, observed RED, and used separate read/edit-only Claude Code agents for the production and test-quality steps. User-owned untracked files remained untouched.
 - Lesson: a fix report must reproduce exact command evidence; model-generated test names, exception types, or timings are not acceptable substitutes.
+
+### 2026-08-09 02:59:19 Asia/Shanghai — Core final-review fix wave
+
+- Task: Core whole-branch final-review findings; triggered `receiving-code-review`, `systematic-debugging`, `test-driven-development`, `requesting-code-review`, and `verification-before-completion`.
+- Root cause: SQLite connection context managers committed or rolled back but never closed; `RunService` persisted a pre-loop snapshot through unconditional `update_run`, allowing a stale service to replace a newer terminal state.
+- TDD RED: `uv run pytest tests/adapters/storage/test_sqlite.py tests/adapters/storage/test_memory.py tests/application/test_loop.py -q` produced 6 failed and 42 passed. Failures deterministically showed open connections after success/exception, the missing SQLite run CAS, and stale `resume`/`cancel` overwrites.
+- Implementation: added close-owning transaction contexts to both SQLite repositories; replaced run updates with a full-snapshot atomic CAS; reconciled lost service races to the authoritative persisted state and stop reason.
+- Review repair RED: independent review found one Important gap: already-terminal `resume()` could re-enter the loop and terminal `cancel()` could return a stale session summary. The focused regression produced 2 failed and 33 deselected before production edits.
+- Final GREEN: terminal-entry regression passed 2 tests; required focused suite passed 50 tests; full suite passed 126 tests. `uv run ruff check .`, `uv run mypy src`, `uv lock --check`, and `git diff --check` passed.
+- Review: no Critical or Minor issues; the one Important finding was addressed with terminal entry-point short-circuits and authoritative summary reconciliation. Full evidence is in `.superpowers/sdd/2026-08-08-613-coding-core/core-final-review-fix-report.md`.
+- Workflow context: used the user-authorized current-workspace fallback because Git ref locks prevented worktree creation. Human intervention: prior authorization only. User-owned untracked `.claude/` and both untracked requirement documents remained untouched.
+- Lesson: transaction context management and resource ownership are separate SQLite concerns; optimistic concurrency must compare the snapshot atomically at the persistence boundary, surface the winning state to callers, and prevent later terminal entry points from trusting stale loop-session state.

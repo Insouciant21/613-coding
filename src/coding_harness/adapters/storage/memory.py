@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
+from contextlib import closing, contextmanager
 from datetime import datetime
 from pathlib import Path
 from uuid import UUID
@@ -29,9 +31,14 @@ class MemoryRepository:
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
+    @contextmanager
+    def _transaction(self) -> Iterator[sqlite3.Connection]:
+        with closing(self._connect()) as connection, connection:
+            yield connection
+
     def put(self, entry: MemoryEntry) -> None:
         redacted = redact_text(entry.text)
-        with self._connect() as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 INSERT INTO memory_entries (
@@ -64,7 +71,7 @@ class MemoryRepository:
             )
 
     def get(self, memory_id: UUID) -> MemoryEntry | None:
-        with self._connect() as connection:
+        with self._transaction() as connection:
             row = connection.execute(
                 """
                 SELECT m.*, e.status AS embedding_state
@@ -94,7 +101,7 @@ class MemoryRepository:
         keyword_clause = " OR ".join(
             "m.redacted_text LIKE ? ESCAPE '\\'" for _ in escaped_terms
         )
-        with self._connect() as connection:
+        with self._transaction() as connection:
             rows = connection.execute(
                 f"""
                 SELECT m.*, e.status AS embedding_state
@@ -109,14 +116,14 @@ class MemoryRepository:
         return [self._from_row(row) for row in rows]
 
     def project_for_run(self, run_id: UUID) -> UUID | None:
-        with self._connect() as connection:
+        with self._transaction() as connection:
             row = connection.execute(
                 "SELECT project_id FROM runs WHERE id = ?", (str(run_id),)
             ).fetchone()
         return UUID(row["project_id"]) if row is not None and row["project_id"] else None
 
     def delete_project(self, project_id: UUID) -> None:
-        with self._connect() as connection:
+        with self._transaction() as connection:
             connection.execute("DELETE FROM projects WHERE id = ?", (str(project_id),))
 
     @staticmethod

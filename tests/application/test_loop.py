@@ -34,6 +34,7 @@ from coding_harness.domain.models import (
     PermissionMode,
     Run,
     RunState,
+    RunSummary,
     StopReason,
 )
 from coding_harness.ports.llm import (
@@ -142,6 +143,74 @@ class RunRecords(EventRecords):
 
     def update_run(self, run: Run) -> None:
         self.runs[run.id] = run
+
+    def compare_and_set_run(self, expected: Run, replacement: Run) -> bool:
+        if self.runs.get(expected.id) != expected:
+            return False
+        self.runs[expected.id] = replacement
+        return True
+
+
+class RacingRunRecords(RunRecords):
+    def __init__(self) -> None:
+        super().__init__()
+        self.authoritative: Run | None = None
+
+    def _persist_competing_terminal(self, run_id: UUID) -> None:
+        if self.authoritative is not None:
+            return
+        current = self.runs[run_id]
+        self.authoritative = current.model_copy(
+            update={
+                "state": RunState.COMPLETED,
+                "stop_reason": StopReason.SUCCESS,
+                "updated_at": current.updated_at + timedelta(seconds=1),
+            }
+        )
+        self.runs[run_id] = self.authoritative
+
+    def update_run(self, run: Run) -> None:
+        self._persist_competing_terminal(run.id)
+        super().update_run(run)
+
+    def compare_and_set_run(self, expected: Run, replacement: Run) -> bool:
+        self._persist_competing_terminal(expected.id)
+        return super().compare_and_set_run(expected, replacement)
+
+
+class StaleRunLoop:
+    def __init__(self) -> None:
+        self.run_calls = 0
+        self.cancel_calls = 0
+
+    def run(
+        self,
+        run_id: UUID,
+        task: str,
+        deps: LoopDependencies,
+    ) -> RunSummary:
+        self.run_calls += 1
+        return RunSummary(run_id=run_id, status=RunState.WAITING_APPROVAL)
+
+    def cancel(
+        self,
+        run_id: UUID,
+        task: str,
+        deps: LoopDependencies,
+    ) -> RunSummary:
+        self.cancel_calls += 1
+        return RunSummary(
+            run_id=run_id,
+            status=RunState.CANCELLED,
+            stop_reason=StopReason.CANCELLED,
+        )
+
+    def get_summary(
+        self,
+        run_id: UUID,
+        deps: LoopDependencies,
+    ) -> RunSummary:
+        return RunSummary(run_id=run_id, status=RunState.WAITING_APPROVAL)
 
 
 class Executor:
@@ -433,6 +502,72 @@ def test_run_service_creates_approves_resumes_and_cancels(tmp_path: Path) -> Non
     with pytest.raises(StaleApprovalError):
         service.approve(pending_request)
     assert records.get_approval(pending_request).status is ApprovalStatus.REJECTED  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize("operation", ("resume", "cancel"))
+def test_run_service_returns_authoritative_terminal_summary_after_status_race(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    store = RacingRunRecords()
+
+    def factory(run: Run) -> LoopDependencies:
+        deps, _, _, _ = dependencies(tmp_path, Provider(()), Validator(()))
+        return deps
+
+    service = RunService(store, StaleRunLoop(), factory)  # type: ignore[arg-type]
+    run = service.create_run(RunRequest(task="race status persistence"))
+
+    summary = service.resume(run.id) if operation == "resume" else service.cancel(run.id)
+
+    assert store.authoritative is not None
+    assert store.get_run(run.id) == store.authoritative
+    assert summary.status is RunState.COMPLETED
+    assert summary.stop_reason is StopReason.SUCCESS
+
+
+@pytest.mark.parametrize("operation", ("resume", "cancel"))
+def test_run_service_terminal_operations_return_authoritative_state_without_reentry(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    store = RunRecords()
+    terminal = Run(
+        task="immutable terminal",
+        state=RunState.COMPLETED,
+        stop_reason=StopReason.SUCCESS,
+    )
+    store.create_run(terminal)
+    loop = StaleRunLoop()
+    service = RunService(
+        store,
+        loop,  # type: ignore[arg-type]
+        lambda run: dependencies(tmp_path, Provider(()), Validator(()))[0],
+    )
+
+    summary = service.resume(terminal.id) if operation == "resume" else service.cancel(terminal.id)
+
+    assert summary.status is RunState.COMPLETED
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert loop.run_calls == 0
+    assert loop.cancel_calls == 0
+    assert store.get_run(terminal.id) == terminal
+
+
+@pytest.mark.parametrize("operation", ("resume", "cancel"))
+def test_run_service_preserves_unknown_run_errors(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    store = RunRecords()
+    service = RunService(
+        store,
+        AgentLoop(),
+        lambda run: dependencies(tmp_path, Provider(()), Validator(()))[0],
+    )
+
+    with pytest.raises(KeyError, match="unknown run"):
+        getattr(service, operation)(uuid4())
 
 
 def test_expired_approval_terminates_instead_of_waiting_forever(tmp_path: Path) -> None:

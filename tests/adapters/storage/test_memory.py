@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 from uuid import uuid4
+
+import pytest
 
 from coding_harness.adapters.embeddings.mock import DeterministicEmbedding
 from coding_harness.adapters.storage.lancedb_index import (
@@ -12,6 +15,22 @@ from coding_harness.adapters.storage.lancedb_index import (
 from coding_harness.adapters.storage.memory import MemoryRepository
 from coding_harness.adapters.storage.sqlite import SqliteEventStore
 from coding_harness.domain.models import MemoryEntry, MemoryType, Project
+
+
+class TrackingMemoryRepository(MemoryRepository):
+    def __init__(self, path: Path) -> None:
+        self.connections: list[sqlite3.Connection] = []
+        super().__init__(path)
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = super()._connect()
+        self.connections.append(connection)
+        return connection
+
+
+def assert_connection_closed(connection: sqlite3.Connection) -> None:
+    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+        connection.execute("SELECT 1")
 
 
 def test_sqlite_memory_is_authoritative_and_redacted(tmp_path: Path) -> None:
@@ -35,6 +54,25 @@ def test_sqlite_memory_is_authoritative_and_redacted(tmp_path: Path) -> None:
     assert "[REDACTED]" in restored.text
     assert repository.search_keyword("parser", project.id) == [restored]
     assert b"sk-test-secret-1234" not in database.read_bytes()
+
+
+def test_memory_repository_closes_connections_after_success_and_exception(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "state.db"
+    repository = TrackingMemoryRepository(database)
+
+    assert repository.get(uuid4()) is None
+    assert_connection_closed(repository.connections[-1])
+
+    missing_project_entry = MemoryEntry(
+        project_id=uuid4(),
+        memory_type=MemoryType.TASK_SUMMARY,
+        text="cannot persist without project",
+    )
+    with pytest.raises(sqlite3.IntegrityError):
+        repository.put(missing_project_entry)
+    assert_connection_closed(repository.connections[-1])
 
 
 def test_lancedb_top_k_filters_project_type_and_permissions(tmp_path: Path) -> None:

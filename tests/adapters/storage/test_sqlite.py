@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -18,7 +18,24 @@ from coding_harness.domain.models import (
     PermissionMode,
     Run,
     RunState,
+    StopReason,
 )
+
+
+class TrackingSqliteEventStore(SqliteEventStore):
+    def __init__(self, path: Path) -> None:
+        self.connections: list[sqlite3.Connection] = []
+        super().__init__(path)
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = super()._connect()
+        self.connections.append(connection)
+        return connection
+
+
+def assert_connection_closed(connection: sqlite3.Connection) -> None:
+    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+        connection.execute("SELECT 1")
 
 
 def test_store_creates_required_schema(tmp_path: Path) -> None:
@@ -43,6 +60,62 @@ def test_store_creates_required_schema(tmp_path: Path) -> None:
         "memory_entries",
         "embedding_status",
     } <= tables
+
+
+def test_store_closes_connections_after_successful_operations(tmp_path: Path) -> None:
+    store = TrackingSqliteEventStore(tmp_path / "state.db")
+    assert_connection_closed(store.connections[-1])
+
+    run = Run(task="close successful connections")
+    store.create_run(run)
+    assert_connection_closed(store.connections[-1])
+
+    assert store.get_run(run.id) == run
+    assert_connection_closed(store.connections[-1])
+
+
+def test_store_closes_connection_after_exception_and_rolls_back(
+    tmp_path: Path,
+) -> None:
+    store = TrackingSqliteEventStore(tmp_path / "state.db")
+    missing_run = IterationRecord(
+        run_id=uuid4(),
+        iteration=1,
+        state_before=RunState.RUNNING,
+        state_after=RunState.WAITING_MODEL,
+        timestamp=datetime.now(UTC),
+    )
+
+    with pytest.raises(sqlite3.IntegrityError):
+        store.save_iteration(missing_run)
+
+    assert_connection_closed(store.connections[-1])
+    with sqlite3.connect(store.path) as connection:
+        count = connection.execute("SELECT COUNT(*) FROM iterations").fetchone()[0]
+    assert count == 0
+
+
+def test_run_compare_and_set_rejects_a_stale_snapshot(tmp_path: Path) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+    original = Run(task="atomic status")
+    store.create_run(original)
+    paused = original.model_copy(
+        update={
+            "state": RunState.WAITING_APPROVAL,
+            "updated_at": original.updated_at + timedelta(seconds=1),
+        }
+    )
+    stale_terminal = original.model_copy(
+        update={
+            "state": RunState.CANCELLED,
+            "stop_reason": StopReason.CANCELLED,
+            "updated_at": original.updated_at + timedelta(seconds=2),
+        }
+    )
+
+    assert store.compare_and_set_run(original, paused)
+    assert not store.compare_and_set_run(original, stale_terminal)
+    assert store.get_run(original.id) == paused
 
 
 def test_run_and_events_round_trip_in_append_order(tmp_path: Path) -> None:

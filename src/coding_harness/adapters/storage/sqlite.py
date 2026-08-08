@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
+from contextlib import closing, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
@@ -27,7 +29,7 @@ class SqliteEventStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         schema = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
-        with self._connect() as connection:
+        with self._transaction() as connection:
             connection.executescript(schema)
 
     def _connect(self) -> sqlite3.Connection:
@@ -36,8 +38,13 @@ class SqliteEventStore:
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
+    @contextmanager
+    def _transaction(self) -> Iterator[sqlite3.Connection]:
+        with closing(self._connect()) as connection, connection:
+            yield connection
+
     def create_run(self, run: Run) -> None:
-        with self._connect() as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 INSERT INTO runs (
@@ -58,7 +65,7 @@ class SqliteEventStore:
             )
 
     def create_project(self, project: Project) -> None:
-        with self._connect() as connection:
+        with self._transaction() as connection:
             connection.execute(
                 "INSERT INTO projects (id, canonical_root, created_at) VALUES (?, ?, ?)",
                 (
@@ -69,7 +76,7 @@ class SqliteEventStore:
             )
 
     def get_run(self, run_id: UUID) -> Run | None:
-        with self._connect() as connection:
+        with self._transaction() as connection:
             row = connection.execute(
                 "SELECT * FROM runs WHERE id = ?", (str(run_id),)
             ).fetchone()
@@ -86,31 +93,46 @@ class SqliteEventStore:
             updated_at=self._parse_datetime(row["updated_at"]),
         )
 
-    def update_run(self, run: Run) -> None:
-        with self._connect() as connection:
+    def compare_and_set_run(self, expected: Run, replacement: Run) -> bool:
+        if expected.id != replacement.id:
+            raise ValueError("replacement run id does not match expected run id")
+        with self._transaction() as connection:
             cursor = connection.execute(
                 """
                 UPDATE runs
                 SET project_id = ?, task = ?, permission_mode = ?, state = ?,
                     stop_reason = ?, updated_at = ?
                 WHERE id = ?
+                    AND project_id IS ?
+                    AND task = ?
+                    AND permission_mode = ?
+                    AND state = ?
+                    AND stop_reason IS ?
+                    AND created_at = ?
+                    AND updated_at = ?
                 """,
                 (
-                    str(run.project_id) if run.project_id else None,
-                    run.task,
-                    run.permission_mode.value,
-                    run.state.value,
-                    run.stop_reason.value if run.stop_reason else None,
-                    run.updated_at.isoformat(),
-                    str(run.id),
+                    str(replacement.project_id) if replacement.project_id else None,
+                    replacement.task,
+                    replacement.permission_mode.value,
+                    replacement.state.value,
+                    replacement.stop_reason.value if replacement.stop_reason else None,
+                    replacement.updated_at.isoformat(),
+                    str(expected.id),
+                    str(expected.project_id) if expected.project_id else None,
+                    expected.task,
+                    expected.permission_mode.value,
+                    expected.state.value,
+                    expected.stop_reason.value if expected.stop_reason else None,
+                    expected.created_at.isoformat(),
+                    expected.updated_at.isoformat(),
                 ),
             )
-            if cursor.rowcount != 1:
-                raise KeyError(run.id)
+        return cursor.rowcount == 1
 
     def append(self, event: Event) -> None:
         payload = redact_payload(event.payload)
-        with self._connect() as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 INSERT INTO events (id, run_id, version, event_type, payload_json, timestamp)
@@ -127,7 +149,7 @@ class SqliteEventStore:
             )
 
     def list_for_run(self, run_id: UUID) -> list[Event]:
-        with self._connect() as connection:
+        with self._transaction() as connection:
             rows = connection.execute(
                 "SELECT * FROM events WHERE run_id = ? ORDER BY sequence", (str(run_id),)
             ).fetchall()
@@ -145,7 +167,7 @@ class SqliteEventStore:
 
     def save_iteration(self, iteration: IterationRecord) -> None:
         record_json = self._redacted_json(iteration.model_dump(mode="json"))
-        with self._connect() as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 INSERT INTO iterations (id, run_id, iteration_number, record_json, timestamp)
@@ -161,7 +183,7 @@ class SqliteEventStore:
             )
 
     def list_iterations(self, run_id: UUID) -> list[IterationRecord]:
-        with self._connect() as connection:
+        with self._transaction() as connection:
             rows = connection.execute(
                 "SELECT record_json FROM iterations WHERE run_id = ? ORDER BY iteration_number",
                 (str(run_id),),
@@ -170,7 +192,7 @@ class SqliteEventStore:
 
     def save_loop_session(self, session: LoopSession) -> None:
         session_json = self._redacted_json(session.model_dump(mode="json"))
-        with self._connect() as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 INSERT INTO loop_sessions (run_id, session_json, updated_at)
@@ -196,7 +218,7 @@ class SqliteEventStore:
             raise ValueError("iteration and session must belong to the same run")
         record_json = self._redacted_json(iteration.model_dump(mode="json"))
         session_json = self._redacted_json(session.model_dump(mode="json"))
-        with self._connect() as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 INSERT INTO iterations (id, run_id, iteration_number, record_json, timestamp)
@@ -228,7 +250,7 @@ class SqliteEventStore:
                 self._replace_claimed_approval(connection, approval_update)
 
     def get_loop_session(self, run_id: UUID) -> LoopSession | None:
-        with self._connect() as connection:
+        with self._transaction() as connection:
             row = connection.execute(
                 "SELECT session_json FROM loop_sessions WHERE run_id = ?",
                 (str(run_id),),
@@ -241,7 +263,7 @@ class SqliteEventStore:
         if request.run_id is None:
             raise ValueError("approval request requires a run_id")
         request_json = self._redacted_json(request.model_dump(mode="json"))
-        with self._connect() as connection:
+        with self._transaction() as connection:
             connection.execute(
                 """
                 INSERT INTO approvals (
@@ -261,7 +283,7 @@ class SqliteEventStore:
             )
 
     def get_approval(self, request_id: UUID) -> ApprovalRequest | None:
-        with self._connect() as connection:
+        with self._transaction() as connection:
             row = connection.execute(
                 "SELECT request_json FROM approvals WHERE id = ?",
                 (str(request_id),),
@@ -271,7 +293,7 @@ class SqliteEventStore:
         return ApprovalRequest.model_validate_json(row["request_json"])
 
     def list_approvals(self, run_id: UUID) -> list[ApprovalRequest]:
-        with self._connect() as connection:
+        with self._transaction() as connection:
             rows = connection.execute(
                 """
                 SELECT request_json FROM approvals
@@ -290,7 +312,7 @@ class SqliteEventStore:
         if replacement.id != request_id:
             raise ValueError("replacement approval id does not match request id")
         request_json = self._redacted_json(replacement.model_dump(mode="json"))
-        with self._connect() as connection:
+        with self._transaction() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 "SELECT request_json FROM approvals WHERE id = ?",

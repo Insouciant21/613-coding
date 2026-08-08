@@ -33,7 +33,7 @@ class RunStore(Protocol):
 
     def get_run(self, run_id: UUID) -> Run | None: ...
 
-    def update_run(self, run: Run) -> None: ...
+    def compare_and_set_run(self, expected: Run, replacement: Run) -> bool: ...
 
     def get_approval(self, request_id: UUID) -> ApprovalRequest | None: ...
 
@@ -62,9 +62,10 @@ class RunService:
     def resume(self, run_id: UUID) -> RunSummary:
         run = self._require_run(run_id)
         dependencies = self._get_dependencies(run)
+        if run.state.is_terminal:
+            return self._terminal_summary(run, dependencies)
         summary = self._loop.run(run_id, run.task, dependencies)
-        self._persist_status(run, summary)
-        return summary
+        return self._persist_status(run, summary)
 
     def approve(self, request_id: UUID) -> ApprovalResolution:
         return self._resolve(request_id, ApprovalDecision.APPROVE)
@@ -76,10 +77,9 @@ class RunService:
         run = self._require_run(run_id)
         dependencies = self._get_dependencies(run)
         if run.state.is_terminal:
-            return self._loop.get_summary(run_id, dependencies)
+            return self._terminal_summary(run, dependencies)
         summary = self._loop.cancel(run_id, run.task, dependencies)
-        self._persist_status(run, summary)
-        return summary
+        return self._persist_status(run, summary)
 
     def get_summary(self, run_id: UUID) -> RunSummary:
         run = self._require_run(run_id)
@@ -110,11 +110,32 @@ class RunService:
             raise KeyError(f"unknown run: {run_id}")
         return run
 
-    def _persist_status(self, run: Run, summary: RunSummary) -> None:
+    def _persist_status(self, run: Run, summary: RunSummary) -> RunSummary:
         data = run.model_dump()
         data.update(
             state=summary.status,
             stop_reason=summary.stop_reason if summary.status.is_terminal else None,
             updated_at=datetime.now(UTC),
         )
-        self._store.update_run(Run.model_validate(data))
+        replacement = Run.model_validate(data)
+        if self._store.compare_and_set_run(run, replacement):
+            return summary
+        authoritative = self._require_run(run.id)
+        return self._with_run_status(summary, authoritative)
+
+    def _terminal_summary(
+        self,
+        run: Run,
+        dependencies: LoopDependencies,
+    ) -> RunSummary:
+        summary = self._loop.get_summary(run.id, dependencies)
+        return self._with_run_status(summary, run)
+
+    @staticmethod
+    def _with_run_status(summary: RunSummary, run: Run) -> RunSummary:
+        return summary.model_copy(
+            update={
+                "status": run.state,
+                "stop_reason": run.stop_reason,
+            }
+        )
