@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-08 22:21:23 (Asia/Shanghai)
+Last updated: 2026-08-08 22:25:19 (Asia/Shanghai)
 Responsible actor: `/root` controller; CORE-01 implementation/review commits `4d51108`, `3b0ea0e`; CORE-02 commits `59bc4f2`, `2934063`, `69b1c59`.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -15,7 +15,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | `AGENT_LOG.md` | active | `AGENT_LOG.md` | append every significant task |
 | `DELIVERY_STATUS.md` | active | this file | update after every delivery change |
 | Source implementation | CORE-01 complete | focused unittest, py_compile, complete `uv.lock`, and review repair in `AGENT_LOG.md`; scaffold commit `4d51108` plus repair commit | proceed to CORE-02 after bootstrap verification |
-| Mock-LLM mechanism tests | not started | no test suite yet | implement before real LLM integration |
+| Mock-LLM mechanism tests | adapter complete | scripted order/snapshot/exhaustion tests in `tests/adapters/llm`; task commit pending | connect mock to AgentLoop demo in CORE-10 |
 | Container sandbox | not started | no Docker runtime yet | run lifecycle/security tests |
 | Multi-agent orchestration | not started | no Supervisor yet | run task-graph/worker tests |
 | README and distribution | not started | no package or Dockerfile yet | verify `uv tool install` and Docker demo |
@@ -45,6 +45,13 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - Status: complete; commit `a97e711`.
 - Tests: 5 focused SQLite tests and 16 combined core tests passed, including foreign-key rollback and concurrent append checks.
 - Persistence: direct raw-secret event payloads are redacted before SQLite insertion.
+
+## CORE-05 Evidence
+
+- Verification timestamp: `2026-08-08 22:25:19 Asia/Shanghai`.
+- Status: implementation complete; commit pending at evidence creation.
+- Tests: 7 focused LLM-adapter tests and 23 combined core tests passed.
+- Provider boundary: only MockTransport used; no real LLM, network request, or credential.
 
 ## Recording Rules
 

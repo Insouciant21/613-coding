@@ -75,3 +75,8 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 - Status: complete; commit `a97e711`; scoped storage review clean.
 - Verification: 5 focused SQLite tests and 16 combined core tests passed; Ruff and mypy passed; temporary concurrent appends completed without loss.
+
+## CORE-05 Task Evidence
+
+- Status: implementation complete; commit hash is recorded after commit.
+- Verification: 7 focused LLM-adapter tests and 23 combined core tests passed; Ruff and mypy passed; HTTP tests were fully offline.

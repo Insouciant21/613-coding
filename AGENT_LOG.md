@@ -126,3 +126,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation: added the complete initial schema, Run model, transactional run/event/iteration writes, ordered event reads, and mandatory persistence-boundary redaction.
 - GREEN: 5 focused storage tests and 16 combined core tests passed; Ruff and mypy passed; a 20-event, 4-thread temporary-database check passed.
 - Human intervention: none; all storage tests use temporary SQLite databases.
+
+### 2026-08-08 22:25:19 Asia/Shanghai — CORE-05 LLM adapters
+
+- Task: CORE-05; triggered `test-driven-development` and `verification-before-completion`.
+- TDD RED: adapter tests failed during collection because the LLM adapter package was absent.
+- Implementation: added deterministic scripted responses with deep snapshots and a single-call OpenAI-compatible HTTP adapter with typed failures.
+- GREEN: 7 focused adapter tests and 23 combined core tests passed; Ruff and mypy passed.
+- Human intervention: none; HTTP tests use MockTransport, no API key, real LLM, retry, or external request.
