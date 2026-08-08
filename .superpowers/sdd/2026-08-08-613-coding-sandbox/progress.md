@@ -7,5 +7,5 @@ Task 1: fix round 1/5 (1 addressed, 0 open — finite CPU/time limits; commits 0
 Task 1: complete (commits 219b475..9df471d, review clean)
 Task 2: complete (commits `698863c`, `840cc21`, `aa3600a`; review clean after filesystem-root repair)
 Task 3: complete (commits `bf129cd`, `3ec6ac1`; fake-client lifecycle review clean; real smoke skipped: no pinned worker image locally)
-Task 4: pending
+Task 4: complete (commit `439540f`; policy hard-boundary review clean)
 Task 5: pending

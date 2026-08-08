@@ -290,3 +290,10 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Verification: focused runtime tests passed 8; sandbox suite passed 34; full suite passed 160; Ruff, mypy across 52 source files, `uv lock --check`, and `git diff --check` passed.
 - Docker smoke: daemon `29.6.2` was available, but only an unapproved `postgres:16-alpine` image was local; no real worker image was pulled, so guarded smoke was skipped with that explicit reason.
 - Review decision: fake-client lifecycle and security boundary review clean; proceed to SANDBOX-04 policy composition.
+
+### 2026-08-09 04:42:00 Asia/Shanghai — SANDBOX-04 security and resource policy
+
+- Task: SANDBOX-04; TDD RED was the expected missing `SandboxPolicyConfig` import before implementation.
+- Implementation: added policy configuration and deterministic validation for pinned/approved images, non-root/read-only/capability-free workers, credential-free environment names, exact network approvals, and per-field resource bounds. Result evaluation maps timeout, explicit exhaustion, and output overflow to `resource_exhausted` decisions.
+- Verification: focused policy tests passed 8; full suite passed 168; Ruff, mypy across 53 source files, `uv lock --check`, and `git diff --check` passed.
+- Review decision: hard rules precede mode; autonomous mode cannot bypass them. Proceed to SANDBOX-05 demonstration.

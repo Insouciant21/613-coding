@@ -26,7 +26,7 @@
 | Plan | Scope | Depends on | Status |
 | --- | --- | --- | --- |
 | `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | complete after final-review repair at `9af4f03` |
-| `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | in progress; SANDBOX-03 complete through `3ec6ac1` |
+| `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | in progress; SANDBOX-04 complete through `439540f` |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | pending |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | pending |
 
@@ -154,3 +154,10 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - TDD evidence: focused collection failed before implementation due to the missing Docker adapter. Final focused runtime suite passed 8 tests.
 - Verification: 34 sandbox tests and all 160 project tests passed; Ruff, mypy across 52 source files, `uv lock --check`, and `git diff --check` passed.
 - Boundaries: only manager-created copied workspaces are mounted; container options pin image/user/read-only/capability/network/memory/PID/CPU settings; command timeouts and output caps map to `CommandResult`; artifacts export through the manager-bound exporter; stop/remove/workspace cleanup runs across failure paths.
+
+## SANDBOX-04 Task Evidence
+
+- Status: complete; commit `439540f` (`feat: enforce sandbox resource and network policy`).
+- TDD evidence: focused collection failed before implementation because `SandboxPolicyConfig` was absent; final focused policy suite passed 8 tests.
+- Verification: all 168 project tests passed; Ruff, mypy across 53 source files, `uv lock --check`, and `git diff --check` passed.
+- Boundaries: hard rules precede mode, autonomous cannot override root/capability/read-only/image/credential/resource denials, network allowlists are exact and recorded, and resource violations map to deterministic `resource_exhausted` decisions.
