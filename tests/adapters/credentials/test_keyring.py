@@ -73,3 +73,43 @@ def test_env_fallback_is_opt_in_and_is_not_used_by_default(monkeypatch: pytest.M
     fallback = service(fake, allow_env_fallback=True)
     assert fallback.resolve("anthropic").source == "env"
     assert "env-secret" not in repr(fallback.resolve("anthropic"))
+
+
+class KeyringBackendError(RuntimeError):
+    pass
+
+
+class RaisingOnDeleteKeyring(FakeKeyring):
+    """Backend that always raises on delete_password (e.g. Freedesktop Secret Service)."""
+
+    def delete_password(self, service: str, username: str) -> None:
+        raise KeyringBackendError("keyring: no item found")
+
+
+class AlwaysRaisingKeyring:
+    """Backend that raises on every call -- simulates delete+get double-fault."""
+
+    def get_password(self, service: str, username: str) -> str | None:
+        raise KeyringBackendError("keyring: get_password failed")
+
+    def set_password(self, service: str, username: str, password: str) -> None:
+        pass
+
+    def delete_password(self, service: str, username: str) -> None:
+        raise KeyringBackendError("keyring: delete_password failed")
+
+
+def test_clear_missing_key_is_idempotent_when_backend_raises_on_delete() -> None:
+    """clear() must not propagate the backend exception when the entry is absent."""
+    backend = RaisingOnDeleteKeyring()
+    credentials = service(backend)
+    # Key was never set; delete_password raises but get_password returns None -> silent
+    credentials.clear("openai")
+
+
+def test_clear_double_fault_raises_credential_error() -> None:
+    """When delete_password AND get_password both raise, clear() must raise CredentialError."""
+    backend = AlwaysRaisingKeyring()
+    credentials = CredentialService(KeyringCredentialStore(keyring_backend=backend))
+    with pytest.raises(CredentialError):
+        credentials.clear("openai")

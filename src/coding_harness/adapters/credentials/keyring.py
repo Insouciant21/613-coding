@@ -43,10 +43,14 @@ class KeyringCredentialStore:
     def clear(self, provider: str) -> None:
         try:
             self._keyring.delete_password(self._service_name, provider)
-        except Exception as error:
+        except Exception as delete_error:
             # Backends differ on whether deleting a missing entry is an error.
-            if self._keyring_value(provider) is not None:
-                raise CredentialError("could not clear provider credential") from error
+            try:
+                still_present = self._keyring_value(provider) is not None
+            except Exception as read_error:
+                raise CredentialError("could not clear provider credential") from read_error
+            if still_present:
+                raise CredentialError("could not clear provider credential") from delete_error
 
     def status(self, provider: str) -> CredentialStatus:
         if self._keyring_value(provider) is not None:
@@ -57,6 +61,6 @@ class KeyringCredentialStore:
 
     def resolve(self, provider: str) -> SecretReference:
         status = self.status(provider)
-        if not status.configured:
+        if not status.configured or status.source == "none":
             raise CredentialError(f"no credential configured for provider {provider}")
-        return SecretReference(provider=provider, source=status.source)  # type: ignore[arg-type]
+        return SecretReference(provider=provider, source=status.source)
