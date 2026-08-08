@@ -2,7 +2,7 @@
 
 Status: complete; initial dependency provisioning was blocked and was later resolved.
 
-Commit: `4d51108` (`chore: scaffold coding harness package`); review repair commit is pending.
+Commits: `4d51108` (`chore: scaffold coding harness package`), `3b0ea0e` (`fix: close CORE-01 bootstrap review findings`).
 
 Tests: RED import test failed with the expected `ModuleNotFoundError`; focused unittest then passed; scaffold modules passed `python3 -m py_compile`. Repair verification: `uv lock` resolved 54 packages and `uv lock --check` passed; `uv sync --all-extras --frozen --offline` remains blocked because the `lancedb==0.36.0` wheel is absent from the cache, so canonical third-party checks were not run.
 
