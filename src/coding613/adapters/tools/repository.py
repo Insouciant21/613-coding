@@ -98,6 +98,23 @@ class _EditFileExecutor:
         return _result(call, changed_files=(path,))
 
 
+class _DeleteFileExecutor:
+    def __init__(self, tools: FilesystemTools, changed_files: list[str]) -> None:
+        self._tools = tools
+        self._changed_files = changed_files
+
+    def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
+        del context
+        path = str(call.arguments["path"])
+        try:
+            self._tools.delete_file(path)
+        except Exception as error:  # noqa: BLE001
+            return _failure(call, error)
+        if path not in self._changed_files:
+            self._changed_files.append(path)
+        return _result(call, changed_files=(path,))
+
+
 class _GitDiffExecutor:
     def __init__(self, tools: GitTools) -> None:
         self._tools = tools
@@ -212,6 +229,19 @@ def build_repository_tools(
             },
         ),
         _ReadFileExecutor(filesystem),
+    )
+    registry.register(
+        ToolDefinition(
+            name="delete_file",
+            description="Delete one repository file",
+            input_schema={
+                "type": "object",
+                "properties": {"path": {"type": "string", "minLength": 1}},
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        ),
+        _DeleteFileExecutor(filesystem, changed_files),
     )
     registry.register(
         ToolDefinition(

@@ -27,12 +27,16 @@ def test_filesystem_lists_searches_reads_and_edits_deterministically(tmp_path: P
     assert tools.read_file("a.txt") == "needle on a\n"
     tools.edit_file("new/file.txt", "created\n")
     assert (tmp_path / "new/file.txt").read_text(encoding="utf-8") == "created\n"
+    tools.delete_file("new/file.txt")
+    assert not (tmp_path / "new/file.txt").exists()
 
 
 @pytest.mark.parametrize("path", ["../outside.txt", "/tmp/outside.txt"])
 def test_filesystem_rejects_path_escape(tmp_path: Path, path: str) -> None:
     with pytest.raises(PathOutsideRepositoryError):
         FilesystemTools(tmp_path).read_file(path)
+    with pytest.raises(PathOutsideRepositoryError):
+        FilesystemTools(tmp_path).delete_file(path)
 
 
 def test_filesystem_rejects_symlink_escape(tmp_path: Path) -> None:

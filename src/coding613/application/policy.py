@@ -48,7 +48,7 @@ class PolicyEngine:
         {"git_diff", "list_files", "read_file", "search_files"}
     )
     _WRITE_TOOLS: ClassVar[frozenset[str]] = frozenset(
-        {"apply_patch", "edit_file", "write_file"}
+        {"apply_patch", "delete_file", "edit_file", "write_file"}
     )
     _NETWORK_TOOLS: ClassVar[frozenset[str]] = frozenset({"network_request"})
     _VALIDATION_TOOLS: ClassVar[frozenset[str]] = frozenset({"run_validation"})

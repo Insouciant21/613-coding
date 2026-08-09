@@ -8,7 +8,7 @@ from coding613.adapters.llm.mock import ScriptedLLM
 from coding613.application.composition import build_services
 from coding613.application.run_service import RunRequest
 from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
-from coding613.domain.models import RunState, StopReason
+from coding613.domain.models import PermissionMode, RunState, StopReason
 from coding613.ports.llm import LLMResponse
 
 
@@ -42,6 +42,23 @@ def test_local_composition_persists_runs_and_can_cancel_without_provider(tmp_pat
     assert cancelled.status is RunState.CANCELLED
     assert cancelled.stop_reason is StopReason.CANCELLED
     assert services.list_events(run.id)
+
+
+def test_local_composition_uses_configured_mode_for_unspecified_run_mode(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "harness.toml").write_text(
+        """
+[policy]
+mode = "autonomous"
+""",
+        encoding="utf-8",
+    )
+
+    services = build_services(tmp_path)
+    run = services.run_service.create_run(RunRequest(task="act autonomously"))
+
+    assert run.permission_mode is PermissionMode.AUTONOMOUS
 
 
 def test_local_composition_reads_new_run_after_service_restart(tmp_path: Path) -> None:

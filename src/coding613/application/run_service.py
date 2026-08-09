@@ -25,7 +25,7 @@ from coding613.domain.models_base import DomainModel
 class RunRequest(DomainModel):
     task: str
     project_id: UUID | None = None
-    permission_mode: PermissionMode = PermissionMode.BALANCED
+    permission_mode: PermissionMode | None = None
 
 
 class RunStore(Protocol):
@@ -54,7 +54,7 @@ class RunService:
         run = Run(
             project_id=request.project_id,
             task=request.task,
-            permission_mode=request.permission_mode,
+            permission_mode=request.permission_mode or PermissionMode.BALANCED,
         )
         self._store.create_run(run)
         return run

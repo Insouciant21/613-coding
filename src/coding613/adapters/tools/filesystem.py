@@ -88,6 +88,14 @@ class FilesystemTools:
         finally:
             temporary_path.unlink(missing_ok=True)
 
+    def delete_file(self, path: str | Path) -> None:
+        resolved = self._resolve(path)
+        if not resolved.exists():
+            raise FileNotFoundError(resolved)
+        if not resolved.is_file():
+            raise IsADirectoryError(resolved)
+        resolved.unlink()
+
     def _resolve(self, path: str | Path) -> Path:
         relative = Path(path)
         if relative.is_absolute() or ".." in relative.parts or not relative.parts:
