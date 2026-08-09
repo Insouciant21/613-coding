@@ -882,3 +882,27 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   `uv lock --check`, and `git diff --check` passed.
 - Human intervention: cleaned only generated `__pycache__` directories left in deleted paths so
   import absence reflected the checkout; no `tmp/cube`, credentials, or remote deployment changed.
+
+### 2026-08-10 05:10:00 Asia/Shanghai - TUI distribution Tasks 8-9 artifact and CI verification
+
+- Task: finish the artifact builder and replace historical runtime-container CI wiring with
+  artifact export/upload; triggered `systematic-debugging`, `test-driven-development`, and
+  `verification-before-completion`.
+- Root-cause RED 1: an independently installed wheel failed with `ModuleNotFoundError: No module
+  named 'click'`; `entrypoint.py` directly imports Click while the package only had Typer's
+  undeclared transitive dependency. A dependency regression test failed before the fix.
+- Fix 1: declared `click>=8.1,<9` as a runtime dependency and regenerated `uv.lock`; focused
+  distribution tests passed 10.
+- Root-cause RED 2: Docker's pinned Debian slim builder failed PyInstaller with `objdump is
+  required`; a Docker system-tool regression test failed before the fix.
+- Fix 2: installed `binutils` in the builder with apt index cleanup; focused distribution tests
+  passed 11.
+- Local evidence: `scripts/build_artifacts.sh` produced a 155M Linux x86_64 ELF, wheel, sdist, and
+  `SHA256SUMS`; `scripts/smoke_artifacts.sh` passed, including clean-wheel `613-coding --help`.
+- Docker evidence: `docker build --pull=false --target artifacts --output
+  type=local,dest=/tmp/613-coding-docker-artifacts-20260810 .` succeeded in 144s; exported binary
+  was 152M and Debian Bookworm slim executed `/artifacts/613-coding-linux-x86_64 --help`.
+  Exported checksums and artifact smoke passed.
+- CI update: GitHub Actions now exports and uploads `dist/`; GitLab DinD exports and retains the
+  same four files; obsolete `scripts/smoke_container.sh` and legacy `coding_harness` demo calls
+  were removed from workflows. No `tmp/cube`, credentials, or remote deployment changed.

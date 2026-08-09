@@ -1,15 +1,15 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 04:39:05 (Asia/Shanghai)
-Responsible actor: `/root` for locally verified TUI-07; safe repository mutations Tasks 1-4 are reviewed and integrated into `main` at `69caa09`; TUI-01 through TUI-07 are locally verified in the TUI/distribution worktree; published deployment remains unchanged.
+Last updated: 2026-08-10 05:10:00 (Asia/Shanghai)
+Responsible actor: `/root` for locally verified TUI-08; safe repository mutations Tasks 1-4 are reviewed and integrated into `main` at `69caa09`; TUI-01 through TUI-08 are locally verified in the TUI/distribution worktree; published deployment remains unchanged.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
-| Claude Code-like TUI | TUI-01 through TUI-07 implementation/fix verified locally; TUI-08 through TUI-09 pending | design `e7f7ece`; plan `9ee205d`; commits `048bdbc`, `4877a7f`; TUI-07 evidence below | broad branch review must include an independent review of the recorded external-review gap, then begin TUI-08 |
-| Binary/wheel/sdist artifact builder | design approved; implementation pending | TUI/distribution design; Docker and CI contract | build and execute artifacts after TDD implementation |
+| Claude Code-like TUI | TUI-01 through TUI-08 implementation/fix verified locally; TUI-09 documentation/Cube handoff pending | design `e7f7ece`; plan `9ee205d`; commits `048bdbc`, `4877a7f`; TUI-08 evidence below | broad branch review must include an independent review of the recorded external-review gap, then begin TUI-09 |
+| Binary/wheel/sdist artifact builder | locally built and Docker-exported; CI workflows updated | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08 evidence below | commit after broad review and retain CI artifact upload gate |
 | Main Web/HTTP removal | design approved; implementation pending | revised `SPEC.md` and `AGENTS.md` | prove code, dependency, test, manifest, and documentation removal |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
 | Approved design | complete | `docs/superpowers/specs/2026-08-07-613-coding-design.md`; commits `6ad0eec`, `c4fd219`, `ba03b70` | none |
@@ -23,7 +23,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
 | Container sandbox | complete | SANDBOX-01 `9df471d`; SANDBOX-02 `aa3600a`; SANDBOX-03 `3ec6ac1`; SANDBOX-04 `439540f`; SANDBOX-05 `fb1c222`; reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | retain regression gate |
 | Multi-agent orchestration | complete | MULTI-01 `9744339`; MULTI-02 `5910d7b`; MULTI-03 `43f51fc`; MULTI-04 `11eaef8`; MULTI-05 `376fd41`; reports under `.superpowers/sdd/2026-08-08-613-coding-multi-agent/` | retain regression gate |
-| README and distribution | existing Web distribution is historical and must be replaced | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata, `scripts/smoke_container.sh`; prior commit `774c07a` | document and verify local TUI/binary distribution |
+| README and distribution | local TUI and artifact-only operation documented | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata, `scripts/smoke_artifacts.sh`; TUI-07/TUI-08 evidence below | retain artifact verification and CI upload gate |
 | Strict package rename documentation and artifacts | deployed and verified | `eefee2d`; Task 3 artifacts and Task 4 CI/deployment evidence below | retain as regression gate |
 | GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |

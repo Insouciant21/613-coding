@@ -12,3 +12,6 @@
 tests
 docs
 .superpowers
+dist
+build
+*.spec.bak
