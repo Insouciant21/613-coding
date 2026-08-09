@@ -378,7 +378,7 @@ Every completed plan task must link a commit and fresh verification output here.
 ## Package Rename Task 4 Evidence
 
 - Verification timestamp: `2026-08-09 14:49:47 Asia/Shanghai`.
-- Review and publication: the full rename diff had no Critical or Important findings. Branch run [31299368456](https://github.com/Insouciant21/613-coding/actions/runs/31299368456) and exact-main run [31299431092](https://github.com/Insouciant21/613-coding/actions/runs/31299431092) passed `unit-test`, `quality`, `demo`, and `package-and-container` at `eefee2d`.
+- Review and publication: the full rename diff had no Critical or Important findings. Branch run [31299368456](https://github.com/Insouciant21/613-coding/actions/runs/31299368456) and exact-main run [31299431092](https://github.com/Insouciant21/613-coding/actions/runs/31299431092) passed `unit-test`, `quality`, `demo`, and `package-and-container` at `eefee2dd2a2f33ea9921fe0ce147e88719d4b14d`.
 - Runtime: `/home/edward/services/613-coding/releases/eefee2d` produced `613-coding:eefee2d` (`sha256:61d42ea1397ba878caf0a04592b3b6c1637c9ee9537deb3b2657ab91a913b0b2`). `613-coding --help` succeeded in the deployed container, `coding-harness` was absent, and `/healthz` plus `/` returned 200.
 - State: existing runs `c0313a2c-7513-4a7b-a594-9afe0d31dc70` and `b9bc83a2-dac2-48c3-a15a-8bae7568118b` remained readable. New run `de1c5292-d40f-4924-8d0d-2d85df1b4731` returned 200 before and after a container restart.
 - Boundary: loopback bind, data mount, read-only root, tmpfs restrictions, dropped capabilities, `no-new-privileges`, resource/PID limits, supplementary group, non-root user, and restart policy match the pre-deployment container. The reverse proxy and ports 80/443 were not changed; no public URL is claimed.

@@ -278,7 +278,7 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 ## Package Rename Task 4 Evidence
 
 - Verification timestamp: `2026-08-09 14:49:47 Asia/Shanghai`.
-- Release: independent whole-branch review found no Critical or Important findings; commit `eefee2d` was fast-forwarded to `main` only after branch run [31299368456](https://github.com/Insouciant21/613-coding/actions/runs/31299368456) passed all four jobs. Exact-main run [31299431092](https://github.com/Insouciant21/613-coding/actions/runs/31299431092) then passed `unit-test`, `quality`, `demo`, and `package-and-container`.
+- Release: independent whole-branch review found no Critical or Important findings; commit `eefee2dd2a2f33ea9921fe0ce147e88719d4b14d` was fast-forwarded to `main` only after branch run [31299368456](https://github.com/Insouciant21/613-coding/actions/runs/31299368456) passed all four jobs. Exact-main run [31299431092](https://github.com/Insouciant21/613-coding/actions/runs/31299431092) then passed `unit-test`, `quality`, `demo`, and `package-and-container`.
 - Deployment: immutable release `/home/edward/services/613-coding/releases/eefee2d` built image `613-coding:eefee2d` with ID `sha256:61d42ea1397ba878caf0a04592b3b6c1637c9ee9537deb3b2657ab91a913b0b2` on `edward@int21`.
 - Runtime: the deployed container exposes `613-coding`, has no `coding-harness`, and returns 200 for `/healthz` and `/`. Existing runs `c0313a2c-7513-4a7b-a594-9afe0d31dc70` and `b9bc83a2-dac2-48c3-a15a-8bae7568118b` remained readable.
 - Restart persistence: new run `de1c5292-d40f-4924-8d0d-2d85df1b4731` returned 200 before and after `docker restart 613-coding`; the container returned to healthy.
