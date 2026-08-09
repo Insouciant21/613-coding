@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 14:26:25 (Asia/Shanghai)
-Responsible actor: `/root/package_rename_task3`; current package/operator documentation and local renamed wheel/Docker release checks are verified; public reverse proxy remains external.
+Last updated: 2026-08-09 14:49:47 (Asia/Shanghai)
+Responsible actor: `/root`; strict package naming is published, CI-verified, and deployed on the loopback SSH service; public reverse proxy remains external.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -19,13 +19,13 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Container sandbox | complete | SANDBOX-01 `9df471d`; SANDBOX-02 `aa3600a`; SANDBOX-03 `3ec6ac1`; SANDBOX-04 `439540f`; SANDBOX-05 `fb1c222`; reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | retain regression gate |
 | Multi-agent orchestration | complete | MULTI-01 `9744339`; MULTI-02 `5910d7b`; MULTI-03 `43f51fc`; MULTI-04 `11eaef8`; MULTI-05 `376fd41`; reports under `.superpowers/sdd/2026-08-08-613-coding-multi-agent/` | retain regression gate |
 | README and distribution | implemented; local and remote smoke verified | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata, `scripts/smoke_container.sh`; commit `774c07a`; local and Actions evidence below | retain regression gate |
-| Strict package rename documentation and artifacts | local verification complete | current names in `README.md`, `docs/deployment.md`, and `AGENTS.md`; Task 3 evidence below | record dedicated documentation/evidence commit and run branch CI |
+| Strict package rename documentation and artifacts | deployed and verified | `eefee2d`; Task 3 artifacts and Task 4 CI/deployment evidence below | retain as regression gate |
 | GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
 | GitHub source publication | complete | `git@github.com:Insouciant21/613-coding.git`; initial source snapshot `f4b9984`; CI repair `341d880`; publication evidence below | keep delivery records synchronized with pushed commits |
-| GitHub Actions CI | passed | main run `31296034199`; `unit-test`, `quality`, `demo`, and `package-and-container` all succeeded for `71c281d`; package/container job includes build and smoke | retain as the remote regression gate |
-| SSH deployment | complete on loopback | `edward@int21`; image `613-coding:71c281d`; `127.0.0.1:8613`; health, WebUI, security settings, and restart persistence verified | operator configures reverse proxy without changing the application bind |
+| GitHub Actions CI | passed | branch run `31299368456` and exact-main run `31299431092`; all four jobs succeeded for `eefee2d`, including image build and smoke | retain as the remote regression gate |
+| SSH deployment | complete on loopback | `edward@int21`; image `613-coding:eefee2d`; `127.0.0.1:8613`; renamed CLI, legacy absence, health, WebUI, security settings, old state, and new-run restart persistence verified | operator configures reverse proxy without changing the application bind |
 | Deployment manifest | published; optional | `render.yaml`; SSH deployment is the currently verified runtime | use only if an additional Render deployment is desired |
 | Public WebUI URL | not verified | SSH service is intentionally loopback-only; `docs/deployment.md` records the proxy target | operator configures and validates the domain/reverse proxy |
 | Reflection | reserved for student | `REFLECTION.md` contains an explicit student-authored boundary and no AI-written narrative | student writes the final report |
@@ -374,6 +374,14 @@ Every completed plan task must link a commit and fresh verification output here.
 - Clean artifacts: `uv build` generated `613_coding-0.1.0-py3-none-any.whl` and `613_coding-0.1.0.tar.gz`; a fresh venv exposed `613-coding --help`, had no `coding-harness` executable, imported `coding613`, and did not resolve the legacy import.
 - Container: `613-coding:rename-smoke` built from the current source and the smoke script returned `container smoke passed: health=healthy user=coding`; no smoke container remained.
 - Source record: `.superpowers/sdd/2026-08-09-613-coding-package-rename/task-3-report.md`.
+
+## Package Rename Task 4 Evidence
+
+- Verification timestamp: `2026-08-09 14:49:47 Asia/Shanghai`.
+- Review and publication: the full rename diff had no Critical or Important findings. Branch run [31299368456](https://github.com/Insouciant21/613-coding/actions/runs/31299368456) and exact-main run [31299431092](https://github.com/Insouciant21/613-coding/actions/runs/31299431092) passed `unit-test`, `quality`, `demo`, and `package-and-container` at `eefee2d`.
+- Runtime: `/home/edward/services/613-coding/releases/eefee2d` produced `613-coding:eefee2d` (`sha256:61d42ea1397ba878caf0a04592b3b6c1637c9ee9537deb3b2657ab91a913b0b2`). `613-coding --help` succeeded in the deployed container, `coding-harness` was absent, and `/healthz` plus `/` returned 200.
+- State: existing runs `c0313a2c-7513-4a7b-a594-9afe0d31dc70` and `b9bc83a2-dac2-48c3-a15a-8bae7568118b` remained readable. New run `de1c5292-d40f-4924-8d0d-2d85df1b4731` returned 200 before and after a container restart.
+- Boundary: loopback bind, data mount, read-only root, tmpfs restrictions, dropped capabilities, `no-new-privileges`, resource/PID limits, supplementary group, non-root user, and restart policy match the pre-deployment container. The reverse proxy and ports 80/443 were not changed; no public URL is claimed.
 
 ## SSH Deployment Evidence
 

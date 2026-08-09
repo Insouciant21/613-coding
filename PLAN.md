@@ -29,7 +29,7 @@
 | `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | complete through `fb1c222` |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | complete through `376fd41` |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | complete through Docker smoke repair `774c07a`; real provider remains injectable |
-| `docs/superpowers/plans/2026-08-09-613-coding-package-rename.md` | Strict distribution/import/runtime/documentation rename | completed Tasks 1-2 | Task 3 local evidence recorded; dedicated commit and report follow |
+| `docs/superpowers/plans/2026-08-09-613-coding-package-rename.md` | Strict distribution/import/runtime/documentation rename | completed Tasks 1-3 | complete through reviewed CI and SSH deployment at `eefee2d` |
 
 The implementation critical path is `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. Core storage and domain work can proceed before sandbox; delivery documentation and test harness scaffolding can proceed after core interfaces are stable.
 
@@ -274,3 +274,12 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Verification: documentation suite passed `4`; full suite passed `241` with the pre-existing deferred Starlette TestClient warning; Ruff, mypy across `82` source files, `uv lock --check`, and `git diff --check` passed.
 - Distribution: clean `uv build` produced `613_coding-0.1.0-py3-none-any.whl` and `613_coding-0.1.0.tar.gz`; an isolated venv installed `613-coding`, exposed `613-coding --help`, omitted the old console script, and could import `coding613` without the old import package.
 - Container: `docker build --pull=false -t 613-coding:rename-smoke .` built the tagged image and `scripts/smoke_container.sh 613-coding:rename-smoke` returned `container smoke passed: health=healthy user=coding`; the smoke container was removed.
+
+## Package Rename Task 4 Evidence
+
+- Verification timestamp: `2026-08-09 14:49:47 Asia/Shanghai`.
+- Release: independent whole-branch review found no Critical or Important findings; commit `eefee2d` was fast-forwarded to `main` only after branch run [31299368456](https://github.com/Insouciant21/613-coding/actions/runs/31299368456) passed all four jobs. Exact-main run [31299431092](https://github.com/Insouciant21/613-coding/actions/runs/31299431092) then passed `unit-test`, `quality`, `demo`, and `package-and-container`.
+- Deployment: immutable release `/home/edward/services/613-coding/releases/eefee2d` built image `613-coding:eefee2d` with ID `sha256:61d42ea1397ba878caf0a04592b3b6c1637c9ee9537deb3b2657ab91a913b0b2` on `edward@int21`.
+- Runtime: the deployed container exposes `613-coding`, has no `coding-harness`, and returns 200 for `/healthz` and `/`. Existing runs `c0313a2c-7513-4a7b-a594-9afe0d31dc70` and `b9bc83a2-dac2-48c3-a15a-8bae7568118b` remained readable.
+- Restart persistence: new run `de1c5292-d40f-4924-8d0d-2d85df1b4731` returned 200 before and after `docker restart 613-coding`; the container returned to healthy.
+- Boundary: `127.0.0.1:8613:8000`, the `/app/.613-coding` data bind, read-only root, bounded no-exec tmpfs, dropped capabilities, `no-new-privileges`, 1 GiB/1 CPU/256 PIDs, group 1000, user `coding`, and `unless-stopped` were preserved. Reverse proxy configuration and ports 80/443 were untouched; no public URL is claimed.

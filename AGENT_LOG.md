@@ -604,3 +604,17 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Docker investigation: the initial streamed build session stopped before image export; an independent image inspection showed no tag. A repeated identical build completed export/tagging, after which the standalone smoke passed. No source or configuration change was needed.
 - Commit: dedicated documentation/evidence commit is recorded in the Task 3 report after creation.
 - Lesson: built-artifact checks must include a clean virtual environment, absence assertions for old names, and an independently observed terminal Docker result when a build stream ends early.
+
+### 2026-08-09 14:49:47 Asia/Shanghai - package rename Task 4 deployment and evidence recording
+
+- Task: PACKAGE-RENAME-04; record deployment evidence after controller-completed Steps 1-6.
+- Release commit: `eefee2d`; branch `agent/package-rename`; independent review found no Critical or Important findings.
+- Branch CI: [run 31299368456](https://github.com/Insouciant21/613-coding/actions/runs/31299368456) — `unit-test`, `quality`, `demo`, and `package-and-container` all passed at exact SHA `eefee2d`.
+- Main CI: [run 31299431092](https://github.com/Insouciant21/613-coding/actions/runs/31299431092) — all four jobs passed at exact SHA `eefee2d` on `main`.
+- Remote release: immutable source `/home/edward/services/613-coding/releases/eefee2d`; image `613-coding:eefee2d` (sha256:61d42ea1397ba878caf0a04592b3b6c1637c9ee9537deb3b2657ab91a913b0b2); container ID 87bc3533d7cb; verification `2026-08-09T14:49:47+08:00`.
+- Runtime: `docker exec 613-coding 613-coding --help` exit 0; `coding-harness` absent; `/healthz` 200; `/` 200.
+- Persistence: pre-rename runs `c0313a2c` and `b9bc83a2` returned 200 before and after replacement; new run `de1c5292` returned 200 before restart and 200 after `docker restart 613-coding`; container returned to healthy.
+- Preserved boundary: `127.0.0.1:8613:8000`; data `/home/edward/services/613-coding/data:/app/.613-coding`; read-only root; `/tmp` tmpfs rw,noexec,nosuid,size=64m; dropped ALL caps; `no-new-privileges`; 1 GiB/1 CPU/256 PIDs; `unless-stopped`; group 1000; user `coding`.
+- Rollback: `613-coding:71c281d` retained on host.
+- No public URL; proxy and ports 80/443 remain outside deployment scope.
+- Local gates: pytest 241 passed (pre-existing Starlette warning); Ruff passed; mypy 82 source files passed; lock check passed; diff check passed.
