@@ -77,6 +77,9 @@ def test_ci_uses_artifact_builder_and_has_no_removed_container_smoke() -> None:
         assert "smoke_artifacts.sh" in workflow
         assert "SHA256SUMS" in workflow or "dist/" in workflow
     assert "actions/upload-artifact" in github
+    assert "setup-uv@v6" in github
+    assert "artifact-smoke" in gitlab
+    assert "needs:" in gitlab
 
 
 def test_artifact_builder_uses_pinned_pyinstaller() -> None:

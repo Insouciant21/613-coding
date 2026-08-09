@@ -322,6 +322,9 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Artifact evidence: Docker output binary is 152M, `file` reports ELF 64-bit LSB x86-64, and
   `sha256sum -c SHA256SUMS` passed. GitHub/GitLab workflows now upload or retain the four artifacts
   and no longer reference the removed runtime container smoke script.
+- CI portability follow-up: GitHub installs pinned uv before artifact smoke; GitLab separates the
+  Docker export job from a dependent Python/uv `artifact-smoke` job. The updated contract test,
+  full 388-test offline suite, Ruff, mypy, lock, and diff checks passed.
 
 ## SSH Deployment Follow-up
 

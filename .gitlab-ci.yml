@@ -4,6 +4,7 @@ stages:
   - typecheck
   - demo
   - container
+  - artifact-smoke
 
 default:
   image: python:3.12.8-slim-bookworm
@@ -47,3 +48,11 @@ docker-build:
     paths:
       - dist/
     expire_in: 1 week
+
+artifact-smoke:
+  stage: artifact-smoke
+  needs:
+    - job: docker-build
+      artifacts: true
+  script:
+    - scripts/smoke_artifacts.sh dist

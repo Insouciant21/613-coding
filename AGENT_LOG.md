@@ -906,3 +906,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - CI update: GitHub Actions now exports and uploads `dist/`; GitLab DinD exports and retains the
   same four files; obsolete `scripts/smoke_container.sh` and legacy `coding_harness` demo calls
   were removed from workflows. No `tmp/cube`, credentials, or remote deployment changed.
+
+### 2026-08-10 05:10:46 Asia/Shanghai - artifact CI environment follow-up
+
+- Final audit found that GitHub artifact smoke used `uv` without installing it and GitLab's
+  Docker CLI job inherited a Python-oriented setup while lacking a guaranteed Bash/uv runtime.
+- TDD RED: the CI contract test failed because GitLab had no separate artifact smoke job.
+- Fix: GitHub explicitly installs pinned uv and syncs before smoke; GitLab exports artifacts in
+  the Docker job and validates them in a dependent Python `artifact-smoke` job with the default
+  uv setup. The focused distribution suite passed 12 tests; full offline suite passed 388; Ruff,
+  mypy, lock, and diff checks passed.
