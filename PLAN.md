@@ -128,6 +128,14 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 
+## SSH Deployment Follow-up
+
+- Status: complete for loopback deployment; public reverse proxy remains operator-owned.
+- Defect repair: fresh persisted runs without a `LoopSession` now return an empty-evidence `RunSummary`; commits `4d1fbad` and `71c281d`.
+- Review and verification: independent review found no Critical/Important issue; full suite passed 239 tests; Ruff, mypy, lock, and diff checks passed; branch CI `31295983040` and main CI `31296034199` passed.
+- Runtime evidence: image `613-coding:71c281d` runs on `edward@int21` at `127.0.0.1:8613`. Health, WebUI, unchanged security/resource settings, pre-existing SQLite data, immediate run retrieval, and post-restart retrieval were verified.
+- Operator boundary: configure the reverse proxy/domain to `http://127.0.0.1:8613`; the deployment task did not modify ports 80/443 or claim a public URL.
+
 ## CORE-01 Task Evidence
 
 - Status: complete after task review and bootstrap repair.

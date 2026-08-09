@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 09:36:35 (Asia/Shanghai)
-Responsible actor: `/root`; source, GitHub Actions, and Docker runtime smoke are verified; public deployment remains external.
+Last updated: 2026-08-09 13:15:03 (Asia/Shanghai)
+Responsible actor: `/root`; source, GitHub Actions, Docker runtime smoke, and loopback-only SSH deployment are verified; public reverse proxy remains external.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -23,9 +23,10 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
 | GitHub source publication | complete | `git@github.com:Insouciant21/613-coding.git`; initial source snapshot `f4b9984`; CI repair `341d880`; publication evidence below | keep delivery records synchronized with pushed commits |
-| GitHub Actions CI | passed | main run `31288535830`; `unit-test`, `quality`, `demo`, and `package-and-container` all succeeded for `cf7f8a5`; package/container job `93181629275` includes build and smoke | retain as the remote regression gate |
-| Deployment manifest | published; deployment pending | `render.yaml`; pinned image build and runtime smoke passed in main job `93181629275` | deploy with a user-controlled Render account and record the public URL |
-| Public WebUI URL | not verified | `docs/deployment.md` explicitly records no deployed URL | deploy isolated demonstration with user-controlled infrastructure |
+| GitHub Actions CI | passed | main run `31296034199`; `unit-test`, `quality`, `demo`, and `package-and-container` all succeeded for `71c281d`; package/container job includes build and smoke | retain as the remote regression gate |
+| SSH deployment | complete on loopback | `edward@int21`; image `613-coding:71c281d`; `127.0.0.1:8613`; health, WebUI, security settings, and restart persistence verified | operator configures reverse proxy without changing the application bind |
+| Deployment manifest | published; optional | `render.yaml`; SSH deployment is the currently verified runtime | use only if an additional Render deployment is desired |
+| Public WebUI URL | not verified | SSH service is intentionally loopback-only; `docs/deployment.md` records the proxy target | operator configures and validates the domain/reverse proxy |
 | Reflection | reserved for student | `REFLECTION.md` contains an explicit student-authored boundary and no AI-written narrative | student writes the final report |
 | Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |
 
@@ -363,3 +364,12 @@ Every completed plan task must link a commit and fresh verification output here.
 - REMOTE-CI-03 | cf7f8a5ee387965003f76bd1f374a288bc0067c0 | pass | main cf7f8a5 passed: unit-test, quality, demo, package-and-container; Docker build and smoke passed
 
 - DEPLOY-01 | 35a383a9bed47d5fc50c691655e71eb18d630348 | blocked | Render API returned HTTP 401; no Render credential or deployed service URL is available
+
+## SSH Deployment Evidence
+
+- Verification timestamp: `2026-08-09 13:15:03 Asia/Shanghai`.
+- Fix: commits `4d1fbad` and `71c281d` make a newly persisted run readable before its first loop session; independent review found no Critical or Important issue.
+- Verification: the focused regression passed, then the full suite passed 239 tests; Ruff, mypy for 82 source files, lock, and diff checks passed. Branch run `31295983040` and main run [31296034199](https://github.com/Insouciant21/613-coding/actions/runs/31296034199) passed all four jobs, including Docker build and smoke.
+- Runtime: `edward@int21` runs `613-coding:71c281d` at `127.0.0.1:8613` with persistent state at `/home/edward/services/613-coding/data`. The root page and `/healthz` returned 200/healthy.
+- Persistence: pre-fix run `c0313a2c-7513-4a7b-a594-9afe0d31dc70` became readable after deployment. New run `b9bc83a2-dac2-48c3-a15a-8bae7568118b` returned 200 both immediately and after `docker restart`, with the same `running` state and empty evidence.
+- Boundary: no reverse proxy, ports 80/443, domain, or public URL was configured or claimed.

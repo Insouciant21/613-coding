@@ -43,9 +43,15 @@ SQLite is the source of truth for runs, events, approvals, task graphs, memory t
 
 `.gitlab-ci.yml` defines `unit-test`, `lint`, `typecheck`, `demo`, `build`, and `docker-build` stages. `.github/workflows/ci.yml` provides equivalent push/PR checks when the repository is hosted on GitHub. Jobs use locked `uv` dependencies, run tests/demos, build the package, build the digest-pinned Docker image, and run `scripts/smoke_container.sh` to verify the health check, non-root `coding` user, and cleanup. `scripts.record_delivery` validates a Git commit and appends command/result evidence without converting failures into passes.
 
+## SSH Deployment
+
+Commit `71c281d` is deployed on `edward@int21` as image `613-coding:71c281d`. The service binds only to `127.0.0.1:8613`; an operator-managed reverse proxy should target `http://127.0.0.1:8613` and use `/healthz` for health checks. Ports 80 and 443 are intentionally untouched.
+
+The immutable release source is under `/home/edward/services/613-coding/releases/71c281d`. Persistent SQLite and LanceDB state lives under `/home/edward/services/613-coding/data`, mounted at `/app/.613-coding`. Back up this data directory before migrations or destructive maintenance. The `613-coding` container runs as UID 10001 with a read-only root, a bounded `/tmp` tmpfs, all capabilities dropped, `no-new-privileges`, 1 GiB memory, one CPU, a 256 PID limit, and `unless-stopped` restart policy.
+
 ## Limitations And Evidence
 
-The Docker Engine is an operator prerequisite for real worker containers. In IPv6-restricted environments, Docker Hub OAuth may reset before a build; an approved registry mirror can be used only when it resolves to the Dockerfile's pinned digest. Local verification built `613-coding:smoke-fix` and passed `scripts/smoke_container.sh` with `health=healthy` and `user=coding`. Main commit `cf7f8a5` passed [GitHub Actions run 31288535830](https://github.com/Insouciant21/613-coding/actions/runs/31288535830), including [job 93181629275](https://github.com/Insouciant21/613-coding/actions/runs/31288535830/job/93181629275) for the pinned build and smoke gate. `render.yaml` is an operator-controlled deployment declaration, not evidence of a deployed service. No unverified deployment claim is made. A deployed URL: not verified.
+The Docker Engine is an operator prerequisite for real worker containers. In IPv6-restricted environments, Docker Hub OAuth may reset before a build; an approved registry mirror can be used only when it resolves to the Dockerfile's pinned digest. Local verification built `613-coding:smoke-fix` and passed `scripts/smoke_container.sh` with `health=healthy` and `user=coding`. Main commit `71c281d` passed [GitHub Actions run 31296034199](https://github.com/Insouciant21/613-coding/actions/runs/31296034199), including the pinned build and smoke gate. The SSH deployment passed `/`, `/healthz`, immediate run retrieval, and retrieval of the same persisted run after container restart. `render.yaml` remains an optional operator-controlled deployment declaration. The SSH service has no verified public URL until the operator configures and validates the reverse proxy. Deployed URL: not verified; any public endpoint remains unverified.
 
 ## Directory Layout
 

@@ -566,3 +566,15 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Status: blocked
 - Command: `curl -sS -o /tmp/613-render-api-response -w render_api_http=%{http_code} https://api.render.com/v1/services`
 - Result: Render API returned HTTP 401; no Render credential or deployed service URL is available
+
+### 2026-08-09 13:15:03 Asia/Shanghai - SSH deployment and persistence repair
+
+- Task: deploy 613 Coding to `edward@int21` without configuring the operator-owned reverse proxy or ports 80/443.
+- Initial deployment: image `613-coding:d617000` ran healthy at `127.0.0.1:8613` with a read-only root, bounded tmpfs, dropped capabilities, `no-new-privileges`, 1 GiB memory, one CPU, 256 PIDs, and persistent `/home/edward/services/613-coding/data`.
+- RED and root cause: a persisted newly created run survived restart in SQLite but `GET /api/runs/{id}` returned 404 because no `LoopSession` existed before first resume/cancel and `AgentLoop.get_summary()` raised `KeyError`.
+- Fix: `RunService.get_summary()` now derives an empty-evidence summary from the authoritative `Run` when the session is absent and still delegates session-backed summaries to `AgentLoop`; implementation commit `4d1fbad`, contract-test commit `71c281d`.
+- Review: independent reviewer found no Critical/Important issue. Minor coverage observations were addressed with explicit empty-evidence assertions and a real-composition unknown-run API 404 test.
+- Verification: full suite passed 239 tests; Ruff, mypy for 82 source files, `uv lock --check`, and `git diff --check` passed. GitHub branch run `31295983040` and main run `31296034199` passed all jobs, including Docker build and smoke.
+- Deployment: immutable release `/home/edward/services/613-coding/releases/71c281d` built image `613-coding:71c281d`; the existing container was recreated with the same bind mount, security controls, limits, and restart policy.
+- Persistence GREEN: old run `c0313a2c-7513-4a7b-a594-9afe0d31dc70` returned 200 after upgrade. New run `b9bc83a2-dac2-48c3-a15a-8bae7568118b` returned 200 immediately and after container restart with unchanged ID/state. `/` returned 200 and `/healthz` returned `{"status":"ok"}`.
+- Boundary: service remains reachable only through `127.0.0.1:8613` on `int21`; no reverse proxy, domain, public URL, or credential was configured.
