@@ -277,6 +277,16 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Behavior: sessions and linked Runs restore from SQLite, transcripts use persisted final response
   content only, newest nonterminal Run is active, and history injection is capped at 12 entries and
   12,000 characters with repeat redaction.
+
+## TUI-05 Task Evidence
+
+- Status: root dispatch and Textual shell locally complete; independent review deferred with the
+  recorded external authentication blocker.
+- RED: CLI/TUI test collection failed on missing `coding613.cli.tui` and `coding613.tui` modules.
+- GREEN: focused entrypoint/Pilot suite passed 13; full offline suite passed 365; Ruff, mypy, lock,
+  and diff checks passed.
+- Behavior: root invocation opens TUI, task words prefill the composer, five management commands
+  retain Typer dispatch, and 80x24/60x20 layouts keep stable full-width regions.
 - Source record: `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-2-report.md`.
 
 ## SSH Deployment Follow-up

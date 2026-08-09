@@ -403,6 +403,14 @@ Every completed plan task must link a commit and fresh verification output here.
 - Boundary: SQLite remains authoritative; transcript deltas are not persisted; session context is
   bounded and redacted; no Web, packaging, `tmp/cube`, deployment, or credential path changed.
 
+## TUI-05 Evidence
+
+- Verification timestamp: `2026-08-10 04:45:00 Asia/Shanghai`.
+- Root `613-coding` now opens the local Textual shell; `--repo`, `--resume`, initial task, help,
+  unknown-option, missing-repository, and management dispatch contracts are tested.
+- Focused suite passed 13; full offline suite passed 365 with the existing Web warning; Ruff,
+  mypy for 91 source files, uv lock, and diff checks passed.
+
 ## CI and Deployment Manifest Evidence
 
 - Verification timestamp: `2026-08-09 07:14:20 Asia/Shanghai`.

@@ -841,3 +841,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   warning; Ruff, mypy, lock, and diff checks passed.
 - Review/delegation: external Codex review attempt failed with HTTP 401
   `refresh_token_invalidated`; no review claim was fabricated and the final broad review retains it.
+
+### 2026-08-10 04:45:00 Asia/Shanghai - TUI distribution Task 5 implementation
+
+- Task: replace root command dispatch with a Claude Code-like local Textual shell; followed TDD and
+  verification-before-completion.
+- RED: entrypoint and Pilot tests failed collection because CLI TUI and TUI package did not exist.
+- Implementation: deterministic argv dispatch, validated repository/resume flags, Textual shell,
+  keyboard bindings, and stable 80x24/60x20 layout. Added pinned Textual/pytest-asyncio ranges via uv.
+- GREEN: focused suite 13 passed; full offline suite 365 passed with the existing Web warning;
+  Ruff, mypy, lock, diff, and live `613-coding --help` checks passed.

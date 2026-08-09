@@ -1,0 +1,40 @@
+Screen {
+    layout: vertical;
+    background: #101214;
+    color: #e8e8e2;
+}
+
+ConversationLog {
+    width: 100%;
+    height: 1fr;
+    padding: 0 1;
+    scrollbar-color: #6d8b74;
+    scrollbar-background: #1a1e21;
+}
+
+ActiveOperation {
+    width: 100%;
+    height: 1;
+    padding: 0 1;
+    background: #1a1e21;
+    color: #a9c7b0;
+}
+
+TaskComposer {
+    width: 100%;
+    height: auto;
+    min-height: 3;
+    max-height: 8;
+    padding: 0 1;
+    background: #17191b;
+    color: #f2f1eb;
+    border-top: solid #5f6f65;
+}
+
+StatusFooter {
+    width: 100%;
+    height: 1;
+    padding: 0 1;
+    background: #26292c;
+    color: #d4c59a;
+}
