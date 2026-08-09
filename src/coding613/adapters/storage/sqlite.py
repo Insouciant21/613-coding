@@ -31,8 +31,10 @@ class SqliteEventStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         schema = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
         with self._transaction() as connection:
-            connection.executescript(schema)
+            connection.execute("BEGIN IMMEDIATE")
+            self._execute_schema(connection, schema)
             self._migrate_interactive_sessions(connection)
+            self._normalize_run_and_session_timestamps(connection)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)
@@ -46,8 +48,18 @@ class SqliteEventStore:
             yield connection
 
     @staticmethod
+    def _execute_schema(connection: sqlite3.Connection, schema: str) -> None:
+        statement = ""
+        for line in schema.splitlines(keepends=True):
+            statement += line
+            if sqlite3.complete_statement(statement):
+                connection.execute(statement)
+                statement = ""
+        if statement.strip():
+            raise ValueError("schema contains an incomplete SQL statement")
+
+    @staticmethod
     def _migrate_interactive_sessions(connection: sqlite3.Connection) -> None:
-        connection.execute("BEGIN IMMEDIATE")
         run_columns = {
             row["name"] for row in connection.execute("PRAGMA table_info(runs)")
         }
@@ -79,6 +91,28 @@ class SqliteEventStore:
         if version < 1:
             connection.execute("PRAGMA user_version = 1")
 
+    @staticmethod
+    def _normalize_run_and_session_timestamps(connection: sqlite3.Connection) -> None:
+        for table in ("runs", "interactive_sessions"):
+            rows = connection.execute(
+                f"SELECT id, created_at, updated_at FROM {table}"
+            ).fetchall()
+            for row in rows:
+                created_at = SqliteEventStore._serialize_datetime(
+                    SqliteEventStore._parse_datetime(row["created_at"])
+                )
+                updated_at = SqliteEventStore._serialize_datetime(
+                    SqliteEventStore._parse_datetime(row["updated_at"])
+                )
+                if (
+                    created_at != row["created_at"]
+                    or updated_at != row["updated_at"]
+                ):
+                    connection.execute(
+                        f"UPDATE {table} SET created_at = ?, updated_at = ? WHERE id = ?",
+                        (created_at, updated_at, row["id"]),
+                    )
+
     def create_run(self, run: Run) -> None:
         with self._transaction() as connection:
             connection.execute(
@@ -96,21 +130,21 @@ class SqliteEventStore:
                     run.permission_mode.value,
                     run.state.value,
                     run.stop_reason.value if run.stop_reason else None,
-                    run.created_at.isoformat(),
-                    run.updated_at.isoformat(),
+                    self._serialize_datetime(run.created_at),
+                    self._serialize_datetime(run.updated_at),
                 ),
             )
             if run.session_id is not None:
+                row = connection.execute(
+                    "SELECT updated_at FROM interactive_sessions WHERE id = ?",
+                    (str(run.session_id),),
+                ).fetchone()
+                if row is None:
+                    raise KeyError(f"unknown interactive session: {run.session_id}")
+                updated_at = max(self._parse_datetime(row["updated_at"]), run.updated_at)
                 connection.execute(
-                    """
-                    UPDATE interactive_sessions
-                    SET updated_at = CASE
-                        WHEN updated_at > ? THEN updated_at
-                        ELSE ?
-                    END
-                    WHERE id = ?
-                    """,
-                    (run.updated_at.isoformat(), run.updated_at.isoformat(), str(run.session_id)),
+                    "UPDATE interactive_sessions SET updated_at = ? WHERE id = ?",
+                    (self._serialize_datetime(updated_at), str(run.session_id)),
                 )
 
     def create_interactive_session(self, session: InteractiveSession) -> None:
@@ -124,8 +158,8 @@ class SqliteEventStore:
                     str(session.id),
                     str(session.project_id),
                     session.title,
-                    session.created_at.isoformat(),
-                    session.updated_at.isoformat(),
+                    self._serialize_datetime(session.created_at),
+                    self._serialize_datetime(session.updated_at),
                 ),
             )
 
@@ -251,7 +285,7 @@ class SqliteEventStore:
                     replacement.permission_mode.value,
                     replacement.state.value,
                     replacement.stop_reason.value if replacement.stop_reason else None,
-                    replacement.updated_at.isoformat(),
+                    self._serialize_datetime(replacement.updated_at),
                     str(expected.id),
                     str(expected.project_id) if expected.project_id else None,
                     str(expected.session_id) if expected.session_id else None,
@@ -259,8 +293,8 @@ class SqliteEventStore:
                     expected.permission_mode.value,
                     expected.state.value,
                     expected.stop_reason.value if expected.stop_reason else None,
-                    expected.created_at.isoformat(),
-                    expected.updated_at.isoformat(),
+                    self._serialize_datetime(expected.created_at),
+                    self._serialize_datetime(expected.updated_at),
                 ),
             )
         return cursor.rowcount == 1
@@ -521,3 +555,7 @@ class SqliteEventStore:
     @staticmethod
     def _parse_datetime(value: str) -> datetime:
         return datetime.fromisoformat(value)
+
+    @staticmethod
+    def _serialize_datetime(value: datetime) -> str:
+        return value.astimezone(UTC).isoformat()
