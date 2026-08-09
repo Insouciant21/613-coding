@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 14:49:47 (Asia/Shanghai)
-Responsible actor: `/root`; strict package naming is published, CI-verified, and deployed on the loopback SSH service; public reverse proxy remains external.
+Last updated: 2026-08-09 22:20:00 (Asia/Shanghai)
+Responsible actor: `/root`; real-provider worker reliability repair is locally verified and awaiting scoped re-review; published deployment remains unchanged.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -23,6 +23,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
+| Real-provider worker reliability | review pending | commits `80f6c85`, `da9cda5`; 258 tests plus static/lock/diff gates; `AGENT_LOG.md` 2026-08-09 22:20 entry | scoped re-review, then integration |
 | GitHub source publication | complete | `git@github.com:Insouciant21/613-coding.git`; initial source snapshot `f4b9984`; CI repair `341d880`; publication evidence below | keep delivery records synchronized with pushed commits |
 | GitHub Actions CI | passed | branch run `31299368456` and exact-main run `31299431092`; all four jobs succeeded for `eefee2d`, including image build and smoke | retain as the remote regression gate |
 | SSH deployment | complete on loopback | `edward@int21`; image `613-coding:eefee2d`; `127.0.0.1:8613`; renamed CLI, legacy absence, health, WebUI, security settings, old state, and new-run restart persistence verified | operator configures reverse proxy without changing the application bind |
