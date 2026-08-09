@@ -8,10 +8,10 @@ from uuid import uuid4
 
 import pytest
 
-from coding_harness.adapters.storage.sqlite import SqliteEventStore
-from coding_harness.domain.actions import ActionEnvelope, ToolCall
-from coding_harness.domain.events import Event
-from coding_harness.domain.models import (
+from coding613.adapters.storage.sqlite import SqliteEventStore
+from coding613.domain.actions import ActionEnvelope, ToolCall
+from coding613.domain.events import Event
+from coding613.domain.models import (
     ApprovalRequest,
     IterationRecord,
     LoopSession,

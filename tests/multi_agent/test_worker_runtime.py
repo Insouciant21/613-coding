@@ -6,11 +6,11 @@ from uuid import uuid4
 
 import pytest
 
-from coding_harness.adapters.sandbox.fake import FakeSandboxRuntime
-from coding_harness.application.worker_runtime import WorkerRuntime, WorkerRuntimeError
-from coding_harness.domain.sandbox import SandboxSpec, WorkArtifact
-from coding_harness.domain.tasks import TaskNode, WorkerRole
-from coding_harness.domain.worker import WorkerContext
+from coding613.adapters.sandbox.fake import FakeSandboxRuntime
+from coding613.application.worker_runtime import WorkerRuntime, WorkerRuntimeError
+from coding613.domain.sandbox import SandboxSpec, WorkArtifact
+from coding613.domain.tasks import TaskNode, WorkerRole
+from coding613.domain.worker import WorkerContext
 
 
 def _context(tmp_path: Path, spec: SandboxSpec) -> WorkerContext:

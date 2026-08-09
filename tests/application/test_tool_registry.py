@@ -5,16 +5,16 @@ from uuid import uuid4
 
 import pytest
 
-from coding_harness.application.tool_registry import (
+from coding613.application.tool_registry import (
     DuplicateToolError,
     ToolRegistry,
     ToolSchemaError,
     UnknownToolError,
 )
-from coding_harness.domain.actions import ToolCall
-from coding_harness.domain.models import PermissionMode
-from coding_harness.ports.llm import ToolDefinition
-from coding_harness.ports.tools import ToolContext, ToolResult
+from coding613.domain.actions import ToolCall
+from coding613.domain.models import PermissionMode
+from coding613.ports.llm import ToolDefinition
+from coding613.ports.tools import ToolContext, ToolResult
 
 
 class RecordingExecutor:

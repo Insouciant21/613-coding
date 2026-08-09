@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from coding_harness.adapters.llm.mock import MockScriptExhausted, ScriptedLLM
-from coding_harness.ports.llm import LLMResponse, ModelContext, ModelMessage
+from coding613.adapters.llm.mock import MockScriptExhausted, ScriptedLLM
+from coding613.ports.llm import LLMResponse, ModelContext, ModelMessage
 
 
 def test_scripted_llm_returns_in_order_and_captures_deep_snapshots() -> None:

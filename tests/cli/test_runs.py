@@ -8,10 +8,10 @@ from uuid import UUID, uuid4
 
 from typer.testing import CliRunner
 
-import coding_harness.cli.runs as runs_cli
-from coding_harness.application.approvals import ApprovalDecision, ApprovalResolution
-from coding_harness.cli.main import app
-from coding_harness.domain.models import Run, RunState, RunSummary, StopReason
+import coding613.cli.runs as runs_cli
+from coding613.application.approvals import ApprovalDecision, ApprovalResolution
+from coding613.cli.main import app
+from coding613.domain.models import Run, RunState, RunSummary, StopReason
 
 
 @dataclass

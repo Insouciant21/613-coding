@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 from typer.testing import CliRunner
 
-from coding_harness.application.credentials import CredentialStatus
-from coding_harness.cli.credentials import app
+from coding613.application.credentials import CredentialStatus
+from coding613.cli.credentials import app
 
 
 @dataclass
@@ -27,7 +27,7 @@ class FakeCredentials:
 
 def test_set_reads_hidden_input_and_never_prints_secret(monkeypatch) -> None:
     fake = FakeCredentials()
-    monkeypatch.setattr("coding_harness.cli.credentials.get_credential_service", lambda: fake)
+    monkeypatch.setattr("coding613.cli.credentials.get_credential_service", lambda: fake)
     result = CliRunner().invoke(app, ["set", "openai"], input="sk-cli-secret\nsk-cli-secret\n")
 
     assert result.exit_code == 0
@@ -37,7 +37,7 @@ def test_set_reads_hidden_input_and_never_prints_secret(monkeypatch) -> None:
 
 def test_status_is_redacted_and_clear_removes_provider(monkeypatch) -> None:
     fake = FakeCredentials(value="sk-cli-secret")
-    monkeypatch.setattr("coding_harness.cli.credentials.get_credential_service", lambda: fake)
+    monkeypatch.setattr("coding613.cli.credentials.get_credential_service", lambda: fake)
 
     status = CliRunner().invoke(app, ["status", "openai"])
     cleared = CliRunner().invoke(app, ["clear", "openai"])

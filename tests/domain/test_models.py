@@ -6,8 +6,8 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from coding_harness.domain.actions import ActionEnvelope, FinishAction, ToolCall
-from coding_harness.domain.models import (
+from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
+from coding613.domain.models import (
     ApprovalRequest,
     ApprovalStatus,
     Feedback,

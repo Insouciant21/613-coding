@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from coding_harness.adapters.sandbox.artifacts import ArtifactExporter
-from coding_harness.adapters.sandbox.workspace import (
+from coding613.adapters.sandbox.artifacts import ArtifactExporter
+from coding613.adapters.sandbox.workspace import (
     Workspace,
     WorkspaceBaseline,
     WorkspaceManager,

@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from coding_harness.application.policy import PolicyEngine, RepositoryPolicyConfig
-from coding_harness.domain.actions import ToolCall
-from coding_harness.domain.models import PermissionMode
-from coding_harness.ports.policy import PolicyEffect
+from coding613.application.policy import PolicyEngine, RepositoryPolicyConfig
+from coding613.domain.actions import ToolCall
+from coding613.domain.models import PermissionMode
+from coding613.ports.policy import PolicyEffect
 
 
 @pytest.fixture

@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from coding_harness.application.budgets import BudgetLimits, BudgetTracker
-from coding_harness.domain.models import StopReason
+from coding613.application.budgets import BudgetLimits, BudgetTracker
+from coding613.domain.models import StopReason
 
 
 def test_interactive_budget_has_no_implicit_five_turn_cap() -> None:

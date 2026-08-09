@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from coding_harness.application.policy import SandboxPolicyConfig
-from coding_harness.application.sandbox_policy import SandboxPolicy
-from coding_harness.domain.models import PermissionMode
-from coding_harness.domain.sandbox import (
+from coding613.application.policy import SandboxPolicyConfig
+from coding613.application.sandbox_policy import SandboxPolicy
+from coding613.domain.models import PermissionMode
+from coding613.domain.sandbox import (
     CommandResult,
     NetworkPolicy,
     ResourceLimits,

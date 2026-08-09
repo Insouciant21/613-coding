@@ -4,10 +4,10 @@ import asyncio
 from pathlib import Path
 from uuid import uuid4
 
-from coding_harness.domain.sandbox import WorkArtifact
-from coding_harness.domain.tasks import TaskNode, WorkerRole
-from coding_harness.domain.worker import WorkerContext
-from coding_harness.ports.orchestration import Worker
+from coding613.domain.sandbox import WorkArtifact
+from coding613.domain.tasks import TaskNode, WorkerRole
+from coding613.domain.worker import WorkerContext
+from coding613.ports.orchestration import Worker
 
 
 def test_worker_roles_and_context_are_explicit(tmp_path: Path) -> None:

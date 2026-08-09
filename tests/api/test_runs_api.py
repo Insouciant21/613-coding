@@ -6,10 +6,10 @@ from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 
-from coding_harness.api.app import create_app
-from coding_harness.application.approvals import ApprovalDecision, ApprovalResolution
-from coding_harness.application.composition import build_services
-from coding_harness.domain.models import Run, RunState, RunSummary, StopReason
+from coding613.api.app import create_app
+from coding613.application.approvals import ApprovalDecision, ApprovalResolution
+from coding613.application.composition import build_services
+from coding613.domain.models import Run, RunState, RunSummary, StopReason
 
 
 @dataclass

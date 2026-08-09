@@ -6,13 +6,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from coding_harness.adapters.sandbox.artifacts import ArtifactExporter
-from coding_harness.adapters.sandbox.docker_runtime import (
+from coding613.adapters.sandbox.artifacts import ArtifactExporter
+from coding613.adapters.sandbox.docker_runtime import (
     DockerSandboxRuntime,
     SandboxRuntimeError,
 )
-from coding_harness.adapters.sandbox.workspace import WorkspaceManager
-from coding_harness.domain.sandbox import (
+from coding613.adapters.sandbox.workspace import WorkspaceManager
+from coding613.domain.sandbox import (
     CommandResult,
     NetworkPolicy,
     ResourceLimits,

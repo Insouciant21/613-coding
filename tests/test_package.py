@@ -3,6 +3,6 @@ import unittest
 
 class PackageTests(unittest.TestCase):
     def test_package_exposes_version(self) -> None:
-        import coding_harness
+        import coding613
 
-        self.assertTrue(coding_harness.__version__)
+        self.assertTrue(coding613.__version__)

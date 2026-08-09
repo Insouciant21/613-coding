@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from coding_harness.adapters.tools.filesystem import (
+from coding613.adapters.tools.filesystem import (
     FilesystemTools,
     FileTooLargeError,
     InvalidUtf8Error,
     PathOutsideRepositoryError,
 )
-from coding_harness.adapters.tools.git import GitTools
+from coding613.adapters.tools.git import GitTools
 
 
 def test_filesystem_lists_searches_reads_and_edits_deterministically(tmp_path: Path) -> None:

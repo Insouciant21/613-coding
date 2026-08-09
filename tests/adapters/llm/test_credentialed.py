@@ -6,12 +6,12 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from coding_harness.adapters.llm.credentialed import (
+from coding613.adapters.llm.credentialed import (
     CredentialedOpenAICompatibleLLM,
     ProviderCredentialError,
 )
-from coding_harness.domain.actions import ToolCall
-from coding_harness.ports.llm import ModelContext, ToolDefinition
+from coding613.domain.actions import ToolCall
+from coding613.ports.llm import ModelContext, ToolDefinition
 
 
 class _Reader:

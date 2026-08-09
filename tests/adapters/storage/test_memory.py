@@ -6,15 +6,15 @@ from uuid import uuid4
 
 import pytest
 
-from coding_harness.adapters.embeddings.mock import DeterministicEmbedding
-from coding_harness.adapters.storage.lancedb_index import (
+from coding613.adapters.embeddings.mock import DeterministicEmbedding
+from coding613.adapters.storage.lancedb_index import (
     LanceMemoryIndex,
     MemoryQuery,
     VectorEntry,
 )
-from coding_harness.adapters.storage.memory import MemoryRepository
-from coding_harness.adapters.storage.sqlite import SqliteEventStore
-from coding_harness.domain.models import MemoryEntry, MemoryType, Project
+from coding613.adapters.storage.memory import MemoryRepository
+from coding613.adapters.storage.sqlite import SqliteEventStore
+from coding613.domain.models import MemoryEntry, MemoryType, Project
 
 
 class TrackingMemoryRepository(MemoryRepository):

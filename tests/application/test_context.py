@@ -6,13 +6,13 @@ from pathlib import Path
 
 import httpx
 
-from coding_harness.adapters.embeddings.openai_compatible import OpenAICompatibleEmbedding
-from coding_harness.adapters.storage.lancedb_index import MemoryQuery, VectorHit
-from coding_harness.adapters.storage.memory import MemoryRepository
-from coding_harness.adapters.storage.sqlite import SqliteEventStore
-from coding_harness.application.context import ContextAssembler
-from coding_harness.domain.events import Event
-from coding_harness.domain.models import MemoryEntry, MemoryType, Project, Run
+from coding613.adapters.embeddings.openai_compatible import OpenAICompatibleEmbedding
+from coding613.adapters.storage.lancedb_index import MemoryQuery, VectorHit
+from coding613.adapters.storage.memory import MemoryRepository
+from coding613.adapters.storage.sqlite import SqliteEventStore
+from coding613.application.context import ContextAssembler
+from coding613.domain.events import Event
+from coding613.domain.models import MemoryEntry, MemoryType, Project, Run
 
 
 class RecordingEmbedding:

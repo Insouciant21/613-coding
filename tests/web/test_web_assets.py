@@ -1,6 +1,6 @@
 from pathlib import Path
 
-ROOT = Path(__file__).parents[2] / "src/coding_harness/web"
+ROOT = Path(__file__).parents[2] / "src/coding613/web"
 
 
 def test_webui_assets_expose_operations_and_safe_api_only_surface() -> None:

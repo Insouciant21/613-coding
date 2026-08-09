@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
-from coding_harness.application.scheduling import Scheduler
-from coding_harness.domain.tasks import TaskGraph, TaskNode, WorkerRole
+from coding613.application.scheduling import Scheduler
+from coding613.domain.tasks import TaskGraph, TaskNode, WorkerRole
 
 
 def test_scheduler_selects_ready_nodes_in_stable_order() -> None:

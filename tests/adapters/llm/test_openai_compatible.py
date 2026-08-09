@@ -6,15 +6,15 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from coding_harness.adapters.llm.openai_compatible import (
+from coding613.adapters.llm.openai_compatible import (
     OpenAICompatibleLLM,
     ProviderAuthenticationError,
     ProviderRateLimitError,
     ProviderResponseError,
     ProviderTimeoutError,
 )
-from coding_harness.domain.actions import ToolCall
-from coding_harness.ports.llm import ModelContext, ModelMessage, ToolDefinition
+from coding613.domain.actions import ToolCall
+from coding613.ports.llm import ModelContext, ModelMessage, ToolDefinition
 
 
 def test_openai_adapter_maps_request_and_validates_tool_response() -> None:

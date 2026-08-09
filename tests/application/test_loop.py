@@ -10,22 +10,22 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from coding_harness.adapters.storage.sqlite import SqliteEventStore
-from coding_harness.application.approvals import (
+from coding613.adapters.storage.sqlite import SqliteEventStore
+from coding613.application.approvals import (
     ApprovalDecision,
     ApprovalService,
     StaleApprovalError,
 )
-from coding_harness.application.budgets import BudgetLimits
-from coding_harness.application.feedback import FeedbackClassifier
-from coding_harness.application.loop import AgentLoop, LoopDependencies
-from coding_harness.application.policy import PolicyEngine, RepositoryPolicyConfig
-from coding_harness.application.run_service import RunRequest, RunService
-from coding_harness.application.tool_registry import ToolRegistry
-from coding_harness.application.validation import ValidationKind, ValidationResult
-from coding_harness.domain.actions import ActionEnvelope, FinishAction, ToolCall
-from coding_harness.domain.events import Event
-from coding_harness.domain.models import (
+from coding613.application.budgets import BudgetLimits
+from coding613.application.feedback import FeedbackClassifier
+from coding613.application.loop import AgentLoop, LoopDependencies
+from coding613.application.policy import PolicyEngine, RepositoryPolicyConfig
+from coding613.application.run_service import RunRequest, RunService
+from coding613.application.tool_registry import ToolRegistry
+from coding613.application.validation import ValidationKind, ValidationResult
+from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
+from coding613.domain.events import Event
+from coding613.domain.models import (
     ApprovalRequest,
     ApprovalStatus,
     FeedbackKind,
@@ -37,13 +37,13 @@ from coding_harness.domain.models import (
     RunSummary,
     StopReason,
 )
-from coding_harness.ports.llm import (
+from coding613.ports.llm import (
     LLMResponse,
     ModelContext,
     ModelMessage,
     ToolDefinition,
 )
-from coding_harness.ports.tools import ToolContext, ToolResult
+from coding613.ports.tools import ToolContext, ToolResult
 
 
 class Provider:

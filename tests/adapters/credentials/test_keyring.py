@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from coding_harness.adapters.credentials.keyring import KeyringCredentialStore
-from coding_harness.application.credentials import CredentialError, CredentialService
+from coding613.adapters.credentials.keyring import KeyringCredentialStore
+from coding613.application.credentials import CredentialError, CredentialService
 
 
 class FakeKeyring:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from coding_harness.adapters.sandbox.workspace import (
+from coding613.adapters.sandbox.workspace import (
     Workspace,
     WorkspaceBaseline,
     WorkspaceManager,
@@ -74,7 +74,7 @@ def test_declared_write_set_is_enforced_during_artifact_collection(tmp_path: Pat
     (workspace.path / "tracked.txt").write_text("changed\n")
     (workspace.path / "untracked.txt").write_text("changed untracked\n")
 
-    from coding_harness.adapters.sandbox.artifacts import ArtifactExporter
+    from coding613.adapters.sandbox.artifacts import ArtifactExporter
 
     with pytest.raises(WriteSetViolation, match="untracked.txt"):
         ArtifactExporter(manager).collect(workspace, workspace.baseline)
@@ -87,7 +87,7 @@ def test_empty_declared_write_set_rejects_all_changes(tmp_path: Path) -> None:
     workspace = manager.create(source, "run", "worker")
     (workspace.path / "new.txt").write_text("changed\n")
 
-    from coding_harness.adapters.sandbox.artifacts import ArtifactExporter
+    from coding613.adapters.sandbox.artifacts import ArtifactExporter
 
     try:
         with pytest.raises(WriteSetViolation, match="new.txt"):

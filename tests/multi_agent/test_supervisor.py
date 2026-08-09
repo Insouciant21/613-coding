@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from coding_harness.application.supervisor import Supervisor
-from coding_harness.domain.sandbox import WorkArtifact
-from coding_harness.domain.tasks import TaskNode, WorkerRole
-from coding_harness.domain.worker import WorkerContext
+from coding613.application.supervisor import Supervisor
+from coding613.domain.sandbox import WorkArtifact
+from coding613.domain.tasks import TaskNode, WorkerRole
+from coding613.domain.worker import WorkerContext
 
 
 class ScriptedWorker:

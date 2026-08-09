@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from coding_harness.domain.tasks import (
+from coding613.domain.tasks import (
     GraphValidationError,
     TaskGraph,
     TaskNode,

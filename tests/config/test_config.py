@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from coding_harness.config import HarnessConfig, load_config, validate_config
-from coding_harness.domain.models import PermissionMode
+from coding613.config import HarnessConfig, load_config, validate_config
+from coding613.domain.models import PermissionMode
 
 
 def test_load_config_parses_toml_and_canonicalizes_repository_root(tmp_path: Path) -> None:

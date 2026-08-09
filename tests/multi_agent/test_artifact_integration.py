@@ -3,10 +3,10 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from coding_harness.adapters.orchestration.integration_workspace import IntegrationWorkspace
-from coding_harness.application.artifact_integrator import ArtifactIntegrator
-from coding_harness.domain.models import FeedbackKind
-from coding_harness.domain.sandbox import WorkArtifact
+from coding613.adapters.orchestration.integration_workspace import IntegrationWorkspace
+from coding613.application.artifact_integrator import ArtifactIntegrator
+from coding613.domain.models import FeedbackKind
+from coding613.domain.sandbox import WorkArtifact
 
 
 def _repo(tmp_path: Path) -> Path:

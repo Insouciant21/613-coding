@@ -3,8 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from coding_harness.adapters.tools.validation import ValidatorRunner
-from coding_harness.application.validation import ValidationKind, ValidationLimits
+from coding613.adapters.tools.validation import ValidatorRunner
+from coding613.application.validation import ValidationKind, ValidationLimits
 
 
 def test_validator_runner_captures_exit_and_caps_output(tmp_path: Path) -> None:

@@ -6,15 +6,15 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from coding_harness.adapters.sandbox.fake import FakeSandboxRuntime
-from coding_harness.domain.sandbox import (
+from coding613.adapters.sandbox.fake import FakeSandboxRuntime
+from coding613.domain.sandbox import (
     CommandResult,
     NetworkPolicy,
     ResourceLimits,
     SandboxSpec,
     WorkArtifact,
 )
-from coding_harness.ports.sandbox import SandboxRuntime
+from coding613.ports.sandbox import SandboxRuntime
 
 
 def _spec(tmp_path: Path) -> SandboxSpec:

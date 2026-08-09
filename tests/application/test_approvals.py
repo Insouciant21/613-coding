@@ -7,15 +7,15 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from coding_harness.adapters.storage.sqlite import SqliteEventStore
-from coding_harness.application.approvals import (
+from coding613.adapters.storage.sqlite import SqliteEventStore
+from coding613.application.approvals import (
     ApprovalDecision,
     ApprovalService,
     StaleApprovalError,
 )
-from coding_harness.domain.actions import ToolCall
-from coding_harness.domain.models import ApprovalRequest, ApprovalStatus, Run
-from coding_harness.ports.policy import PolicyDecision, PolicyEffect
+from coding613.domain.actions import ToolCall
+from coding613.domain.models import ApprovalRequest, ApprovalStatus, Run
+from coding613.ports.policy import PolicyDecision, PolicyEffect
 
 
 class Clock:

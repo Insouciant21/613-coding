@@ -5,20 +5,20 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from coding_harness.domain.actions import ActionEnvelope, ToolCall
-from coding_harness.domain.events import Event
-from coding_harness.domain.models import PermissionMode
-from coding_harness.ports.embeddings import EmbeddingProvider
-from coding_harness.ports.llm import (
+from coding613.domain.actions import ActionEnvelope, ToolCall
+from coding613.domain.events import Event
+from coding613.domain.models import PermissionMode
+from coding613.ports.embeddings import EmbeddingProvider
+from coding613.ports.llm import (
     LLMProvider,
     LLMResponse,
     ModelContext,
     ModelMessage,
     ToolDefinition,
 )
-from coding_harness.ports.policy import PolicyDecision, PolicyEffect, PolicyEvaluator
-from coding_harness.ports.storage import EventStore
-from coding_harness.ports.tools import ToolContext, ToolExecutor, ToolResult
+from coding613.ports.policy import PolicyDecision, PolicyEffect, PolicyEvaluator
+from coding613.ports.storage import EventStore
+from coding613.ports.tools import ToolContext, ToolExecutor, ToolResult
 
 
 class FakeLLM:

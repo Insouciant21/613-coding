@@ -3,11 +3,11 @@ requires = ["uv_build>=0.8.0,<1"]
 build-backend = "uv_build"
 
 [project]
-name = "coding-harness"
+name = "613-coding"
 version = "0.1.0"
 description = "613 Coding local coding agent harness"
 requires-python = ">=3.12"
-scripts = { coding-harness = "coding_harness.cli.entrypoint:main" }
+scripts = { 613-coding = "coding613.cli.entrypoint:main" }
 dependencies = [
     "pydantic>=2.11,<3",
     "httpx>=0.28,<1",
@@ -30,6 +30,9 @@ dev = [
 
 [tool.uv]
 default-groups = ["dev"]
+
+[tool.uv.build-backend]
+module-name = "coding613"
 
 [tool.ruff]
 target-version = "py312"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from coding_harness.application.role_policies import role_policy
-from coding_harness.domain.tasks import WorkerRole
+from coding613.application.role_policies import role_policy
+from coding613.domain.tasks import WorkerRole
 
 
 def test_planner_and_observer_roles_are_read_only() -> None:

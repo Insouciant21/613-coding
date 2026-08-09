@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from coding_harness.adapters.sandbox.fake import FakeSandboxRuntime
-from coding_harness.demo.sandbox import run_sandbox_demo
+from coding613.adapters.sandbox.fake import FakeSandboxRuntime
+from coding613.demo.sandbox import run_sandbox_demo
 
 
 def test_sandbox_demo_covers_isolation_policy_resources_artifact_and_cleanup(tmp_path: Path) -> None:

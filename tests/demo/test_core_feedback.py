@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from coding_harness.adapters.storage.sqlite import SqliteEventStore
-from coding_harness.demo.core_feedback import run_core_feedback_demo
-from coding_harness.domain.models import RunState
+from coding613.adapters.storage.sqlite import SqliteEventStore
+from coding613.demo.core_feedback import run_core_feedback_demo
+from coding613.domain.models import RunState
 
 
 def test_core_feedback_demo_is_offline_deterministic_and_complete(tmp_path: Path) -> None:

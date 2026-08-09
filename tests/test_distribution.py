@@ -1,3 +1,4 @@
+import importlib.util
 import re
 import tomllib
 from pathlib import Path
@@ -5,10 +6,17 @@ from pathlib import Path
 ROOT = Path(__file__).parents[1]
 
 
-def test_package_declares_console_entrypoint_and_runtime_metadata() -> None:
+def test_package_declares_only_613_coding_console_entrypoint() -> None:
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert data["project"]["name"] == "coding-harness"
-    assert data["project"]["scripts"]["coding-harness"] == "coding_harness.cli.entrypoint:main"
+    assert data["project"]["name"] == "613-coding"
+    assert data["project"]["scripts"] == {
+        "613-coding": "coding613.cli.entrypoint:main",
+    }
+
+
+def test_only_coding613_import_package_is_available() -> None:
+    assert importlib.util.find_spec("coding613") is not None
+    assert importlib.util.find_spec("coding_harness") is None
 
 
 def test_dockerfile_is_pinned_non_root_and_does_not_mount_socket() -> None:

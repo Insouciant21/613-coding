@@ -4,12 +4,12 @@ from pathlib import Path
 
 import httpx
 
-from coding_harness.adapters.llm.mock import ScriptedLLM
-from coding_harness.application.composition import build_services
-from coding_harness.application.run_service import RunRequest
-from coding_harness.domain.actions import ActionEnvelope, FinishAction, ToolCall
-from coding_harness.domain.models import RunState, StopReason
-from coding_harness.ports.llm import LLMResponse
+from coding613.adapters.llm.mock import ScriptedLLM
+from coding613.application.composition import build_services
+from coding613.application.run_service import RunRequest
+from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
+from coding613.domain.models import RunState, StopReason
+from coding613.ports.llm import LLMResponse
 
 
 class _ProbeProvider:

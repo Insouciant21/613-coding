@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from coding_harness.demo.multi_agent import run_multi_agent_demo
+from coding613.demo.multi_agent import run_multi_agent_demo
 
 
 def test_multi_agent_demo_exposes_supervisor_feedback_approval_and_integration() -> None:

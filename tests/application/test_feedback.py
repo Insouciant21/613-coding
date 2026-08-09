@@ -4,14 +4,14 @@ from uuid import uuid4
 
 import pytest
 
-from coding_harness.application.feedback import FeedbackClassifier
-from coding_harness.application.validation import (
+from coding613.application.feedback import FeedbackClassifier
+from coding613.application.validation import (
     ValidationKind,
     ValidationResult,
     ValidationTracker,
 )
-from coding_harness.domain.actions import ToolCall
-from coding_harness.domain.models import FeedbackKind
+from coding613.domain.actions import ToolCall
+from coding613.domain.models import FeedbackKind
 
 
 def result(

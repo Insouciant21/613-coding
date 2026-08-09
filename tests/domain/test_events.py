@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from coding_harness.domain.events import Event
+from coding613.domain.events import Event
 
 
 def test_event_new_sets_version_uuid_and_redacts_sensitive_payload() -> None:
