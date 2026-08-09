@@ -44,6 +44,17 @@ from coding613.ports.policy import PolicyDecision, PolicyEffect
 from coding613.ports.storage import EventStore, LoopSessionStore
 from coding613.ports.tools import ToolContext, ToolResult
 
+_FINISH_TOOL = ToolDefinition(
+    name="finish",
+    description="Finish the task only after objective validation is fresh and passing.",
+    input_schema={
+        "type": "object",
+        "properties": {"summary": {"type": "string", "minLength": 1}},
+        "required": ["summary"],
+        "additionalProperties": False,
+    },
+)
+
 
 class ContextBuilder(Protocol):
     def build(
@@ -212,7 +223,7 @@ class AgentLoop:
                 definitions = tuple(
                     ToolDefinition.model_validate(definition)
                     for definition in dependencies.tools.definitions()
-                )
+                ) + (_FINISH_TOOL,)
             except Exception as error:
                 return self._dependency_failure(
                     run_id,
@@ -327,7 +338,7 @@ class AgentLoop:
                 continue
 
             continue_model = False
-            for envelope in response.actions:
+            for action_index, envelope in enumerate(response.actions):
                 action = envelope.action
                 if isinstance(action, FinishAction):
                     try:
@@ -542,6 +553,7 @@ class AgentLoop:
                     (context, response, envelope),
                     session,
                     dependencies,
+                    validate=action_index == len(response.actions) - 1,
                     state_before=session.state,
                     schema_validation=schema_evidence,
                     policy_decision=policy_evidence,
@@ -936,6 +948,7 @@ class AgentLoop:
         session: _Session,
         dependencies: LoopDependencies,
         *,
+        validate: bool = True,
         state_before: RunState,
         schema_validation: SchemaValidationEvidence,
         policy_decision: PolicyDecisionEvidence,
@@ -1014,6 +1027,22 @@ class AgentLoop:
                 call,
                 tool_result,
                 feedback,
+                session,
+                dependencies,
+                state_before=state_before,
+                schema_validation=schema_validation,
+                policy_decision=policy_decision,
+                approval_update=approval_update,
+            )
+            return False
+
+        if not validate:
+            self._record_from_turn(
+                run_id,
+                turn,
+                call,
+                tool_result,
+                None,
                 session,
                 dependencies,
                 state_before=state_before,
@@ -1294,7 +1323,7 @@ class AgentLoop:
         turn: tuple[ModelContext, LLMResponse, ActionEnvelope] | None,
         call: ToolCall,
         tool_result: ToolResult | None,
-        feedback: Feedback,
+        feedback: Feedback | None,
         session: _Session,
         deps: LoopDependencies,
         validation: ValidationResult | None = None,

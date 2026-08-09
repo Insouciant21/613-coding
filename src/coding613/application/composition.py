@@ -33,7 +33,7 @@ from coding613.application.policy import PolicyEngine
 from coding613.application.run_service import RunRequest, RunService
 from coding613.config import load_config
 from coding613.domain.events import Event
-from coding613.domain.models import Project, Run
+from coding613.domain.models import PermissionMode, Project, Run
 from coding613.ports.llm import LLMProvider, LLMResponse, ModelContext, ToolDefinition
 
 
@@ -50,14 +50,31 @@ class DeferredLLMProvider(LLMProvider):
 
 
 class ConfiguredRunService(RunService):
-    def __init__(self, project: Project, *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        project: Project,
+        *args: Any,
+        events: SqliteEventStore,
+        permission_mode: PermissionMode,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.project = project
+        self._events = events
+        self._permission_mode = permission_mode
 
     def create_run(self, request: RunRequest) -> Run:
+        updates: dict[str, Any] = {}
         if request.project_id is None:
-            request = request.model_copy(update={"project_id": self.project.id})
+            updates["project_id"] = self.project.id
+        if request.permission_mode is None:
+            updates["permission_mode"] = self._permission_mode
+        if updates:
+            request = request.model_copy(update=updates)
         return super().create_run(request)
+
+    def list_events(self, run_id: UUID) -> list[Event]:
+        return self._events.list_for_run(run_id)
 
 
 class LocalServices:
@@ -131,6 +148,8 @@ def build_services(
         store,
         AgentLoop(),
         dependencies,
+        events=store,
+        permission_mode=config.permission_mode,
     )
     return LocalServices(service, store)
 

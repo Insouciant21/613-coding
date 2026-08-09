@@ -15,6 +15,16 @@ from coding613.domain.redaction import redact_text
 from coding613.ports.embeddings import EmbeddingProvider
 from coding613.ports.llm import ModelContext, ModelMessage
 
+_WORKER_SYSTEM_PROMPT = (
+    "You are a 613 Coding repository worker. Act directly on the repository with "
+    "the available tools to complete the user's task. Use read-only tools only to "
+    "gather information that is still missing, then make the smallest required "
+    "edits. Do not repeat successful read-only actions unless new evidence makes "
+    "another read necessary. Treat objective validation as authoritative feedback: "
+    "diagnose its concrete failure, edit the implicated files, rerun validation, "
+    "and finish only after fresh validation passes."
+)
+
 
 class MemoryIndex(Protocol):
     def query(
@@ -57,7 +67,8 @@ class ContextAssembler:
         )
         self.last_query = query
         memories = self._retrieve(safe_task, query)
-        messages = [
+        messages = [ModelMessage(role="system", content=_WORKER_SYSTEM_PROMPT)]
+        messages.extend(
             ModelMessage(
                 role="system",
                 content=f"Memory ({entry.memory_type.value}): {entry.text}"[
@@ -65,13 +76,13 @@ class ContextAssembler:
                 ],
             )
             for entry in memories
-        ]
+        )
         messages.append(ModelMessage(role="user", content=safe_task[: self._max_message_chars]))
         for event in recent_events[-self._max_recent_events :]:
             payload = json.dumps(event.payload, sort_keys=True, separators=(",", ":"))
             messages.append(
                 ModelMessage(
-                    role="tool",
+                    role="user",
                     content=f"Event {event.event_type}: {payload}"[: self._max_message_chars],
                 )
             )

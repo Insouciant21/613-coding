@@ -73,6 +73,16 @@ def test_feedback_detects_invalid_action_and_no_progress() -> None:
     assert feedback.kind is FeedbackKind.NO_PROGRESS
 
 
+def test_feedback_treats_delete_without_changed_file_as_no_progress() -> None:
+    feedback = FeedbackClassifier().classify(
+        result(ValidationKind.TEST, 0),
+        ToolCall(name="delete_file", arguments={"path": "missing.py"}),
+        (),
+    )
+
+    assert feedback.kind is FeedbackKind.NO_PROGRESS
+
+
 def test_repeated_failure_becomes_no_progress() -> None:
     classifier = FeedbackClassifier(repeated_failure_limit=3)
     failure = result(ValidationKind.TEST, 1, "same failure")
@@ -82,6 +92,28 @@ def test_repeated_failure_becomes_no_progress() -> None:
     no_progress = classifier.classify(failure, call, ("a.py",))
     assert no_progress.kind is FeedbackKind.NO_PROGRESS
     assert not no_progress.retryable
+
+
+def test_repeated_failure_allows_progressive_file_changes() -> None:
+    classifier = FeedbackClassifier(repeated_failure_limit=3)
+    failure = result(ValidationKind.TEST, 1, "same failure")
+    call = ToolCall(name="edit_file", arguments={"path": "next.py", "content": "x"})
+
+    assert classifier.classify(failure, call, ("a.py",)).kind is FeedbackKind.TEST_FAILURE
+    assert classifier.classify(failure, call, ("a.py", "b.py")).kind is FeedbackKind.TEST_FAILURE
+    assert (
+        classifier.classify(failure, call, ("a.py", "b.py", "c.py")).kind
+        is FeedbackKind.TEST_FAILURE
+    )
+
+    assert (
+        classifier.classify(failure, call, ("a.py", "b.py", "c.py")).kind
+        is FeedbackKind.TEST_FAILURE
+    )
+    assert (
+        classifier.classify(failure, call, ("a.py", "b.py", "c.py")).kind
+        is FeedbackKind.NO_PROGRESS
+    )
 
 
 def test_feedback_classifier_restores_repeated_failure_state() -> None:

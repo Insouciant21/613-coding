@@ -13,7 +13,7 @@ class ToolPolicy(DomainModel):
 
 
 _READ_TOOLS = frozenset({"read_file", "search_files", "list_files", "git_diff"})
-_WRITE_TOOLS = frozenset({"edit_file", "write_file", "apply_patch"})
+_WRITE_TOOLS = frozenset({"delete_file", "edit_file", "write_file", "apply_patch"})
 
 
 def role_policy(role: WorkerRole) -> ToolPolicy:

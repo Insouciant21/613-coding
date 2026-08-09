@@ -660,3 +660,53 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation boundary: no source code, dependency, CI, WebUI, Dockerfile, or Cube product file
   changed during planning.
 - Plan commit: `9ee205d` (`docs: plan tui artifact and cube recovery work`).
+### 2026-08-09 22:20:00 Asia/Shanghai - real-provider worker reliability repair
+
+- Task: make provider-backed 613 Coding workers retain goal-directed context, inherit configured permission mode, and remove obsolete repository files while implementing the approved Cube Solver plan; triggered `executing-plans`, `using-git-worktrees`, `test-driven-development`, `systematic-debugging`, `requesting-code-review`, `receiving-code-review`, and `verification-before-completion`.
+- Human intervention: the user configured the `ai2` API credential in the OS Keyring. Verification returned `ai2: configured (source=keyring)`; no key material entered commands, files, prompts, events, or this log.
+- Real-provider failures: Cube foundation runs exposed OpenAI-compatible tool-history rejection, per-action validation, progress fingerprints that ignored growing changed-file sets, missing stable worker instructions, repeated inspection, and approval/budget exhaustion. Failed and cancelled runs remain recorded in `tmp/cube/AGENT_LOG.md`; no failure is represented as success.
+- Harness TDD: the initial targeted RED produced 5 failures for system-context ordering, configured mode inheritance, and repository deletion. The targeted GREEN passed 5 tests; the related suite passed 50; the pre-review full suite passed 249 tests with the existing Starlette warning. Ruff, mypy across 82 source files, lock check, and diff check passed.
+- Target evidence: real-provider run `46ec4663-1c43-41e7-95d7-ce31f3b7d489` reached `completed/success`; its automatic verifier exited 0. Independent frontend/API tests, TypeScript typecheck, Ruff, mypy, and diff check passed. This is product evidence, not a substitute for the harness tests.
+- Implementation: `80f6c85` adds a stable coding-worker system message, configured-mode inheritance for CLI-created runs, and an agent-visible `delete_file` integrated with repository tools, policy, role policy, progress classification, and changed-file tracking.
+- Review repair: independent read-only review found symlink-following deletion could remove a target rather than its repository entry and identified missing boundary coverage. RED reproduced both internal-target deletion and external-target rejection as 2 failures; the fix resolves only the parent path and unlinks the final entry. Focused GREEN passed 8 filesystem tests and 89 cross-layer tests.
+- First scoped re-review: cross-layer coverage was addressed, but the reviewer reproduced an internal intermediate-parent bypass such as `alias -> .ssh` followed by deletion of `alias/id_rsa`; merge remained blocked.
+- Second RED/GREEN: the internal-parent regression failed 1 test while the external-parent case was already denied. Commit `ee05b2a` rejects every symlinked delete-parent component before resolving the real parent. Focused filesystem GREEN passed 10 tests; fresh full verification passed 260 tests with the existing Starlette warning; Ruff, mypy across 82 source files, `uv lock --check`, and `git diff --check` exited 0. A second scoped re-review is required before integration.
+- Second scoped re-review: merge remains blocked. The reviewer reproduced a check/use race that swaps a checked parent directory for a symlink before pathname-based `unlink()`, allowing an external target deletion. After three failed path-check repair rounds, the controller stopped per `systematic-debugging`; the required redesign is descriptor-relative traversal with `O_NOFOLLOW | O_DIRECTORY` and `dir_fd`. No further Cube batch may use `delete_file`, and this branch must not merge in its current form.
+- Bounded listing follow-up: Cube Task 3 run `40d8f1f0-21dd-4477-854f-7921caf07697` made 17 read-only model calls because `list_files` included `.613-coding`, dependency trees, build output, and caches. TDD RED produced 6 focused failures for generated directories. Commit `0836308` adds six generated/runtime directory classes to the existing bounded ignore set; focused GREEN passed 16 tests, and the full suite passed 266 tests with the existing Starlette warning. Ruff, mypy across 82 source files, lock check, and diff check passed.
+- Lesson: security-sensitive deletion requires descriptor-relative no-follow syscalls rather than pathname prechecks. Objective progress also depends on bounded repository context, stable instructions, and the accumulated changed-file set, not validation output alone.
+
+### 2026-08-09 23:16:00 Asia/Shanghai - Cube domain authoring blocker
+
+- Task: continue Cube Solver Task 3 exclusively through real-provider 613 Coding runs after Foundation commit `8c052ee`; triggered `systematic-debugging`, `test-driven-development`, and `verification-before-completion`.
+- Bounded context repair: run `40d8f1f0-21dd-4477-854f-7921caf07697` made 17 read-only calls because `list_files` returned runtime, dependency, build, and cache trees. TDD commit `0836308` excludes those generated directory classes; focused tests passed 16 and the full suite passed 266.
+- Policy repair: run `ffe7ea54-9f4c-45fb-9285-fd843117dfda` produced repeated policy blocks because `token: string` matched the generic secret regex. TDD commit `a61a9d1` exempts common code type annotations while retaining actual secret assignments; focused tests passed 19 and the full suite passed 267. Ruff, mypy across 82 source files, lock check, and diff check passed.
+- Remaining blocker: 613 Coding registers only whole-file `edit_file` for repository mutation even though role policy mentions `apply_patch`. Independent bounded runs created Task 3 tests and partial files, but three consecutive `state.ts` repair attempts replaced incompatible whole files; the last one-line import repair deleted the fuller implementation and left 42 focused tests failing.
+- Decision: stop before a fourth repair attempt under `systematic-debugging`. Do not hand-edit Cube product code or claim Task 3 completion. Architecture choice is required between adding a schema-validated patch executor with conflict/preimage checks or explicitly relaxing the 613-only product-authoring constraint.
+
+### 2026-08-10 01:47:40 Asia/Shanghai - Safe repository mutations Task 4
+
+- Task: Task 4 tool-registry, policy, composition, and evidence completion; triggered `requesting-code-review`, `receiving-code-review`, `test-driven-development`, and `verification-before-completion`.
+- TDD RED: the focused policy regression for `.ssh/id_rsa`, `.aws/credentials`, and nested `.gnupg` patch headers failed 3 tests because policy only inspected named path arguments.
+- Implementation: `apply_patch` policy now inspects unified-diff `---`/`+++` headers and applies the existing hard path rules before executor dispatch. Added exact partial-commit propagation coverage for `PatchCommitError` and preserved the versioned `coding613.tool.apply_patch.v1` schema.
+- GREEN: policy suite passed 22 tests; registry/policy/composition suite passed 36 tests. Earlier fresh full verification passed 304 tests with one existing Starlette/httpx deprecation warning; Ruff, mypy for 83 source files, `uv lock --check`, and `git diff --check` passed.
+- Independent review: one Critical credential-path bypass and one Important evidence omission were addressed; the review also identified a Minor partial-commit test, which was added. No Critical or Important findings remain.
+- Human intervention: controller applied the minimal repair after verifying the reviewer finding; no `tmp/cube` product code, `.claude/`, requirement documents, credentials, or deployment state were touched.
+- Lesson: policy hard rules must inspect structured content carried inside mutation payloads, not only top-level path fields; task evidence files are part of the implementation boundary.
+
+### 2026-08-10 01:52:00 Asia/Shanghai - Safe mutation scoped re-review repairs
+
+- Task: address the second independent review's Critical root-path TOCTOU, Important partial-error reporting, and Important strict-parser findings; triggered `systematic-debugging`, `test-driven-development`, and `verification-before-completion`.
+- TDD RED: root replacement reproduced writes landing in the replacement directory; a late `PathOutsideRepositoryError` after the first file commit lost `changed_files`; trailing junk was silently accepted by the parser.
+- Implementation: `apply_patch` now opens one repository-root descriptor before preflight and passes duplicated descriptors through every read/delete/write; all commit-phase exceptions become `PatchCommitError` with exact committed paths; parser line accounting rejects trailing content and validates source/target hunk lengths.
+- GREEN: safe mutation and loop integration suite passed 132 tests; full suite passed 312 tests with one existing Starlette/httpx deprecation warning; Ruff, mypy for 83 source files, `uv lock --check`, and `git diff --check` passed.
+- Independent re-review: all Critical and Important findings are addressed; no new blocking issue remains.
+- Human intervention: controller implemented the verified minimal fixes; no `tmp/cube` product code, credentials, deployment, `.claude/`, or user-owned requirement files were modified.
+- Implementation commit: `c6ce018`; delivery-record linkage is finalized in the follow-up documentation commit.
+
+### 2026-08-10 01:56:00 Asia/Shanghai - Safe mutation final close-boundary repair
+
+- Task: close the remaining Important review finding for root descriptor cleanup; triggered `receiving-code-review`, `systematic-debugging`, `test-driven-development`, and `verification-before-completion`.
+- TDD RED: injected failure of the pinned root descriptor's `os.close()` after a successful replacement; the raw `OSError` escaped while the file had already changed.
+- Fix: commit-phase cleanup now converts root-close failures into `PatchCommitError` with the exact committed paths, while preserving the original commit error when both failures occur.
+- GREEN: focused safe mutation and loop integration suite passed 133 tests; full suite passed 313 tests with one existing Starlette/httpx deprecation warning; Ruff, mypy for 83 source files, `uv lock --check`, and `git diff --check` passed.
+- Review status: the remaining Important finding is addressed in `e80883b`; no Critical or Important findings remain.

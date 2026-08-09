@@ -50,9 +50,11 @@ class Provider:
     def __init__(self, responses: Sequence[Any]) -> None:
         self.responses = deque(responses)
         self.contexts: list[ModelContext] = []
+        self.tool_batches: list[tuple[ToolDefinition, ...]] = []
 
     def complete(self, context: ModelContext, tools: Sequence[ToolDefinition]) -> Any:
         self.contexts.append(context)
+        self.tool_batches.append(tuple(tools))
         return self.responses.popleft()
 
 
@@ -226,11 +228,19 @@ class Executor:
         return ToolResult(call=call, success=True, changed_files=tuple(self.changed_files))
 
 
+class ReadExecutor:
+    def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
+        del context
+        return ToolResult(call=call, success=True, output="read")
+
+
 class Validator:
     def __init__(self, results: Sequence[ValidationResult]) -> None:
         self.results = deque(results)
+        self.calls = 0
 
     def validate(self) -> ValidationResult:
+        self.calls += 1
         return self.results.popleft()
 
 
@@ -299,6 +309,16 @@ def dependencies(
     return deps, records, executor, approvals
 
 
+def test_bare_run_service_defaults_unspecified_mode_to_balanced(tmp_path: Path) -> None:
+    deps, _, _, _ = dependencies(tmp_path, Provider(()), Validator(()))
+    records = RunRecords()
+    service = RunService(records, AgentLoop(), lambda run: deps)
+
+    created = service.create_run(RunRequest(task="use library default"))
+
+    assert created.permission_mode is PermissionMode.BALANCED
+
+
 def test_failure_feedback_drives_repair_and_fresh_finish(tmp_path: Path) -> None:
     provider = Provider(
         (
@@ -316,6 +336,78 @@ def test_failure_feedback_drives_repair_and_fresh_finish(tmp_path: Path) -> None
     assert len(executor.calls) == 2
     assert "feedback.test_failure" in provider.contexts[1].metadata["event_types"]
     assert records.iterations[-1].state_after is RunState.COMPLETED
+
+
+def test_loop_exposes_finish_tool_to_provider(tmp_path: Path) -> None:
+    provider = Provider(
+        (
+            response(
+                ToolCall(
+                    name="edit_file", arguments={"path": "a.py", "content": "ok"}
+                )
+            ),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, _, _, _ = dependencies(tmp_path, provider, Validator((validation(0),)))
+
+    summary = AgentLoop().run(uuid4(), "finish after verification", deps)
+
+    finish = next(tool for tool in provider.tool_batches[0] if tool.name == "finish")
+    assert finish.input_schema == {
+        "type": "object",
+        "properties": {"summary": {"type": "string", "minLength": 1}},
+        "required": ["summary"],
+        "additionalProperties": False,
+    }
+    assert summary.status is RunState.COMPLETED
+
+
+def test_model_tool_batch_runs_objective_validation_once(tmp_path: Path) -> None:
+    provider = Provider(
+        (
+            LLMResponse(
+                actions=(
+                    ActionEnvelope(action=ToolCall(name="list_files", arguments={})),
+                    ActionEnvelope(
+                        action=ToolCall(
+                            name="read_file", arguments={"path": "harness.toml"}
+                        )
+                    ),
+                )
+            ),
+            response(
+                ToolCall(
+                    name="edit_file",
+                    arguments={"path": "answer.txt", "content": "done"},
+                )
+            ),
+            response(FinishAction(summary="done")),
+        )
+    )
+    validator = Validator((validation(1, "foundation missing"), validation(0)))
+    deps, _, _, _ = dependencies(tmp_path, provider, validator)
+    read_executor = ReadExecutor()
+    for name, schema in (
+        ("list_files", {"type": "object", "properties": {}}),
+        (
+            "read_file",
+            {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        ),
+    ):
+        deps.tools.register(
+            ToolDefinition(name=name, description=name, input_schema=schema),
+            read_executor,
+        )
+
+    summary = AgentLoop().run(uuid4(), "inspect before editing", deps)
+
+    assert summary.status is RunState.COMPLETED
+    assert validator.calls == 2
 
 
 def test_invalid_response_and_premature_finish_are_repaired(tmp_path: Path) -> None:

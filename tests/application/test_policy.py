@@ -33,8 +33,30 @@ def config(tmp_path: Path) -> RepositoryPolicyConfig:
 def test_write_policy_varies_by_mode(
     config: RepositoryPolicyConfig, mode: PermissionMode, effect: PolicyEffect
 ) -> None:
-    call = ToolCall(name="edit_file", arguments={"path": "src/a.py", "content": "pass"})
+    call = ToolCall(name="delete_file", arguments={"path": "src/a.py"})
     assert PolicyEngine().evaluate(call, config, mode).effect is effect
+
+
+def test_delete_policy_honors_disabled_writes(config: RepositoryPolicyConfig) -> None:
+    restricted = config.model_copy(update={"allow_writes": False})
+    call = ToolCall(name="delete_file", arguments={"path": "src/a.py"})
+
+    decision = PolicyEngine().evaluate(call, restricted, PermissionMode.AUTONOMOUS)
+
+    assert decision.effect is PolicyEffect.DENY
+    assert decision.rule_id == "config.writes_disabled"
+
+
+def test_apply_patch_policy_varies_by_mode(config: RepositoryPolicyConfig) -> None:
+    call = ToolCall(name="apply_patch", arguments={"patch": "--- /dev/null\n+++ b/a\n"})
+    assert PolicyEngine().evaluate(call, config, PermissionMode.STRICT).effect is PolicyEffect.ASK
+    assert PolicyEngine().evaluate(call, config, PermissionMode.BALANCED).effect is PolicyEffect.ALLOW
+    assert (
+        PolicyEngine()
+        .evaluate(call, config.model_copy(update={"allow_writes": False}), PermissionMode.AUTONOMOUS)
+        .effect
+        is PolicyEffect.DENY
+    )
 
 
 def test_declared_validation_is_allowed_except_in_strict_mode(
@@ -77,6 +99,44 @@ def test_secret_bearing_action_is_hard_denied_before_persistence(
 
     assert decision.effect is PolicyEffect.DENY
     assert decision.rule_id == "hard.secret_material"
+
+
+def test_credential_path_delete_is_hard_denied_in_autonomous_mode(
+    config: RepositoryPolicyConfig,
+) -> None:
+    call = ToolCall(name="delete_file", arguments={"path": ".ssh/id_rsa"})
+    decision = PolicyEngine().evaluate(call, config, PermissionMode.AUTONOMOUS)
+    assert decision.effect is PolicyEffect.DENY
+    assert decision.rule_id == "hard.credential_path"
+
+
+@pytest.mark.parametrize("path", [".ssh/id_rsa", ".aws/credentials", "nested/.gnupg/key"])
+def test_apply_patch_credential_paths_are_hard_denied(
+    config: RepositoryPolicyConfig, path: str
+) -> None:
+    call = ToolCall(
+        name="apply_patch",
+        arguments={"patch": f"--- a/{path}\n+++ b/{path}\n@@ -1 +1 @@\n-old\n+new\n"},
+    )
+    decision = PolicyEngine().evaluate(call, config, PermissionMode.AUTONOMOUS)
+    assert decision.effect is PolicyEffect.DENY
+    assert decision.rule_id == "hard.credential_path"
+
+
+def test_code_token_type_annotation_is_not_treated_as_secret(
+    config: RepositoryPolicyConfig,
+) -> None:
+    call = ToolCall(
+        name="edit_file",
+        arguments={
+            "path": "moves.ts",
+            "content": "export function parseMove(token: string) { return token }",
+        },
+    )
+
+    decision = PolicyEngine().evaluate(call, config, PermissionMode.AUTONOMOUS)
+
+    assert decision.effect is PolicyEffect.ALLOW
 
 
 def test_symlink_escape_and_memory_override_are_hard_denied(

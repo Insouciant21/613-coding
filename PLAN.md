@@ -148,11 +148,59 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - TDD: the end-to-end `read_file` → validation → `finish` test failed before registration and passed after wiring the toolset.
 - Boundary: filesystem paths remain canonical-root constrained, validation commands remain argv-only and exact-match policy checked, and tool/validation failures return deterministic loop feedback.
 
+## Real-provider Worker Reliability Repair Evidence
+
+- Status: review blocked. Context, configured-mode inheritance, and bounded file listings work through `0836308`, but pathname-based `delete_file` remains vulnerable to a parent-symlink TOCTOU race and must not merge.
+- Scope: stable goal-directed worker context, configured permission-mode inheritance, bounded repository listings, and a pending descriptor-relative `delete_file` redesign using no-follow directory descriptors.
+- Verification: real-provider Cube foundation run `46ec4663-1c43-41e7-95d7-ce31f3b7d489` completed successfully; the latest harness verification passed 266 tests, Ruff, mypy across 82 source files, lock check, and diff check. Independent review reproduced the unresolved delete race.
+- Evidence: `AGENT_LOG.md` entry `2026-08-09 22:20:00 Asia/Shanghai`; target operation details remain append-only in `tmp/cube/AGENT_LOG.md`.
+
 ## CI and Deployment Manifest Evidence
 
 - Status: repository configuration complete in `0d8d63a`; Docker source-copy order fixed, GitLab/GitHub CI container jobs added, and `render.yaml` declares an operator-controlled Web Service.
 - Verification: distribution-focused suite passed 7; Docker build attempt failed at external Docker Hub token retrieval, so no Docker or deployment success is claimed.
 - Boundary: remote CI final status and public URL require a configured forge/deployment account.
+
+## Safe Repository Mutations Evidence
+
+- Status: Tasks 1-4 complete in the reviewed fix/provider-context-history
+  worktree; integration into main remains pending the final branch check.
+- Task 1 commits: 9255c08, 62c4fe6; descriptor-relative delete holds parent
+  directory descriptors, rejects parent symlinks and protected roots, permits
+  final symlink deletion without following it, and passed its independent
+  review plus one fix round.
+- Task 2 commits: 338b363, ad2cd04, 80366e5; strict unidiff parser, immutable
+  prepared changes, path/header/hunk preflight, UTF-8 and aggregate limits,
+  and stable exceptions. Parser suite reached 23 passing tests after two
+  scoped review fix rounds.
+- Task 3 commits: 1e6fb22, 890e576; descriptor-relative patch staging, fsync,
+  atomic replace, delete reuse, sorted PatchResult, and exact partial
+  changed-file reporting. Patch/filesystem suite reached 48 passing tests
+  after one scoped review fix round.
+- Task 4 local implementation wires the versioned schema
+  coding613.tool.apply_patch.v1, executor result/error propagation,
+  composition integration, permission-mode tests, credential-path hard
+  denial coverage, and exact partial-commit changed-file propagation.
+- Task 4 review found and fixed a Critical policy bypass: credential paths in
+  apply_patch headers are now hard-denied before execution. A second scoped
+  review found and fixed root-path replacement during multi-file commits,
+  non-OSError partial-error reporting, and strict-parser trailing/target
+  length gaps. Final re-review found and fixed root descriptor close-error
+  reporting. No Critical or Important findings remain.
+- Fresh verification at 2026-08-10 01:52:00 CST: safe mutation and loop
+  integration suite passed 133 tests; full suite passed 313 tests with one
+  pre-existing Starlette/httpx deprecation warning; Ruff, mypy (83 source
+  files), uv lock --check, and git diff --check passed.
+- Task 4 implementation commit: `c6ce018`; final close-boundary fix commit:
+  `e80883b`; evidence-record commit follows after this hash is linked.
+- Delegation deviation: 613 Coding run
+  51a8e02a-3e46-4ed6-93b2-aae093be16b2 exhausted 20 model calls repeating
+  git diff --check without writes; earlier Task 2 runs
+  9b284a12-6d32-4c34-8c39-db4b1be7877b,
+  63b5fe3e-9790-4f5a-95a0-66789d363b74, and
+  1d87af44-3373-409d-86de-44c8a1bbe61d showed provider/no-progress
+  behavior. Controller takeover and all deviations are recorded in
+  AGENT_LOG.md and the SDD ledger.
 
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 

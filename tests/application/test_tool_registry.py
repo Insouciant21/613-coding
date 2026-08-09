@@ -5,6 +5,9 @@ from uuid import uuid4
 
 import pytest
 
+from coding613.adapters.tools.filesystem import FilesystemTools
+from coding613.adapters.tools.patch import PatchCommitError
+from coding613.adapters.tools.repository import build_repository_tools
 from coding613.application.tool_registry import (
     DuplicateToolError,
     ToolRegistry,
@@ -63,3 +66,70 @@ def test_registry_rejects_duplicate_unknown_and_invalid_arguments(tmp_path: Path
         registry.dispatch(ToolCall(name="missing", arguments={}), context(tmp_path))
     with pytest.raises(ToolSchemaError):
         registry.dispatch(ToolCall(name="read_file", arguments={"path": 1}), context(tmp_path))
+
+
+def test_repository_registry_exposes_versioned_apply_patch_and_dispatches(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "value.txt"
+    target.write_text("old\n", encoding="utf-8")
+    registry, _, changed_files = build_repository_tools(tmp_path, ())
+    definition = next(item for item in registry.definitions() if item.name == "apply_patch")
+    assert definition.input_schema == {
+        "$id": "coding613.tool.apply_patch.v1",
+        "type": "object",
+        "properties": {
+            "patch": {"type": "string", "minLength": 1, "maxLength": 1_000_000}
+        },
+        "required": ["patch"],
+        "additionalProperties": False,
+    }
+    patch = """--- a/value.txt
++++ b/value.txt
+@@ -1 +1 @@
+-old
++new
+"""
+
+    result = registry.dispatch(
+        ToolCall(name="apply_patch", arguments={"patch": patch}),
+        context(tmp_path),
+    )
+
+    assert result.success is True
+    assert result.changed_files == ("value.txt",)
+    assert changed_files == ["value.txt"]
+    assert target.read_text(encoding="utf-8") == "new\n"
+    assert result.output == '{"added": 0, "changed_files": ["value.txt"], "deleted": 0, "updated": 1}'
+
+
+def test_apply_patch_schema_rejects_malformed_arguments_before_executor(
+    tmp_path: Path,
+) -> None:
+    registry, _, _ = build_repository_tools(tmp_path, ())
+    with pytest.raises(ToolSchemaError):
+        registry.dispatch(
+            ToolCall(name="apply_patch", arguments={"patch": 1}),
+            context(tmp_path),
+        )
+
+
+def test_apply_patch_preserves_partial_commit_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry, _, changed_files = build_repository_tools(tmp_path, ())
+
+    def fail_after_partial_commit(self: FilesystemTools, patch: str) -> object:
+        del self, patch
+        raise PatchCommitError("descriptor close failed", ("a.txt", "b.txt"))
+
+    monkeypatch.setattr(FilesystemTools, "apply_patch", fail_after_partial_commit)
+    result = registry.dispatch(
+        ToolCall(name="apply_patch", arguments={"patch": "--- /dev/null\n+++ b/a.txt\n"}),
+        context(tmp_path),
+    )
+
+    assert result.success is False
+    assert result.error == "PatchCommitError"
+    assert result.changed_files == ("a.txt", "b.txt")
+    assert changed_files == ["a.txt", "b.txt"]

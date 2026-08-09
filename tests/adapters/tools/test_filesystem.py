@@ -27,12 +27,38 @@ def test_filesystem_lists_searches_reads_and_edits_deterministically(tmp_path: P
     assert tools.read_file("a.txt") == "needle on a\n"
     tools.edit_file("new/file.txt", "created\n")
     assert (tmp_path / "new/file.txt").read_text(encoding="utf-8") == "created\n"
+    tools.delete_file("new/file.txt")
+    assert not (tmp_path / "new/file.txt").exists()
+
+
+@pytest.mark.parametrize(
+    "directory",
+    [
+        ".613-coding",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        "dist",
+        "node_modules",
+    ],
+)
+def test_filesystem_omits_generated_directory_trees(
+    tmp_path: Path, directory: str
+) -> None:
+    generated = tmp_path / directory
+    generated.mkdir()
+    (generated / "large-generated-file.txt").write_text("generated\n", encoding="utf-8")
+    (tmp_path / "source.txt").write_text("source\n", encoding="utf-8")
+
+    assert FilesystemTools(tmp_path).list_files() == ["source.txt"]
 
 
 @pytest.mark.parametrize("path", ["../outside.txt", "/tmp/outside.txt"])
 def test_filesystem_rejects_path_escape(tmp_path: Path, path: str) -> None:
     with pytest.raises(PathOutsideRepositoryError):
         FilesystemTools(tmp_path).read_file(path)
+    with pytest.raises(PathOutsideRepositoryError):
+        FilesystemTools(tmp_path).delete_file(path)
 
 
 def test_filesystem_rejects_symlink_escape(tmp_path: Path) -> None:
@@ -41,6 +67,83 @@ def test_filesystem_rejects_symlink_escape(tmp_path: Path) -> None:
     os.symlink(outside, tmp_path / "link.txt")
     with pytest.raises(PathOutsideRepositoryError):
         FilesystemTools(tmp_path).read_file("link.txt")
+
+
+@pytest.mark.parametrize("target_location", ["inside", "outside"])
+def test_filesystem_deletes_symlink_without_deleting_target(
+    tmp_path: Path, target_location: str
+) -> None:
+    target_root = tmp_path if target_location == "inside" else tmp_path.parent
+    target = target_root / f"{target_location}-delete-target.txt"
+    target.write_text("keep\n", encoding="utf-8")
+    link = tmp_path / f"{target_location}-delete-link.txt"
+    os.symlink(target, link)
+
+    FilesystemTools(tmp_path).delete_file(link.name)
+
+    assert not link.exists()
+    assert not link.is_symlink()
+    assert target.read_text(encoding="utf-8") == "keep\n"
+
+
+@pytest.mark.parametrize("target_location", ["inside", "outside"])
+def test_filesystem_rejects_symlink_in_delete_parent_path(
+    tmp_path: Path, target_location: str
+) -> None:
+    target_root = tmp_path if target_location == "inside" else tmp_path.parent
+    target_directory = target_root / f"{target_location}-delete-directory"
+    target_directory.mkdir(exist_ok=True)
+    target = target_directory / "id_rsa"
+    target.write_text("keep\n", encoding="utf-8")
+    os.symlink(target_directory, tmp_path / "alias")
+
+    with pytest.raises(PathOutsideRepositoryError):
+        FilesystemTools(tmp_path).delete_file("alias/id_rsa")
+
+    assert target.read_text(encoding="utf-8") == "keep\n"
+
+
+@pytest.mark.parametrize("path", [".git/config", ".613-coding/state.db"])
+def test_filesystem_rejects_deletion_under_protected_root(
+    tmp_path: Path, path: str
+) -> None:
+    target = tmp_path / path
+    target.parent.mkdir()
+    target.write_text("protected\n", encoding="utf-8")
+
+    with pytest.raises(PathOutsideRepositoryError):
+        FilesystemTools(tmp_path).delete_file(path)
+
+    assert target.read_text(encoding="utf-8") == "protected\n"
+
+
+def test_delete_file_is_anchored_when_parent_path_is_swapped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    safe = tmp_path / "safe"
+    safe.mkdir()
+    (safe / "victim.txt").write_text("inside\n", encoding="utf-8")
+    outside = tmp_path.parent / f"outside-{tmp_path.name}"
+    outside.mkdir()
+    outside_victim = outside / "victim.txt"
+    outside_victim.write_text("outside\n", encoding="utf-8")
+    parked = tmp_path / "parked"
+    real_unlink = os.unlink
+    raced = False
+
+    def swap_then_unlink(path: str, *, dir_fd: int | None = None) -> None:
+        nonlocal raced
+        if not raced:
+            raced = True
+            safe.rename(parked)
+            os.symlink(outside, safe)
+        real_unlink(path, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "unlink", swap_then_unlink)
+    FilesystemTools(tmp_path).delete_file("safe/victim.txt")
+
+    assert not (parked / "victim.txt").exists()
+    assert outside_victim.read_text(encoding="utf-8") == "outside\n"
 
 
 def test_filesystem_enforces_size_and_utf8_limits(tmp_path: Path) -> None:

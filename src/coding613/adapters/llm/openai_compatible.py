@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from coding613.domain.actions import ActionEnvelope, ToolCall
+from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
 from coding613.ports.llm import LLMResponse, ModelContext, ToolDefinition
 
 
@@ -109,11 +109,12 @@ class OpenAICompatibleLLM:
                 arguments = json.loads(function["arguments"])
                 if not isinstance(arguments, dict):
                     raise TypeError("tool arguments must be an object")
-                actions.append(
-                    ActionEnvelope(
-                        action=ToolCall(name=function["name"], arguments=arguments)
-                    )
+                action = (
+                    FinishAction.model_validate(arguments)
+                    if function["name"] == "finish"
+                    else ToolCall(name=function["name"], arguments=arguments)
                 )
+                actions.append(ActionEnvelope(action=action))
                 call_ids.append(str(item["id"]))
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
                 raise ProviderResponseError("provider returned an invalid tool call") from error

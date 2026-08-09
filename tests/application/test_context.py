@@ -80,7 +80,7 @@ def test_context_uses_authoritative_text_and_final_permission_filter(tmp_path: P
     context = assembler.build(run.id, "fix sk-test-secret-1234 parser", ())
     assert embedding.texts == ["fix [REDACTED] parser"]
     assert context.metadata["memory_ids"] == [str(public.id)]
-    assert "parser uses strict mode" in context.messages[0].content
+    assert any("parser uses strict mode" in message.content for message in context.messages)
     assert "private parser note" not in context.model_dump_json()
     assert assembler.last_query == MemoryQuery(
         project_id=project.id, allowed_permission_tags=frozenset({"public"})
@@ -105,6 +105,47 @@ def test_context_falls_back_to_sqlite_keyword_search_and_bounds_events(tmp_path:
     assert context.metadata["memory_ids"] == [str(public.id)]
     assert context.messages[-1].content.endswith('{"n":2}')
     assert all("old" not in message.content for message in context.messages)
+
+
+def test_context_serializes_persisted_events_without_unmatched_tool_messages(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    event = Event.new(
+        "state.transition",
+        run.id,
+        {"from": "running", "to": "waiting_model"},
+        datetime.now(UTC),
+    )
+
+    context = assembler.build(run.id, "fix parser", (event,))
+
+    assert context.messages[-1].role == "user"
+    assert context.messages[-1].content.startswith("Event state.transition:")
+
+
+def test_context_keeps_goal_directed_worker_instructions_ahead_of_run_history(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    event = Event.new(
+        "feedback.tool_error",
+        run.id,
+        {"message": "objective validation failed"},
+        datetime.now(UTC),
+    )
+
+    context = assembler.build(run.id, "implement the missing file", (event,))
+
+    instruction = context.messages[0]
+    assert instruction.role == "system"
+    assert "Act directly on the repository" in instruction.content
+    assert "Do not repeat successful read-only actions" in instruction.content
+    assert "objective validation" in instruction.content
+    assert context.messages[-2].content == "implement the missing file"
+    assert context.messages[-1].content.startswith("Event feedback.tool_error:")
 
 
 def test_openai_compatible_embedding_maps_single_request() -> None:

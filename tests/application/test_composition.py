@@ -8,7 +8,7 @@ from coding613.adapters.llm.mock import ScriptedLLM
 from coding613.application.composition import build_services
 from coding613.application.run_service import RunRequest
 from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
-from coding613.domain.models import RunState, StopReason
+from coding613.domain.models import PermissionMode, RunState, StopReason
 from coding613.ports.llm import LLMResponse
 
 
@@ -42,6 +42,40 @@ def test_local_composition_persists_runs_and_can_cancel_without_provider(tmp_pat
     assert cancelled.status is RunState.CANCELLED
     assert cancelled.stop_reason is StopReason.CANCELLED
     assert services.list_events(run.id)
+
+
+def test_local_composition_uses_configured_mode_for_unspecified_run_mode(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "harness.toml").write_text(
+        """
+[policy]
+mode = "autonomous"
+""",
+        encoding="utf-8",
+    )
+
+    services = build_services(tmp_path)
+    run = services.run_service.create_run(RunRequest(task="act autonomously"))
+
+    assert run.permission_mode is PermissionMode.AUTONOMOUS
+
+
+def test_local_composition_explicit_mode_overrides_configured_mode(tmp_path: Path) -> None:
+    (tmp_path / "harness.toml").write_text(
+        """
+[policy]
+mode = "autonomous"
+""",
+        encoding="utf-8",
+    )
+
+    services = build_services(tmp_path)
+    run = services.run_service.create_run(
+        RunRequest(task="require approval", permission_mode=PermissionMode.STRICT)
+    )
+
+    assert run.permission_mode is PermissionMode.STRICT
 
 
 def test_local_composition_reads_new_run_after_service_restart(tmp_path: Path) -> None:
@@ -168,3 +202,50 @@ total_model_calls = 2
     assert summary.status is RunState.COMPLETED
     assert summary.stop_reason is StopReason.SUCCESS
     assert summary.validation_evidence
+
+
+def test_local_composition_runs_apply_patch_and_persists_changed_file(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "answer.txt"
+    target.write_text("before\n", encoding="utf-8")
+    (tmp_path / "harness.toml").write_text(
+        """
+[validation]
+commands = [["python", "-c", "print('ok')"]]
+
+[budgets]
+total_model_calls = 2
+""",
+        encoding="utf-8",
+    )
+    provider = ScriptedLLM(
+        (
+            LLMResponse(
+                actions=(
+                    ActionEnvelope(
+                        action=ToolCall(
+                            name="apply_patch",
+                            arguments={
+                                "patch": """--- a/answer.txt
++++ b/answer.txt
+@@ -1 +1 @@
+-before
++after
+"""
+                            },
+                        )
+                    ),
+                )
+            ),
+            LLMResponse(actions=(ActionEnvelope(action=FinishAction(summary="patched")),)),
+        )
+    )
+    services = build_services(tmp_path, provider=provider)
+    run = services.run_service.create_run(RunRequest(task="patch answer"))
+
+    summary = services.run_service.resume(run.id)
+
+    assert summary.status is RunState.COMPLETED
+    assert summary.changed_files == ("answer.txt",)
+    assert target.read_text(encoding="utf-8") == "after\n"
