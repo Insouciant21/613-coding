@@ -19,6 +19,14 @@ uv run 613-coding --resume latest
 The root command opens the local TUI. `--repo PATH` selects a repository. Management commands
 remain scriptable: `credentials`, `config`, `run`, `runs`, and `demo`.
 
+## TUI Workflow
+
+Type a task and press Enter to start a streamed Run. Use Ctrl+J for a newline, Esc to cooperatively
+pause the active Run, and Ctrl+Q to exit. A paused session resumes with the same Run ID through
+`613-coding --resume latest`; pending approvals are restored after restart. In the TUI, `/help`,
+`/model`, `/permissions`, `/runs`, `/resume`, `/clear`, and `/quit` provide the corresponding local
+workflows. `A` and `R` approve or reject the displayed exact-action request.
+
 Build a Python package and install the console command with:
 
 ```bash

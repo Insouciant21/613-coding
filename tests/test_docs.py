@@ -58,3 +58,22 @@ def test_current_docs_use_613_coding_package_names() -> None:
     assert "613-coding web" not in current
     assert "coding-harness" not in current
     assert "src/coding_harness" not in current
+
+
+def test_current_docs_cover_tui_recovery_artifact_and_headless_boundaries() -> None:
+    current = "\n".join(
+        (ROOT / path).read_text(encoding="utf-8")
+        for path in ("README.md", "docs/deployment.md", "docs/development.md")
+    )
+    for required in (
+        "Ctrl+J",
+        "Esc",
+        "/resume",
+        "Secret Service",
+        "headless",
+        "glibc",
+        "--target artifacts",
+        "GitHub Actions",
+        "GitLab CI",
+    ):
+        assert required.lower() in current.lower()

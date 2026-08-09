@@ -78,6 +78,16 @@ def test_ci_uses_artifact_builder_and_has_no_removed_container_smoke() -> None:
         assert "SHA256SUMS" in workflow or "dist/" in workflow
     assert "actions/upload-artifact" in github
     assert "setup-uv@v6" in github
+    assert 'tags: ["v*"]' in github
+    assert "contents: write" in github
+    assert "action-gh-release" in github
+    for artifact in (
+        "613-coding-linux-x86_64",
+        "613_coding-*.whl",
+        "613_coding-*.tar.gz",
+        "SHA256SUMS",
+    ):
+        assert artifact in github
     assert "artifact-smoke" in gitlab
     assert "needs:" in gitlab
     docker_job, smoke_job = gitlab.split("artifact-smoke:", 1)

@@ -1,16 +1,16 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 05:19:25 (Asia/Shanghai)
-Responsible actor: `/root` for locally verified TUI-08; safe repository mutations Tasks 1-4 are reviewed and integrated into `main` at `69caa09`; TUI-01 through TUI-08 are locally verified in the TUI/distribution worktree; published deployment remains unchanged.
+Last updated: 2026-08-10 05:38:12 (Asia/Shanghai)
+Responsible actor: `/root` for exact-main local verification at `4528bda`; safe repository mutations Tasks 1-4 are reviewed and integrated into `main` at `69caa09`; TUI-01 through TUI-09 are integrated locally; no remote deployment or pipeline execution was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
-| Claude Code-like TUI | TUI-01 through TUI-08 implementation/fix verified locally; final recovery review fixes verified | design `e7f7ece`; plan `9ee205d`; commits `048bdbc`, `4877a7f`; paused/approval recovery evidence in `AGENT_LOG.md` | merge verified branch to main and rerun acceptance gates |
-| Binary/wheel/sdist artifact builder | locally built and Docker-exported; CI workflows updated | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08 evidence below | commit after broad review and retain CI artifact upload gate |
-| Main Web/HTTP removal | design approved; implementation pending | revised `SPEC.md` and `AGENTS.md` | prove code, dependency, test, manifest, and documentation removal |
+| Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
+| Binary/wheel/sdist artifact builder | Docker-exported and runtime-smoked on main; CI/release configuration present | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08/TUI-09 evidence | push/tag when an operator wants remote CI artifacts or a GitHub release |
+| Main Web/HTTP removal | complete and verified on main | import/dependency/manifest absence contracts; merge `4528bda` | retain removal regression checks |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
 | Approved design | complete | `docs/superpowers/specs/2026-08-07-613-coding-design.md`; commits `6ad0eec`, `c4fd219`, `ba03b70` | none |
 | `AGENTS.md` workflow rules | complete | `AGENTS.md`; commit `ba03b70` | keep updated per task |
@@ -30,9 +30,9 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
 | Real-provider worker reliability | unblocked and integrated on `main` | descriptor-relative delete and patch mutation Tasks 1-4; merge `69caa09`; fresh main evidence below | retain regression gate |
 | GitHub source publication | complete | `git@github.com:Insouciant21/613-coding.git`; initial source snapshot `f4b9984`; CI repair `341d880`; publication evidence below | keep delivery records synchronized with pushed commits |
-| GitHub Actions CI | passed | branch run `31299368456` and exact-main run `31299431092`; all four jobs succeeded for `eefee2d`, including image build and smoke | retain as the remote regression gate |
+| GitHub Actions CI | configured for artifact upload and tag release; not rerun for `4528bda` | `.github/workflows/ci.yml`; exact-main local equivalent passed | push/tag to obtain current remote run and release evidence |
 | Historical SSH deployment | prior evidence retained; no longer a deliverable | `edward@int21`; image `613-coding:eefee2d`; prior loopback evidence below | no new deployment or reverse proxy work |
-| Deployment manifest | removal pending | `render.yaml` is superseded by the approved local-artifact design | delete during Web/HTTP removal task |
+| Deployment manifest | removed | `render.yaml` absent; absence contract passed on `4528bda` | none |
 | Public WebUI URL | removed from product scope | approved TUI/distribution design | no action |
 | Reflection | reserved for student | `REFLECTION.md` contains an explicit student-authored boundary and no AI-written narrative | student writes the final report |
 | Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |

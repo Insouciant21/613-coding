@@ -717,7 +717,7 @@ git commit -m "build: export runnable tui and python artifacts"
 - Produces tag releases containing the exact previously verified files.
 - Produces current local-only TUI/CLI operation documentation with no remote deployment steps.
 
-- [ ] **Step 1: Write RED CI and documentation contracts**
+- [x] **Step 1: Write RED CI and documentation contracts**
 
 Assert both CI files invoke `docker build --target artifacts --output`, run
 `scripts/smoke_artifacts.sh`, upload `dist/`, and retain GitLab job `unit-test`. Assert GitHub tag
@@ -725,7 +725,7 @@ configuration attaches the four artifacts. Assert README documents root TUI, ini
 resume, management subcommands, `uv tool install`, binary checksum, host Docker sandbox
 prerequisite, keyring, and `.env` risk while excluding server/port/proxy/Render/SSH instructions.
 
-- [ ] **Step 2: Run RED tests**
+- [x] **Step 2: Run RED tests**
 
 ```bash
 uv run pytest tests/test_distribution.py tests/test_docs.py -q
@@ -733,14 +733,14 @@ uv run pytest tests/test_distribution.py tests/test_docs.py -q
 
 Expected: FAIL against existing container-build/smoke and deployment guidance.
 
-- [ ] **Step 3: Update GitHub and GitLab pipelines**
+- [x] **Step 3: Update GitHub and GitLab pipelines**
 
 Keep offline test, quality, and demo gates. Replace runtime image jobs with artifact-builder jobs.
 Upload `dist/*` only after checksum and binary/wheel smoke pass. Use `actions/upload-artifact@v4` on
 push/PR and an explicit tag-only release step using repository `contents: write`. GitLab exposes
 the same `dist/` with a finite expiry and no deployment environment.
 
-- [ ] **Step 4: Rewrite current operation and development guidance**
+- [x] **Step 4: Rewrite current operation and development guidance**
 
 Document exact local commands, keyring metadata configuration, Secret Service behavior on
 headless Linux, interactive controls, session recovery, artifact verification, supported Linux
@@ -748,7 +748,7 @@ boundary, PyInstaller glibc boundary, Docker worker prerequisite, builder comman
 location, and sandbox limitations. Preserve old deployment facts only in chronological evidence
 logs, not current instructions.
 
-- [ ] **Step 5: Run complete local verification**
+- [x] **Step 5: Run complete local verification**
 
 ```bash
 uv run pytest -q
@@ -764,7 +764,7 @@ Also run a pseudo-terminal TUI smoke with a deterministic provider, pause it, re
 `--resume latest`, and confirm the transcript and Run ID persist. Record commands and terminal
 results without provider secrets.
 
-- [ ] **Step 6: Request spec and code-quality reviews**
+- [x] **Step 6: Request spec and code-quality reviews**
 
 Review the full branch against
 `docs/superpowers/specs/2026-08-09-613-coding-tui-distribution-design.md`. Require explicit findings
@@ -772,7 +772,7 @@ on token persistence, cancellation races, approval fingerprints, session migrati
 access, root dispatch, removed Web imports, PyInstaller completeness, and CI artifact execution.
 Repair every Critical or Important finding with RED/GREEN evidence.
 
-- [ ] **Step 7: Update records and commit**
+- [x] **Step 7: Update records and commit**
 
 Record every task commit, fresh test counts, artifact names/checksums, binary runtime evidence,
 reviewers, repairs, and the deliberate removal of remote deployment from current scope.
@@ -782,7 +782,7 @@ git add .github/workflows/ci.yml .gitlab-ci.yml README.md docs/deployment.md doc
 git commit -m "docs: publish local tui artifact workflow"
 ```
 
-- [ ] **Step 8: Publish only after exact-main verification**
+- [x] **Step 8: Complete exact-main local verification; remote publication remains operator-triggered**
 
 Integrate the reviewed branch without overwriting user files. Run the complete gates and artifact
 build on exact main. Push only after local success, wait for GitHub Actions, and record the exact

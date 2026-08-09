@@ -40,7 +40,7 @@ LanceDB, `keyring`, Docker Engine API/BuildKit, HTTPX streaming for OpenAI-compa
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | complete through Docker smoke repair `774c07a`; real provider remains injectable |
 | `docs/superpowers/plans/2026-08-09-613-coding-package-rename.md` | Strict distribution/import/runtime/documentation rename | completed Tasks 1-3 | complete through reviewed CI and SSH deployment at `eefee2d` |
 | `docs/superpowers/plans/2026-08-09-safe-repository-mutations.md` | Schema-validated apply_patch and descriptor-relative delete | existing provider/context repair branch | committed in `9ee205d`; pending execution approval |
-| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | TUI-01 through TUI-08 complete locally; TUI-09 documentation/Cube handoff remains |
+| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | TUI-01 through TUI-09 integrated and verified on `main` at `4528bda`; remote CI publication remains operator-triggered |
 | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | committed in `9ee205d`; pending execution approval |
 | `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
 
@@ -313,7 +313,7 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 ## TUI-08 Task Evidence
 
-- Status: locally complete; implementation remains uncommitted in the TUI/distribution worktree.
+- Status: complete and merged to `main` through `4528bda`.
 - Root-cause fixes: the standalone wheel explicitly declares its direct `click` runtime dependency;
   the pinned Debian slim builder installs `binutils` required by PyInstaller's Linux analysis.
 - Verification: focused distribution/CI tests passed 11; local build and smoke passed for binary,
@@ -331,6 +331,22 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   Run, and restores pending approval actions after restart. Fresh deliverables each passed config
   inspection and the offline core demo; focused 111 and full 392-test suites plus all static gates
   passed.
+
+## TUI-09 Task Evidence
+
+- Status: complete for configured CI/CD and exact-main local verification; no remote pipeline or
+  release is claimed without an explicit push/tag action.
+- CI/CD: GitHub uploads verified `dist/` on push/PR and tag-only `v*` runs publish the exact
+  binary, wheel, sdist, and `SHA256SUMS`; GitLab keeps its required `unit-test`, exports through
+  Docker DinD, and verifies in a dependent Python/uv artifact-smoke job.
+- Documentation: current README/deployment/development guidance covers the local Textual workflow,
+  pause/recovery and approval controls, headless Secret Service boundary, glibc platform limit,
+  artifact build/verification, CI locations, and worker-Docker prerequisite without remote server
+  operation instructions.
+- Exact-main gates: `uv run pytest -q --ignore=tmp` passed 392 tests; Ruff, mypy, lock, diff,
+  root CLI help, and removed-import checks passed. BuildKit exported the four files, enhanced smoke
+  passed binary/wheel config and core-demo commands, Debian slim executed binary help, and all
+  checksums passed. Pilot restart test preserved the paused Run ID and transcript.
 
 ## SSH Deployment Follow-up
 

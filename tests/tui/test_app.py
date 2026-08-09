@@ -62,6 +62,22 @@ class FakeUiServices:
         self.execution_started.set()
         run = self.runs[-1]
         if run.task == "pause":
+            if run.state is RunState.PAUSED:
+                self.transcript.append(
+                    TranscriptEntry(role="assistant", text="resumed", run_id=run_id)
+                )
+                self.runs[-1] = run.model_copy(
+                    update={
+                        "state": RunState.COMPLETED,
+                        "stop_reason": StopReason.SUCCESS,
+                        "updated_at": datetime.now(UTC),
+                    }
+                )
+                return RunSummary(
+                    run_id=run_id,
+                    status=RunState.COMPLETED,
+                    stop_reason=StopReason.SUCCESS,
+                )
             while not cancellation.is_cancelled():
                 time.sleep(0.005)
             replacement = run.model_copy(
@@ -266,6 +282,39 @@ async def test_tui_pause_is_idempotent_and_reports_redacted_error() -> None:
         errors = [item.display_text for item in app.query(DetailMessage)]
         assert any("[REDACTED]" in item for item in errors)
         assert all("topsecret" not in item and "sk-secretvalue" not in item for item in errors)
+
+
+@pytest.mark.asyncio
+async def test_tui_restart_resumes_paused_run_with_same_transcript_and_run_id() -> None:
+    fake = FakeUiServices()
+    first = CodingApp(controller=_controller(fake))
+    async with first.run_test(size=(80, 24)) as pilot:
+        composer = first.query_one(TaskComposer)
+        composer.load_text("pause")
+        await pilot.press("enter")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if fake.execution_started.is_set():
+                break
+        await pilot.press("escape")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if fake.runs and fake.runs[-1].state is RunState.PAUSED:
+                break
+
+    run_id = fake.runs[-1].id
+    second = CodingApp(controller=_controller(fake), resume="latest")
+    async with second.run_test(size=(80, 24)) as pilot:
+        for _ in range(50):
+            await pilot.pause(0.01)
+            assistants = list(second.query(AssistantMessage))
+            if assistants and assistants[-1].markdown_text == "resumed":
+                break
+
+        assert len(fake.runs) == 1
+        assert fake.runs[-1].id == run_id
+        assert fake.runs[-1].state is RunState.COMPLETED
+        assert list(second.query(AssistantMessage))[-1].markdown_text == "resumed"
 
 
 @pytest.mark.asyncio

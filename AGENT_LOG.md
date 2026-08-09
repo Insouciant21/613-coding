@@ -936,3 +936,22 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Verification: focused recovery/artifact suite passed 17; TUI/CLI/application/distribution suite
   passed 111; full offline suite passed 392; Ruff, mypy, lock, and diff checks passed. Fresh build
   produced a 155M x86-64 ELF plus wheel/sdist/checksums, and enhanced artifact smoke passed.
+
+### 2026-08-10 05:38:12 Asia/Shanghai - TUI distribution exact-main integration and Task 9 evidence
+
+- Integration: user-selected local merge created `4528bda` from `feature/tui-distribution`; root
+  worktree user-owned `.claude/`, course-requirement documents, and `tmp/cube/` remained untracked
+  and untouched. Only stale ignored API bytecode from the deleted Web surface was removed.
+- Final TDD: CI/tag-release and documentation contracts initially failed. GitHub now uploads
+  verified artifacts on push/PR and publishes the exact four files for `v*` tags; GitLab retains
+  the same export after dependent Python/uv smoke. Current docs cover TUI controls, recovery,
+  headless Secret Service, glibc, artifact construction, and CI handoff without server deployment.
+- Pilot evidence: a deterministic two-instance Textual test paused a Run, restarted with
+  `--resume latest`, resumed the same Run ID, and rendered the persisted transcript.
+- Exact-main verification: `uv sync --frozen`; 392 offline tests; Ruff; mypy; lock; diff; root CLI
+  help; removed `coding613.api`, `coding613.web`, and legacy-import checks all passed. Docker
+  BuildKit `--target artifacts` exported binary/wheel/sdist/SHA256SUMS; enhanced smoke exercised
+  binary and wheel config plus core demo; Debian Bookworm slim executed binary help; checksums
+  passed. Docker dependency retrieval took about 14 minutes but completed successfully.
+- Boundary: GitHub/GitLab configuration is committed; no push, remote pipeline, tag, server, or
+  provider credential operation was performed or claimed.

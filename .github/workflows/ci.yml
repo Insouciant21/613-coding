@@ -2,6 +2,8 @@ name: 613 Coding CI
 
 on:
   push:
+    branches: ["**"]
+    tags: ["v*"]
   pull_request:
 
 jobs:
@@ -51,3 +53,22 @@ jobs:
           name: 613-coding-${{ github.sha }}
           path: dist/
           if-no-files-found: error
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: package-and-artifacts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: 613-coding-${{ github.sha }}
+          path: dist/
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/613-coding-linux-x86_64
+            dist/613_coding-*.whl
+            dist/613_coding-*.tar.gz
+            dist/SHA256SUMS

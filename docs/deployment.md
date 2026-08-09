@@ -40,8 +40,15 @@ uv tool install 613_coding-*.whl
 ./613-coding
 ```
 
-The standalone executable runs without host Python. The Python package is the portable option on
-platforms without a published executable.
+Build the same files locally with Docker Engine:
+
+```bash
+docker build --pull=false --target artifacts --output type=local,dest=dist .
+scripts/smoke_artifacts.sh dist
+```
+
+The standalone executable runs without host Python, but requires a compatible Linux x86_64 glibc
+runtime. The Python package is the portable option on platforms without a published executable.
 
 ## Worker Sandbox
 
@@ -55,11 +62,14 @@ vulnerabilities.
 ## CI
 
 GitLab CI has a required `unit-test` job and builds the same artifacts as the Docker builder. GitHub
-Actions runs the offline suite, deterministic mechanism demo, quality checks, and artifact upload.
-No network access or real provider key is needed for unit tests.
+Actions runs the offline suite, deterministic mechanism demo, quality checks, artifact smoke, and
+artifact upload. A `v*` GitHub tag releases the exact verified binary, wheel, sdist, and
+`SHA256SUMS`; GitLab retains `dist/` after its dependent Python/uv artifact smoke. No network access
+or real provider key is needed for unit tests.
 
 ## Limitations
 
-The initial standalone release supports Linux x86_64. Interactive model calls require a configured
-OpenAI-compatible endpoint and keyring entry. Unattended runs require a finite model-call or cost
-budget. Docker Engine and a compatible storage driver are prerequisites for worker sandbox runs.
+The initial standalone release supports Linux x86_64 with a compatible glibc loader. Interactive
+model calls require a configured OpenAI-compatible endpoint and keyring entry. Unattended runs
+require a finite model-call or cost budget. Docker Engine and a compatible storage driver are
+prerequisites for worker sandbox runs.
