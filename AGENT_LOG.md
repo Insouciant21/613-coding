@@ -578,3 +578,11 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Deployment: immutable release `/home/edward/services/613-coding/releases/71c281d` built image `613-coding:71c281d`; the existing container was recreated with the same bind mount, security controls, limits, and restart policy.
 - Persistence GREEN: old run `c0313a2c-7513-4a7b-a594-9afe0d31dc70` returned 200 after upgrade. New run `b9bc83a2-dac2-48c3-a15a-8bae7568118b` returned 200 immediately and after container restart with unchanged ID/state. `/` returned 200 and `/healthz` returned `{"status":"ok"}`.
 - Boundary: service remains reachable only through `127.0.0.1:8613` on `int21`; no reverse proxy, domain, public URL, or credential was configured.
+
+### 2026-08-09 13:37:47 Asia/Shanghai - package naming redesign
+
+- Task: align the Python distribution, CLI command, import package, and Keyring namespace with the 613 Coding product name; triggered `brainstorming` before implementation.
+- Decision: use distribution and command `613-coding`, import package `coding613`, state directory `.613-coding`, and Keyring service namespace `613-coding`.
+- Compatibility: the user selected a strict rename; no `coding-harness` command, `coding_harness` import, legacy Keyring lookup, compatibility shim, or deprecation period will remain.
+- Scope: rename source/import paths, packaging metadata, lock data, Docker entrypoint, current documentation, tests, CI assumptions, and the deployed image without changing stored domain formats or application behavior.
+- Design: `docs/superpowers/specs/2026-08-09-613-coding-package-rename-design.md`; implementation is gated on written-spec review and an approved plan.
