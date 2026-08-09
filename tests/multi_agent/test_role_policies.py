@@ -10,11 +10,14 @@ def test_planner_and_observer_roles_are_read_only() -> None:
         assert policy.allow_writes is False
         assert "read_file" in policy.allowed_tools
         assert "edit_file" not in policy.allowed_tools
+        assert "delete_file" not in policy.allowed_tools
 
 
 def test_coder_is_scoped_to_explicit_write_tools() -> None:
     policy = role_policy(WorkerRole.CODER)
 
     assert policy.allow_writes is True
-    assert {"read_file", "edit_file", "write_file"}.issubset(policy.allowed_tools)
+    assert {"read_file", "delete_file", "edit_file", "write_file"}.issubset(
+        policy.allowed_tools
+    )
     assert "network_request" not in policy.allowed_tools

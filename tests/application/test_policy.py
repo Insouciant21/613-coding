@@ -33,8 +33,18 @@ def config(tmp_path: Path) -> RepositoryPolicyConfig:
 def test_write_policy_varies_by_mode(
     config: RepositoryPolicyConfig, mode: PermissionMode, effect: PolicyEffect
 ) -> None:
-    call = ToolCall(name="edit_file", arguments={"path": "src/a.py", "content": "pass"})
+    call = ToolCall(name="delete_file", arguments={"path": "src/a.py"})
     assert PolicyEngine().evaluate(call, config, mode).effect is effect
+
+
+def test_delete_policy_honors_disabled_writes(config: RepositoryPolicyConfig) -> None:
+    restricted = config.model_copy(update={"allow_writes": False})
+    call = ToolCall(name="delete_file", arguments={"path": "src/a.py"})
+
+    decision = PolicyEngine().evaluate(call, restricted, PermissionMode.AUTONOMOUS)
+
+    assert decision.effect is PolicyEffect.DENY
+    assert decision.rule_id == "config.writes_disabled"
 
 
 def test_declared_validation_is_allowed_except_in_strict_mode(

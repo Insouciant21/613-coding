@@ -47,6 +47,23 @@ def test_filesystem_rejects_symlink_escape(tmp_path: Path) -> None:
         FilesystemTools(tmp_path).read_file("link.txt")
 
 
+@pytest.mark.parametrize("target_location", ["inside", "outside"])
+def test_filesystem_deletes_symlink_without_deleting_target(
+    tmp_path: Path, target_location: str
+) -> None:
+    target_root = tmp_path if target_location == "inside" else tmp_path.parent
+    target = target_root / f"{target_location}-delete-target.txt"
+    target.write_text("keep\n", encoding="utf-8")
+    link = tmp_path / f"{target_location}-delete-link.txt"
+    os.symlink(target, link)
+
+    FilesystemTools(tmp_path).delete_file(link.name)
+
+    assert not link.exists()
+    assert not link.is_symlink()
+    assert target.read_text(encoding="utf-8") == "keep\n"
+
+
 def test_filesystem_enforces_size_and_utf8_limits(tmp_path: Path) -> None:
     (tmp_path / "large.txt").write_text("12345", encoding="utf-8")
     (tmp_path / "binary.dat").write_bytes(b"\xff")

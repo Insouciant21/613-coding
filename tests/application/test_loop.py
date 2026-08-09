@@ -309,6 +309,16 @@ def dependencies(
     return deps, records, executor, approvals
 
 
+def test_bare_run_service_defaults_unspecified_mode_to_balanced(tmp_path: Path) -> None:
+    deps, _, _, _ = dependencies(tmp_path, Provider(()), Validator(()))
+    records = RunRecords()
+    service = RunService(records, AgentLoop(), lambda run: deps)
+
+    created = service.create_run(RunRequest(task="use library default"))
+
+    assert created.permission_mode is PermissionMode.BALANCED
+
+
 def test_failure_feedback_drives_repair_and_fresh_finish(tmp_path: Path) -> None:
     provider = Provider(
         (

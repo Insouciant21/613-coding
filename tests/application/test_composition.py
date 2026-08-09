@@ -61,6 +61,23 @@ mode = "autonomous"
     assert run.permission_mode is PermissionMode.AUTONOMOUS
 
 
+def test_local_composition_explicit_mode_overrides_configured_mode(tmp_path: Path) -> None:
+    (tmp_path / "harness.toml").write_text(
+        """
+[policy]
+mode = "autonomous"
+""",
+        encoding="utf-8",
+    )
+
+    services = build_services(tmp_path)
+    run = services.run_service.create_run(
+        RunRequest(task="require approval", permission_mode=PermissionMode.STRICT)
+    )
+
+    assert run.permission_mode is PermissionMode.STRICT
+
+
 def test_local_composition_reads_new_run_after_service_restart(tmp_path: Path) -> None:
     services = build_services(tmp_path)
     run = services.run_service.create_run(RunRequest(task="inspect after restart"))

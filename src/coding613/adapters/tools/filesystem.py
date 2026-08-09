@@ -89,12 +89,18 @@ class FilesystemTools:
             temporary_path.unlink(missing_ok=True)
 
     def delete_file(self, path: str | Path) -> None:
-        resolved = self._resolve(path)
-        if not resolved.exists():
-            raise FileNotFoundError(resolved)
-        if not resolved.is_file():
-            raise IsADirectoryError(resolved)
-        resolved.unlink()
+        relative = Path(path)
+        if relative.is_absolute() or ".." in relative.parts or not relative.parts:
+            raise PathOutsideRepositoryError("path must be repository-relative")
+        parent = (self.root / relative).parent.resolve(strict=True)
+        if not parent.is_relative_to(self.root):
+            raise PathOutsideRepositoryError("parent escaped repository root")
+        entry = parent / relative.name
+        if not entry.exists() and not entry.is_symlink():
+            raise FileNotFoundError(entry)
+        if entry.is_dir() and not entry.is_symlink():
+            raise IsADirectoryError(entry)
+        entry.unlink()
 
     def _resolve(self, path: str | Path) -> Path:
         relative = Path(path)

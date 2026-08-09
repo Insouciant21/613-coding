@@ -73,6 +73,16 @@ def test_feedback_detects_invalid_action_and_no_progress() -> None:
     assert feedback.kind is FeedbackKind.NO_PROGRESS
 
 
+def test_feedback_treats_delete_without_changed_file_as_no_progress() -> None:
+    feedback = FeedbackClassifier().classify(
+        result(ValidationKind.TEST, 0),
+        ToolCall(name="delete_file", arguments={"path": "missing.py"}),
+        (),
+    )
+
+    assert feedback.kind is FeedbackKind.NO_PROGRESS
+
+
 def test_repeated_failure_becomes_no_progress() -> None:
     classifier = FeedbackClassifier(repeated_failure_limit=3)
     failure = result(ValidationKind.TEST, 1, "same failure")
