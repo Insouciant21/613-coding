@@ -710,3 +710,10 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Fix: commit-phase cleanup now converts root-close failures into `PatchCommitError` with the exact committed paths, while preserving the original commit error when both failures occur.
 - GREEN: focused safe mutation and loop integration suite passed 133 tests; full suite passed 313 tests with one existing Starlette/httpx deprecation warning; Ruff, mypy for 83 source files, `uv lock --check`, and `git diff --check` passed.
 - Review status: the remaining Important finding is addressed in `e80883b`; no Critical or Important findings remain.
+
+### 2026-08-10 02:04:00 Asia/Shanghai - Safe mutation integration on main
+
+- Task: non-destructively integrate the reviewed safe repository mutation branch; no `.claude/`, course requirement document, or `tmp/cube` path was staged.
+- Merge: `69caa09` integrates `fix/provider-context-history` into `main`; tracked source and tests are clean after merge.
+- Verification: `uv run ruff check .`, `uv run mypy src` (83 files), `uv lock --check`, and `git diff --check` passed. Unfiltered `uv run pytest -q` first stopped during collection in the user-owned `tmp/cube` tree because `cube_api` is not on the default import path; after removing only stale ignored `src/coding_harness` bytecode/empty directories, harness verification `uv run pytest -q --ignore=tmp` passed 313 tests with one existing Starlette/httpx deprecation warning.
+- Boundary: `tmp/cube` remains untouched and its independent test/import setup is still outside harness verification; the user-owned untracked paths remain untracked.

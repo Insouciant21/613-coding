@@ -163,8 +163,8 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 
 ## Safe Repository Mutations Evidence
 
-- Status: Tasks 1-4 complete in the reviewed fix/provider-context-history
-  worktree; integration into main remains pending the final branch check.
+- Status: Tasks 1-4 complete and integrated into `main` at merge commit
+  `69caa09`; user-owned untracked paths remain outside the merge.
 - Task 1 commits: 9255c08, 62c4fe6; descriptor-relative delete holds parent
   directory descriptors, rejects parent symlinks and protected roots, permits
   final symlink deletion without following it, and passed its independent

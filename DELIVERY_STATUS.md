@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
 Last updated: 2026-08-10 01:56:00 (Asia/Shanghai)
-Responsible actor: `/root`; safe repository mutations Tasks 1-4 are reviewed, locally verified, and integrated into `main`; the approved local TUI/distribution implementation remains pending; published deployment remains unchanged.
+Responsible actor: `/root`; safe repository mutations Tasks 1-4 are reviewed, locally verified, and integrated into `main` at `69caa09`; the approved local TUI/distribution implementation remains pending; published deployment remains unchanged.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -28,7 +28,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
-| Real-provider worker reliability | unblocked on reviewed branch; main integration pending | descriptor-relative delete and patch mutation branch Tasks 1-4; fresh local evidence below | merge reviewed branch into main and rerun complete gates |
+| Real-provider worker reliability | unblocked and integrated on `main` | descriptor-relative delete and patch mutation Tasks 1-4; merge `69caa09`; fresh main evidence below | retain regression gate |
 | GitHub source publication | complete | `git@github.com:Insouciant21/613-coding.git`; initial source snapshot `f4b9984`; CI repair `341d880`; publication evidence below | keep delivery records synchronized with pushed commits |
 | GitHub Actions CI | passed | branch run `31299368456` and exact-main run `31299431092`; all four jobs succeeded for `eefee2d`, including image build and smoke | retain as the remote regression gate |
 | Historical SSH deployment | prior evidence retained; no longer a deliverable | `edward@int21`; image `613-coding:eefee2d`; prior loopback evidence below | no new deployment or reverse proxy work |
@@ -340,6 +340,8 @@ Every completed plan task must link a commit and fresh verification output here.
 - Review: independent review's Critical credential-header bypass and Important missing-record findings were addressed; no Critical or Important findings remain.
 - Fresh verification: safe mutation and loop integration suite passed 133 tests; full suite passed 313 tests with one pre-existing Starlette/httpx deprecation warning; Ruff, mypy for 83 source files, `uv lock --check`, and `git diff --check` passed.
 - Source records: `PLAN.md`, `AGENT_LOG.md`, and `.superpowers/sdd/2026-08-09-safe-repository-mutations/progress.md`.
+
+- Main integration evidence: merge commit `69caa09`; `uv run pytest -q --ignore=tmp` passed 313 tests, Ruff, mypy, lock, and diff checks passed. Unfiltered pytest collection remains blocked by the user-owned `tmp/cube` package import path and is not claimed.
 
 ## CI and Deployment Manifest Evidence
 
