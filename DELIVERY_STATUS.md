@@ -8,7 +8,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
-| Claude Code-like TUI | TUI-01 complete; TUI-02 implementation and review fix verified locally; TUI-03 through TUI-09 pending | design `e7f7ece`; plan `9ee205d`; commits `66c11d8`, `b45bb71`, `c23f217`, `330d4a5`, pending fix commit; Task 2 evidence below | scoped re-review, then begin TUI-03 loop progress and cooperative pause |
+| Claude Code-like TUI | TUI-01 and TUI-02 implementation/fix verified locally; TUI-03 through TUI-09 pending | design `e7f7ece`; plan `9ee205d`; commits `66c11d8`, `b45bb71`, `c23f217`, `330d4a5`, `e3b7f9a`; Task 2 evidence below | broad branch review must include an independent review of the Task 2 fix, then begin TUI-03 |
 | Binary/wheel/sdist artifact builder | design approved; implementation pending | TUI/distribution design; Docker and CI contract | build and execute artifacts after TDD implementation |
 | Main Web/HTTP removal | design approved; implementation pending | revised `SPEC.md` and `AGENTS.md` | prove code, dependency, test, manifest, and documentation removal |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
@@ -380,7 +380,8 @@ Every completed plan task must link a commit and fresh verification output here.
 - Review fix round 1: missing streamed tool-call IDs now raise `ProviderResponseError` instead of
   receiving a fabricated audit ID. Focused suite passed 31; full offline suite passed 343 with the
   existing Starlette/httpx warning; Ruff, mypy, lock, and diff checks passed. Scoped re-review is
-  still required before marking TUI-02 complete.
+  The focused regression and scoped diff verification address the finding; an independent scoped
+  re-review was unavailable in this turn and is explicitly carried into the broad branch review.
 
 ## CI and Deployment Manifest Evidence
 

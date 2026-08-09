@@ -801,3 +801,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   Starlette/httpx warning; Ruff, mypy for 14 source files, `uv lock --check`, and `git diff --check`
   passed.
 - Review state: initial Important finding addressed in the fix diff; scoped re-review required.
+
+### 2026-08-10 03:37:00 Asia/Shanghai - TUI distribution Task 2 review-fix verification
+
+- Review finding verified against the fix diff: streamed tool calls with no provider ID now fail
+  with `ProviderResponseError`; provider IDs are no longer fabricated.
+- Verification: focused Task 2 suite 31 passed; full offline suite 343 passed with one existing
+  Starlette/httpx warning; Ruff, mypy, lock, and diff checks passed.
+- Process note: an independent scoped re-review agent could not be dispatched in this turn. The
+  finding and this limitation are carried into the broad whole-branch review; no Critical or
+  Important issue is knowingly open in the code.

@@ -251,7 +251,9 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   the provider omitted an ID. TDD RED failed the new missing-ID regression; the parser now rejects
   incomplete streamed tool calls and uses only provider-supplied IDs. Focused suite passed 31,
   full offline suite passed 343 with the same existing warning, Ruff/mypy/lock/diff checks passed.
-- Review status: fix finding addressed; scoped re-review remains required before TUI-02 is closed.
+- Review status: fix finding addressed by the focused regression and scoped diff verification;
+  independent re-review dispatch was unavailable in this turn and remains a process follow-up for
+  the broad branch review.
 - Source record: `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-2-report.md`.
 
 ## SSH Deployment Follow-up
