@@ -89,6 +89,22 @@ def test_secret_bearing_action_is_hard_denied_before_persistence(
     assert decision.rule_id == "hard.secret_material"
 
 
+def test_code_token_type_annotation_is_not_treated_as_secret(
+    config: RepositoryPolicyConfig,
+) -> None:
+    call = ToolCall(
+        name="edit_file",
+        arguments={
+            "path": "moves.ts",
+            "content": "export function parseMove(token: string) { return token }",
+        },
+    )
+
+    decision = PolicyEngine().evaluate(call, config, PermissionMode.AUTONOMOUS)
+
+    assert decision.effect is PolicyEffect.ALLOW
+
+
 def test_symlink_escape_and_memory_override_are_hard_denied(
     tmp_path: Path, config: RepositoryPolicyConfig
 ) -> None:
