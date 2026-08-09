@@ -955,3 +955,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   passed. Docker dependency retrieval took about 14 minutes but completed successfully.
 - Boundary: GitHub/GitLab configuration is committed; no push, remote pipeline, tag, server, or
   provider credential operation was performed or claimed.
+
+### 2026-08-10 05:46:09 Asia/Shanghai - local TUI distribution branch closure
+
+- Commit `043077a` records the completed Task 9 CI/tag-release/documentation contracts on main.
+  `git diff 4528bda..043077a -- Dockerfile pyproject.toml uv.lock packaging scripts src/coding613`
+  returned no paths, so the artifact builder and executable code remain exactly the locally
+  verified merge content.
+- Cleanup after user-selected local merge removed the clean `feature/tui-distribution` worktree and
+  merged branch. Existing user-owned untracked `.claude/`, course requirements, and `tmp/cube/`
+  remain intact; unrelated historical/reviewer worktrees were left alone.
