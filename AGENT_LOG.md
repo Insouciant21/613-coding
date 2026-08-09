@@ -916,3 +916,7 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   the Docker job and validates them in a dependent Python `artifact-smoke` job with the default
   uv setup. The focused distribution suite passed 12 tests; full offline suite passed 388; Ruff,
   mypy, lock, and diff checks passed.
+- Independent review caught that the producer still inherited the default Python `before_script`
+  and retained its direct smoke call. A stricter job-boundary RED reproduced both omissions;
+  `docker-build` now declares `before_script: []` and only exports artifacts, while the dependent
+  Python job exclusively owns smoke validation.

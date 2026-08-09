@@ -35,6 +35,7 @@ demo:
 docker-build:
   stage: container
   image: docker:27.5.1-cli
+  before_script: []
   services:
     - name: docker:27.5.1-dind
       command: ["--tls=false"]
@@ -43,7 +44,6 @@ docker-build:
     DOCKER_TLS_CERTDIR: ""
   script:
     - docker build --pull --target artifacts --output type=local,dest=dist .
-    - scripts/smoke_artifacts.sh dist
   artifacts:
     paths:
       - dist/

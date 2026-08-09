@@ -80,6 +80,11 @@ def test_ci_uses_artifact_builder_and_has_no_removed_container_smoke() -> None:
     assert "setup-uv@v6" in github
     assert "artifact-smoke" in gitlab
     assert "needs:" in gitlab
+    docker_job, smoke_job = gitlab.split("artifact-smoke:", 1)
+    docker_job = docker_job.rsplit("docker-build:", 1)[1]
+    assert "before_script: []" in docker_job
+    assert "smoke_artifacts.sh" not in docker_job
+    assert "smoke_artifacts.sh" in smoke_job
 
 
 def test_artifact_builder_uses_pinned_pyinstaller() -> None:
