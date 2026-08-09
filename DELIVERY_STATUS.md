@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 13:15:03 (Asia/Shanghai)
-Responsible actor: `/root`; source, GitHub Actions, Docker runtime smoke, and loopback-only SSH deployment are verified; public reverse proxy remains external.
+Last updated: 2026-08-09 14:26:25 (Asia/Shanghai)
+Responsible actor: `/root/package_rename_task3`; current package/operator documentation and local renamed wheel/Docker release checks are verified; public reverse proxy remains external.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -19,6 +19,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Container sandbox | complete | SANDBOX-01 `9df471d`; SANDBOX-02 `aa3600a`; SANDBOX-03 `3ec6ac1`; SANDBOX-04 `439540f`; SANDBOX-05 `fb1c222`; reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | retain regression gate |
 | Multi-agent orchestration | complete | MULTI-01 `9744339`; MULTI-02 `5910d7b`; MULTI-03 `43f51fc`; MULTI-04 `11eaef8`; MULTI-05 `376fd41`; reports under `.superpowers/sdd/2026-08-08-613-coding-multi-agent/` | retain regression gate |
 | README and distribution | implemented; local and remote smoke verified | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata, `scripts/smoke_container.sh`; commit `774c07a`; local and Actions evidence below | retain regression gate |
+| Strict package rename documentation and artifacts | local verification complete | current names in `README.md`, `docs/deployment.md`, and `AGENTS.md`; Task 3 evidence below | record dedicated documentation/evidence commit and run branch CI |
 | GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
@@ -364,6 +365,15 @@ Every completed plan task must link a commit and fresh verification output here.
 - REMOTE-CI-03 | cf7f8a5ee387965003f76bd1f374a288bc0067c0 | pass | main cf7f8a5 passed: unit-test, quality, demo, package-and-container; Docker build and smoke passed
 
 - DEPLOY-01 | 35a383a9bed47d5fc50c691655e71eb18d630348 | blocked | Render API returned HTTP 401; no Render credential or deployed service URL is available
+
+## Package Rename Task 3 Evidence
+
+- Verification timestamp: `2026-08-09 14:26:25 Asia/Shanghai`.
+- TDD RED: `uv run pytest tests/test_docs.py::test_current_docs_use_613_coding_package_names -q` failed with one assertion because current guidance did not contain `613-coding web`.
+- TDD GREEN: the focused contract passed `1`; the documentation suite passed `4`; the full suite passed `241` with the pre-existing deferred Starlette TestClient warning. Ruff, mypy across `82` source files, lock, and diff checks passed.
+- Clean artifacts: `uv build` generated `613_coding-0.1.0-py3-none-any.whl` and `613_coding-0.1.0.tar.gz`; a fresh venv exposed `613-coding --help`, had no `coding-harness` executable, imported `coding613`, and did not resolve the legacy import.
+- Container: `613-coding:rename-smoke` built from the current source and the smoke script returned `container smoke passed: health=healthy user=coding`; no smoke container remained.
+- Source record: `.superpowers/sdd/2026-08-09-613-coding-package-rename/task-3-report.md`.
 
 ## SSH Deployment Evidence
 

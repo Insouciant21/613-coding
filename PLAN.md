@@ -29,6 +29,7 @@
 | `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | complete through `fb1c222` |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | complete through `376fd41` |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | complete through Docker smoke repair `774c07a`; real provider remains injectable |
+| `docs/superpowers/plans/2026-08-09-613-coding-package-rename.md` | Strict distribution/import/runtime/documentation rename | completed Tasks 1-2 | Task 3 local evidence recorded; dedicated commit and report follow |
 
 The implementation critical path is `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. Core storage and domain work can proceed before sandbox; delivery documentation and test harness scaffolding can proceed after core interfaces are stable.
 
@@ -264,3 +265,12 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - TDD evidence: the runtime-path contract and reusable smoke-script behavior both failed before implementation, then passed after adding the image `PATH`, pinned base digest, and `scripts/smoke_container.sh`.
 - Verification: the delivery-focused suite passed 9 tests; the full isolated suite passed 237 tests; Ruff, mypy, and `git diff --check` passed. Local `613-coding:smoke-fix` output was `container smoke passed: health=healthy user=coding` with no retained container.
 - Remote evidence: main commit `cf7f8a5` passed GitHub Actions run [31288535830](https://github.com/Insouciant21/613-coding/actions/runs/31288535830); package/container job [93181629275](https://github.com/Insouciant21/613-coding/actions/runs/31288535830/job/93181629275) passed both the pinned Docker build and `scripts/smoke_container.sh`.
+
+## Package Rename Task 3 Evidence
+
+- Verification timestamp: `2026-08-09 14:26:25 Asia/Shanghai`.
+- Status: current guidance and local artifact verification complete; dedicated commit recorded in `.superpowers/sdd/2026-08-09-613-coding-package-rename/task-3-report.md`.
+- TDD evidence: `uv run pytest tests/test_docs.py::test_current_docs_use_613_coding_package_names -q` was RED with one assertion failure because `613-coding web` was absent. After updating only current guidance, the same command was GREEN with `1 passed`.
+- Verification: documentation suite passed `4`; full suite passed `241` with the pre-existing deferred Starlette TestClient warning; Ruff, mypy across `82` source files, `uv lock --check`, and `git diff --check` passed.
+- Distribution: clean `uv build` produced `613_coding-0.1.0-py3-none-any.whl` and `613_coding-0.1.0.tar.gz`; an isolated venv installed `613-coding`, exposed `613-coding --help`, omitted the old console script, and could import `coding613` without the old import package.
+- Container: `docker build --pull=false -t 613-coding:rename-smoke .` built the tagged image and `scripts/smoke_container.sh 613-coding:rename-smoke` returned `container smoke passed: health=healthy user=coding`; the smoke container was removed.

@@ -21,3 +21,14 @@ def test_reflection_is_explicitly_student_authored_boundary() -> None:
     reflection = (ROOT / "REFLECTION.md").read_text(encoding="utf-8")
     assert "student-authored" in reflection.lower()
     assert "ai" in reflection.lower()
+
+
+def test_current_docs_use_613_coding_package_names() -> None:
+    current = "\n".join(
+        (ROOT / path).read_text(encoding="utf-8")
+        for path in ("README.md", "docs/deployment.md", "AGENTS.md")
+    )
+    assert "613-coding web" in current
+    assert "coding613.api.create_app" in current
+    assert "coding-harness" not in current
+    assert "src/coding_harness" not in current

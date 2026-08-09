@@ -4,6 +4,8 @@
 
 This repository builds **613 Coding**, a Python Coding Agent Harness for local Git repositories. The product owns its agent loop, tool dispatch, governance, objective feedback, memory, container sandbox, and multi-agent orchestration.
 
+The distribution and sole CLI command are `613-coding`; the Python import and source package are `coding613` and `src/coding613`; the Keyring service is `613-coding`; local state remains `.613-coding`. Do not add compatibility names.
+
 The main engineering contribution is the deterministic feedback loop. Container isolation and multi-agent orchestration are required, complete supporting subsystems, but they must not dilute the feedback-loop depth.
 
 ## Sources Of Truth

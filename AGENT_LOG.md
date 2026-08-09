@@ -593,3 +593,14 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Plan: `docs/superpowers/plans/2026-08-09-613-coding-package-rename.md` separates the core import/distribution rename, runtime surfaces, documentation/artifact verification, and reviewed CI/deployment rollout.
 - TDD gate: naming contract tests must fail against the legacy package before the mechanical directory/import migration begins.
 - Deployment gate: no remote replacement occurs until clean wheel/Docker smoke, independent review, branch CI, and exact-main CI pass.
+
+### 2026-08-09 14:26:25 Asia/Shanghai - package rename Task 3 documentation and artifact verification
+
+- Task: PACKAGE-RENAME-03; used `test-driven-development`, `systematic-debugging` for an interrupted Docker build stream, and `verification-before-completion`.
+- TDD RED: `uv run pytest tests/test_docs.py::test_current_docs_use_613_coding_package_names -q` failed as expected with one assertion because the current documentation did not yet contain `613-coding web`.
+- TDD GREEN: after changing current README/deployment/agent guidance to the strict command, import, and source paths, the focused contract passed `1`; `tests/test_docs.py` passed `4`.
+- Verification: `uv run pytest -q` passed `241` with the pre-existing deferred Starlette TestClient warning; `uv run ruff check .`, `uv run mypy src` across `82` source files, `uv lock --check`, and `git diff --check` passed.
+- Artifact evidence: clean build created `613_coding-0.1.0-py3-none-any.whl` and `613_coding-0.1.0.tar.gz`; a fresh venv exposed only `613-coding`, imported `coding613`, and did not resolve the legacy import. `docker build --pull=false -t 613-coding:rename-smoke .` and `scripts/smoke_container.sh 613-coding:rename-smoke` passed with `health=healthy user=coding` and removed the smoke container.
+- Docker investigation: the initial streamed build session stopped before image export; an independent image inspection showed no tag. A repeated identical build completed export/tagging, after which the standalone smoke passed. No source or configuration change was needed.
+- Commit: dedicated documentation/evidence commit is recorded in the Task 3 report after creation.
+- Lesson: built-artifact checks must include a clean virtual environment, absence assertions for old names, and an independently observed terminal Docker result when a build stream ends early.
