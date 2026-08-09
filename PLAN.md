@@ -40,7 +40,7 @@ LanceDB, `keyring`, Docker Engine API/BuildKit, HTTPX streaming for OpenAI-compa
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | complete through Docker smoke repair `774c07a`; real provider remains injectable |
 | `docs/superpowers/plans/2026-08-09-613-coding-package-rename.md` | Strict distribution/import/runtime/documentation rename | completed Tasks 1-3 | complete through reviewed CI and SSH deployment at `eefee2d` |
 | `docs/superpowers/plans/2026-08-09-safe-repository-mutations.md` | Schema-validated apply_patch and descriptor-relative delete | existing provider/context repair branch | committed in `9ee205d`; pending execution approval |
-| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | TUI-01 complete through `66c11d8`, `b45bb71`; TUI-02 complete through `330d4a5`; TUI-03 through TUI-09 pending |
+| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | TUI-01 through TUI-06 complete through `048bdbc`; TUI-07 through TUI-09 pending |
 | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | committed in `9ee205d`; pending execution approval |
 | `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
 
@@ -288,6 +288,17 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Behavior: root invocation opens TUI, task words prefill the composer, five management commands
   retain Typer dispatch, and 80x24/60x20 layouts keep stable full-width regions.
 - Source record: `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-2-report.md`.
+
+## TUI-06 Task Evidence
+
+- Status: complete; commit `048bdbc`; source record `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-6-report.md`.
+- TDD/Pilot: controller, command, renderer, approval, long-diff, pause, provider-error, and
+  narrow-terminal tests passed; the full Task 6 regression command passed 95 tests.
+- Behavior: UI-thread progress draining, one streamed assistant Markdown per Run, persisted
+  transcript reconciliation, public approval lookup/fingerprint details, explicit approval keys,
+  slash commands, provider metadata, redacted bounded details, and idempotent Esc pause.
+- Static/reproducibility gates: scoped Ruff and mypy passed; `uv lock --check` and `git diff --check`
+  passed. No remote review claim is made because the external Codex token remains invalidated.
 
 ## SSH Deployment Follow-up
 

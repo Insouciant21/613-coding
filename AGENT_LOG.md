@@ -851,3 +851,19 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   keyboard bindings, and stable 80x24/60x20 layout. Added pinned Textual/pytest-asyncio ranges via uv.
 - GREEN: focused suite 13 passed; full offline suite 365 passed with the existing Web warning;
   Ruff, mypy, lock, diff, and live `613-coding --help` checks passed.
+
+### 2026-08-10 04:29:21 Asia/Shanghai - TUI distribution Task 6 implementation
+
+- Task: complete the Claude Code-like local TUI interaction layer; triggered `executing-plans`,
+  `systematic-debugging`, `test-driven-development`, and `verification-before-completion`.
+- RED: renderer/Pilot tests failed on missing renderer/controller contracts, strict enum test data,
+  missing public approval lookup, invalid Textual spacing, and absent structured progress details.
+- Implementation: commit `048bdbc` adds `TuiController`, slash command parsing, UI-thread progress
+  draining, streamed Markdown reconciliation, approval details/actions, bounded redacted renderers,
+  provider metadata/mode wiring, and structured ephemeral tool/validation progress payloads.
+- GREEN: `uv run pytest tests/tui tests/cli tests/application/test_interactive.py tests/application/test_loop.py -q`
+  passed 95 tests; scoped Ruff, mypy, `uv lock --check`, and `git diff --check` passed.
+- Human intervention: corrected the existing fake to construct `StopReason.SUCCESS` instead of a
+  raw string; no credentials, remote deployment, or `tmp/cube` files were touched.
+- Review boundary: external Codex review attempts still return HTTP 401 `refresh_token_invalidated`;
+  this limitation is recorded and retained for the broad branch review.

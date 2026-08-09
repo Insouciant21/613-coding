@@ -1,14 +1,14 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 03:35:00 (Asia/Shanghai)
-Responsible actor: `/root/tui_task2_finish` for locally verified TUI-02 recovery; safe repository mutations Tasks 1-4 are reviewed and integrated into `main` at `69caa09`; TUI-01 and TUI-02 are locally verified in the TUI/distribution worktree; published deployment remains unchanged.
+Last updated: 2026-08-10 04:29:21 (Asia/Shanghai)
+Responsible actor: `/root` for locally verified TUI-06; safe repository mutations Tasks 1-4 are reviewed and integrated into `main` at `69caa09`; TUI-01 through TUI-06 are locally verified in the TUI/distribution worktree; published deployment remains unchanged.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
-| Claude Code-like TUI | TUI-01 and TUI-02 implementation/fix verified locally; TUI-03 through TUI-09 pending | design `e7f7ece`; plan `9ee205d`; commits `66c11d8`, `b45bb71`, `c23f217`, `330d4a5`, `e3b7f9a`; Task 2 evidence below | broad branch review must include an independent review of the Task 2 fix, then begin TUI-03 |
+| Claude Code-like TUI | TUI-01 through TUI-06 implementation/fix verified locally; TUI-07 through TUI-09 pending | design `e7f7ece`; plan `9ee205d`; commit `048bdbc`; TUI-06 evidence below | broad branch review must include an independent review of the recorded external-review gap, then begin TUI-07 |
 | Binary/wheel/sdist artifact builder | design approved; implementation pending | TUI/distribution design; Docker and CI contract | build and execute artifacts after TDD implementation |
 | Main Web/HTTP removal | design approved; implementation pending | revised `SPEC.md` and `AGENTS.md` | prove code, dependency, test, manifest, and documentation removal |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
@@ -410,6 +410,20 @@ Every completed plan task must link a commit and fresh verification output here.
   unknown-option, missing-repository, and management dispatch contracts are tested.
 - Focused suite passed 13; full offline suite passed 365 with the existing Web warning; Ruff,
   mypy for 91 source files, uv lock, and diff checks passed.
+
+## TUI-06 Evidence
+
+- Verification timestamp: `2026-08-10 04:29:21 Asia/Shanghai`.
+- Commit: `048bdbc` (`feat: add streamed coding conversation tui`).
+- TDD/Pilot: `uv run pytest tests/tui tests/cli tests/application/test_interactive.py tests/application/test_loop.py -q` passed 95 tests.
+- Static gates: scoped Ruff and mypy passed; `uv lock --check` and `git diff --check` passed.
+- Behavior: streamed assistant reconciliation, background service execution, idempotent pause,
+  approval fingerprint/reason/path/diff details, explicit approve/reject keys, slash commands,
+  provider metadata, bounded redacted tool/validation/error output, and 80x24/60x20 long-diff
+  scrollability.
+- Review boundary: external Codex review remains unavailable due HTTP 401 `refresh_token_invalidated`;
+  no independent review success is claimed. No `tmp/cube`, deployment, Web removal, or release
+  artifact state changed.
 
 ## CI and Deployment Manifest Evidence
 
