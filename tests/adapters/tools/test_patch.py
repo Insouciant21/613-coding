@@ -297,3 +297,76 @@ def test_apply_patch_reports_only_committed_files_and_cleans_temps(
     assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "new-a\n"
     assert (tmp_path / "b.txt").read_text(encoding="utf-8") == "old-b\n"
     assert not [path for path in tmp_path.iterdir() if path.name.startswith(".")]
+
+
+def test_apply_patch_reports_replace_committed_before_parent_close_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    target = tmp_path / "value.txt"
+    target.write_text("old\n", encoding="utf-8")
+    patch = """--- a/value.txt
++++ b/value.txt
+@@ -1 +1 @@
+-old
++new
+"""
+    real_replace = os.replace
+    real_close = os.close
+    replaced = False
+
+    def mark_replace(*args: object, **kwargs: object) -> None:
+        nonlocal replaced
+        real_replace(*args, **kwargs)  # type: ignore[arg-type]
+        replaced = True
+
+    def fail_close_after_replace(descriptor: int) -> None:
+        nonlocal replaced
+        real_close(descriptor)
+        if replaced:
+            replaced = False
+            raise OSError("close failed")
+
+    monkeypatch.setattr(os, "replace", mark_replace)
+    monkeypatch.setattr(os, "close", fail_close_after_replace)
+
+    with pytest.raises(PatchCommitError) as raised:
+        FilesystemTools(tmp_path).apply_patch(patch)
+
+    assert raised.value.changed_files == ("value.txt",)
+    assert target.read_text(encoding="utf-8") == "new\n"
+
+
+def test_apply_patch_reports_delete_committed_before_parent_close_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    target = tmp_path / "gone.txt"
+    target.write_text("remove\n", encoding="utf-8")
+    patch = """--- a/gone.txt
++++ /dev/null
+@@ -1 +0,0 @@
+-remove
+"""
+    real_unlink = os.unlink
+    real_close = os.close
+    unlinked = False
+
+    def mark_unlink(path: str, *, dir_fd: int | None = None) -> None:
+        nonlocal unlinked
+        real_unlink(path, dir_fd=dir_fd)
+        unlinked = True
+
+    def fail_close_after_unlink(descriptor: int) -> None:
+        nonlocal unlinked
+        real_close(descriptor)
+        if unlinked:
+            unlinked = False
+            raise OSError("close failed")
+
+    monkeypatch.setattr(os, "unlink", mark_unlink)
+    monkeypatch.setattr(os, "close", fail_close_after_unlink)
+
+    with pytest.raises(PatchCommitError) as raised:
+        FilesystemTools(tmp_path).apply_patch(patch)
+
+    assert raised.value.changed_files == ("gone.txt",)
+    assert not target.exists()

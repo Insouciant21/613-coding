@@ -6,6 +6,7 @@ import os
 import secrets
 import stat
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import ClassVar
 
@@ -110,13 +111,16 @@ class FilesystemTools:
             temporary_path.unlink(missing_ok=True)
 
     def delete_file(self, path: str | Path) -> None:
-        relative = Path(path)
+        self._delete_file(Path(path), lambda: None)
+
+    def _delete_file(self, relative: Path, on_commit: Callable[[], None]) -> None:
         parent_fd, name = self._parent_descriptor(relative)
         try:
             metadata = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
             if stat.S_ISDIR(metadata.st_mode):
                 raise IsADirectoryError(self.root / relative)
             os.unlink(name, dir_fd=parent_fd)
+            on_commit()
         finally:
             os.close(parent_fd)
 
@@ -129,13 +133,17 @@ class FilesystemTools:
         changed_files: list[str] = []
         try:
             for change in prepared.changes:
+                record_commit = lambda path=change.path: changed_files.append(path)
                 if change.operation is PatchOperation.DELETE:
-                    self.delete_file(change.path)
+                    self._delete_file(Path(change.path), record_commit)
                 else:
                     if change.after is None:
                         raise RuntimeError("prepared write change has no content")
-                    self._write_patch_text(Path(change.path), change.after)
-                changed_files.append(change.path)
+                    self._write_patch_text(
+                        Path(change.path),
+                        change.after,
+                        record_commit,
+                    )
         except OSError as error:
             committed = tuple(sorted(changed_files))
             raise PatchCommitError(str(error), committed) from error
@@ -187,7 +195,12 @@ class FilesystemTools:
                 os.close(descriptor)
             os.close(parent_fd)
 
-    def _write_patch_text(self, path: Path, content: str) -> None:
+    def _write_patch_text(
+        self,
+        path: Path,
+        content: str,
+        on_commit: Callable[[], None],
+    ) -> None:
         data = content.encode("utf-8")
         if len(data) > self.max_file_bytes:
             raise FileTooLargeError(f"content exceeds {self.max_file_bytes} bytes")
@@ -225,6 +238,7 @@ class FilesystemTools:
                 dst_dir_fd=parent_fd,
             )
             staged = False
+            on_commit()
         finally:
             if descriptor is not None:
                 os.close(descriptor)
