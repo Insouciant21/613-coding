@@ -487,3 +487,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Result: repository-internal implementation, tests, manifests, and local evidence are complete; remote CI final pass, Docker registry/image smoke, public WebUI URL, and student-authored reflection cannot be produced from this workspace.
 - Human intervention required: configure a forge/deployment account and write the student reflection; no safe in-scope filesystem change can substitute for those external actions.
 - Lesson: stop at the external boundary once all reproducible local work is complete; preserve explicit missing evidence instead of claiming it.
+
+### 2026-08-09 08:49:55 Asia/Shanghai - initial GitHub publication
+
+- Task: configure and publish the user-supplied GitHub remote; followed the `github:yeet` publication workflow.
+- Human intervention: user supplied `git@github.com:Insouciant21/613-coding.git` after the prior external-state audit.
+- Preflight: `git status -sb` showed only the protected untracked `.claude/` and two course requirement documents; the tracked diff was empty. `gh auth status` reported no API login.
+- Remote safety: added `origin`, verified it was empty with `git ls-remote --symref origin`, and verified the SSH identity as `Insouciant21` before pushing.
+- Result: `git push -u origin main` published `main` at `f4b9984` and established upstream tracking. The protected untracked paths were not staged.
+- CI boundary: the push triggers `.github/workflows/ci.yml`, but the repository is private to anonymous API requests and `gh` lacks an authenticated session, so the final run status cannot yet be read and is not claimed.
+- Lesson: SSH Git authorization and GitHub API authorization are separate; publication can succeed while CI inspection still requires `gh auth login`.

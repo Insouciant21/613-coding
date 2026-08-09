@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 07:00:59 (Asia/Shanghai)
-Responsible actor: `/root`; implementation and local delivery verification complete; remote CI/deployment evidence remains external.
+Last updated: 2026-08-09 08:49:55 (Asia/Shanghai)
+Responsible actor: `/root`; source is published to GitHub; remote CI status and deployment evidence remain external.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -22,7 +22,8 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
-| CI and deployment manifests | implemented; locally inspected | `.gitlab-ci.yml`, `.github/workflows/ci.yml`, `render.yaml`, Dockerfile ordering test; current task evidence below | run remote pipeline and deploy manifest |
+| GitHub source publication | complete | `git@github.com:Insouciant21/613-coding.git`; `main` at `f4b9984`; SSH push output and publication evidence below | keep delivery records synchronized with pushed commits |
+| CI and deployment manifests | published; remote result pending authentication | `.gitlab-ci.yml`, `.github/workflows/ci.yml`, `render.yaml`, Dockerfile ordering test; GitHub Actions was triggered by the initial push | authenticate `gh`, record the final workflow result, then deploy the manifest |
 | Public WebUI URL | not verified | `docs/deployment.md` explicitly records no deployed URL | deploy isolated demonstration with user-controlled infrastructure |
 | Reflection | reserved for student | `REFLECTION.md` contains an explicit student-authored boundary and no AI-written narrative | student writes the final report |
 | Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |
@@ -335,3 +336,11 @@ Every completed plan task must link a commit and fresh verification output here.
 - Verification timestamp: `2026-08-09 07:21:49 Asia/Shanghai`.
 - No Git remote, forge token, deployment credential, local CI runner, or public tunnel is available. Docker daemon `29.6.2` is available, but Docker Hub OAuth retrieval resets.
 - Remaining external requirements are therefore explicitly open: remote CI final pass, Docker image/worker smoke, deployed WebUI URL, and student-written reflection.
+
+## GitHub Publication Evidence
+
+- Verification timestamp: `2026-08-09 08:49:55 Asia/Shanghai`.
+- Remote: `git@github.com:Insouciant21/613-coding.git` configured as `origin`; `git ls-remote --symref origin` confirmed the repository was empty before publication.
+- Authentication: `ssh -T git@github.com` identified `Insouciant21`; `git push -u origin main` published `main` at `f4b9984` and established upstream tracking.
+- CI boundary: the push triggered `.github/workflows/ci.yml`, but the private repository returns `404` to the anonymous Actions API and this host has no authenticated `gh` session. No workflow pass or failure is claimed until API authentication is provided.
+- Protected paths: `.claude/` and both user-owned requirement documents remain untracked and were not staged.
