@@ -2,11 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
-**Goal:** Build 613 Coding as a self-owned Python Coding Agent Harness with an objective feedback loop, container-isolated workers, Supervisor orchestration, secure memory, and CLI/WebUI distribution.
+**Goal:** Deliver 613 Coding as a self-owned local TUI/CLI Coding Agent Harness with an objective
+feedback loop, safe focused mutation, container-isolated workers, Supervisor orchestration, secure
+memory, and CI-built executable/Python artifacts, then finish Cube Solver through that harness.
 
-**Architecture:** A domain/application core owns the agent loop, tool protocol, governance, feedback classification, and run state. SQLite is authoritative for structured state and memory text; LanceDB is a rebuildable vector index. Sandbox and multi-agent adapters consume explicit ports, while CLI, FastAPI, and the demonstration WebUI call the same application services.
+**Architecture:** A domain/application core owns the agent loop, tool protocol, governance,
+feedback classification, interactive sessions, and run state. SQLite is authoritative for
+structured state and memory text; LanceDB is a rebuildable vector index. Descriptor-relative
+filesystem adapters enforce mutation safety, Textual provides the local interaction adapter, and
+Docker remains a worker runtime boundary plus the reproducible release builder.
 
-**Tech Stack:** Python 3.12+, `uv`, Pydantic, pytest, Ruff, mypy, FastAPI/Uvicorn, Typer, SQLite, LanceDB, `keyring`, Docker Engine API, HTTPX for OpenAI-compatible providers.
+**Tech Stack:** Python 3.12+, `uv`, Pydantic, pytest, Ruff, mypy, Textual, Typer, SQLite,
+LanceDB, `keyring`, Docker Engine API/BuildKit, HTTPX streaming for OpenAI-compatible providers,
+`unidiff`, and PyInstaller.
 
 ## Global Constraints
 
@@ -19,7 +27,8 @@
 - SQLite is the source of truth; LanceDB stores redacted vectors linked to authoritative SQLite records.
 - API keys never enter Git, databases, logs, prompts, subprocess arguments, or worker containers.
 - `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, and `DELIVERY_STATUS.md` are updated with fresh evidence after each significant task.
-- No implementation code is written until SPEC/PLAN review and the different-agent cold-start gate pass.
+- No redesign implementation code is written until the three 2026-08-09 redesign plans are
+  reviewed and the user selects an execution workflow.
 
 ## Plan Registry And Dependencies
 
@@ -30,8 +39,14 @@
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | complete through `376fd41` |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | complete through Docker smoke repair `774c07a`; real provider remains injectable |
 | `docs/superpowers/plans/2026-08-09-613-coding-package-rename.md` | Strict distribution/import/runtime/documentation rename | completed Tasks 1-3 | complete through reviewed CI and SSH deployment at `eefee2d` |
+| `docs/superpowers/plans/2026-08-09-safe-repository-mutations.md` | Schema-validated apply_patch and descriptor-relative delete | existing provider/context repair branch | written; pending execution approval |
+| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | written; pending execution approval |
+| `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | written; pending execution approval |
+| `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
 
-The implementation critical path is `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. Core storage and domain work can proceed before sandbox; delivery documentation and test harness scaffolding can proceed after core interfaces are stable.
+The completed historical critical path was `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. The current
+critical path is `SAFE_MUTATION → TUI_DISTRIBUTION → CUBE_RECOVERY → CUBE Tasks 4-9`. Do not start
+Cube recovery with the old whole-file editing boundary.
 
 ## Phase Gates
 
@@ -42,6 +57,12 @@ The implementation critical path is `CORE → SANDBOX → MULTI_AGENT → DELIVE
 - [x] A different agent type cold-started `CORE-01` and `CORE-02` with only `SPEC.md` and `PLAN.md`, recorded the dependency-bootstrap ambiguity, and produced a report referenced by `SPEC_PROCESS.md`.
 - [x] The cold-start findings were incorporated: standard-library package baseline, explicit dependency provisioning, air-gapped cache/wheelhouse requirement, and a `DEPENDENCY_PROVISIONING_BLOCKED` stop condition.
 - [x] Bootstrap revision committed as `fc7bf53`.
+- [x] TUI/mutation/Cube recovery brainstorming approved and committed as `e7f7ece` with evidence
+  follow-up `f9d7f47`.
+- [x] Root `SPEC.md`, `AGENTS.md`, `SPEC_PROCESS.md`, and delivery status updated for the local TUI
+  and artifact-only deployment direction.
+- [ ] User reviews the three redesign implementation plans and selects Subagent-Driven or Inline
+  Execution.
 - [ ] Each task receives spec-compliance review, code-quality review, fresh verification, a commit, and record updates.
 
 ## Task Index
@@ -52,6 +73,12 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - `SANDBOX-01` through `SANDBOX-05`: sandbox contracts, workspace/artifacts, Docker lifecycle, security/resource policy, and integration evidence.
 - `MULTI-01` through `MULTI-05`: task graph, worker runtime, Supervisor scheduling, artifact integration, and orchestration demo.
 - `DELIVERY-01` through `DELIVERY-07`: CLI, API, WebUI, distribution, CI, documentation, and delivery-record automation.
+- `MUTATION-01` through `MUTATION-04`: descriptor delete, strict diff preflight, descriptor patch
+  commit, and tool/policy integration.
+- `TUI-01` through `TUI-09`: sessions, streaming, pause, interactive application service, Textual
+  shell/workflow, Web removal, artifact builder, CI/CD, and documentation.
+- `CUBE-RECOVERY-01` through `CUBE-RECOVERY-04`: baseline, state/move repair,
+  orientation/notation/replay, and handoff to original Cube Tasks 4-9.
 
 ## DELIVERY-01 Task Evidence
 

@@ -641,3 +641,21 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Scope boundary: no implementation code changed during brainstorming. Existing remote-deployment
   evidence remains historical; no new remote action is required.
 - Design commit: `e7f7ece` (`docs: redesign local tui and artifact delivery`).
+
+### 2026-08-09 23:58:41 Asia/Shanghai - redesign implementation plans
+
+- Trigger: continued execution after written-spec confirmation; invoked `writing-plans` before
+  any implementation code.
+- Plans: safe repository mutations (4 tasks, 25 steps), TUI/distribution (9 tasks, 60 steps), and
+  Cube Task 3 recovery (4 tasks, 16 steps).
+- Dependency order: safe mutation first in the existing repair worktree; TUI/Web removal/artifact
+  delivery second in a fresh worktree; Cube recovery third through the completed TUI; original
+  Cube Tasks 4-9 remain the final product path.
+- Plan self-review: all three approved specs map to named tasks; no TODO/TBD/placeholder patterns
+  remain; shared signatures for patch results, progress, cancellation, sessions, TUI launch, and
+  artifact names are consistent across producer/consumer tasks.
+- Scope correction: PyInstaller uses a dedicated absolute-import launcher rather than executing a
+  package-relative module as a script. SQLite planning includes an exact non-destructive migration
+  for existing state databases.
+- Implementation boundary: no source code, dependency, CI, WebUI, Dockerfile, or Cube product file
+  changed during planning.

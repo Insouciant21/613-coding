@@ -8,11 +8,11 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
-| Safe repository mutations | design approved; implementation pending | `docs/superpowers/specs/2026-08-09-safe-repository-mutations-design.md`; commit `e7f7ece` | write and approve implementation plan |
-| Claude Code-like TUI | design approved; implementation pending | `docs/superpowers/specs/2026-08-09-613-coding-tui-distribution-design.md`; commit `e7f7ece` | write and approve implementation plan |
+| Safe repository mutations | design and implementation plan written; execution pending | design commit `e7f7ece`; `docs/superpowers/plans/2026-08-09-safe-repository-mutations.md` | select execution workflow and begin MUTATION-01 |
+| Claude Code-like TUI | design and implementation plan written; execution pending | design commit `e7f7ece`; `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | complete safe mutations, then begin TUI-01 |
 | Binary/wheel/sdist artifact builder | design approved; implementation pending | TUI/distribution design; Docker and CI contract | build and execute artifacts after TDD implementation |
 | Main Web/HTTP removal | design approved; implementation pending | revised `SPEC.md` and `AGENTS.md` | prove code, dependency, test, manifest, and documentation removal |
-| Cube recovery through 613 Coding | design approved; blocked on the two harness stages | `docs/superpowers/specs/2026-08-09-cube-solver-recovery-design.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
+| Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
 | Approved design | complete | `docs/superpowers/specs/2026-08-07-613-coding-design.md`; commits `6ad0eec`, `c4fd219`, `ba03b70` | none |
 | `AGENTS.md` workflow rules | complete | `AGENTS.md`; commit `ba03b70` | keep updated per task |
 | `SPEC.md` | approved with bootstrap revision | `SPEC.md`; commits `a2909c7`, `fc7bf53`; cold-start report incorporated | begin CORE-01 |
