@@ -4,11 +4,13 @@ from typing import Protocol
 from uuid import UUID
 
 from coding613.domain.events import Event
+from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import (
     ApprovalRequest,
     ApprovalStatus,
     IterationRecord,
     LoopSession,
+    Run,
 )
 
 
@@ -44,3 +46,15 @@ class LoopSessionStore(Protocol):
         session: LoopSession,
         approval_update: ApprovalRequest | None = None,
     ) -> None: ...
+
+
+class InteractiveSessionStore(Protocol):
+    def create_interactive_session(self, session: InteractiveSession) -> None: ...
+
+    def get_interactive_session(self, session_id: UUID) -> InteractiveSession | None: ...
+
+    def list_interactive_sessions(
+        self, project_id: UUID, limit: int = 50
+    ) -> list[InteractiveSession]: ...
+
+    def list_runs_for_session(self, session_id: UUID) -> list[Run]: ...

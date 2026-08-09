@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
@@ -11,11 +12,13 @@ import pytest
 from coding613.adapters.storage.sqlite import SqliteEventStore
 from coding613.domain.actions import ActionEnvelope, ToolCall
 from coding613.domain.events import Event
+from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import (
     ApprovalRequest,
     IterationRecord,
     LoopSession,
     PermissionMode,
+    Project,
     Run,
     RunState,
     StopReason,
@@ -51,6 +54,7 @@ def test_store_creates_required_schema(tmp_path: Path) -> None:
     assert {
         "projects",
         "runs",
+        "interactive_sessions",
         "iterations",
         "loop_sessions",
         "events",
@@ -60,6 +64,152 @@ def test_store_creates_required_schema(tmp_path: Path) -> None:
         "memory_entries",
         "embedding_status",
     } <= tables
+
+
+def test_session_round_trip_and_ordered_runs(tmp_path: Path) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+    project = Project(canonical_root=tmp_path)
+    store.create_project(project)
+    session = InteractiveSession(project_id=project.id, title="Repair tests")
+    store.create_interactive_session(session)
+    assert store.get_interactive_session(session.id) == session
+    first = Run(project_id=project.id, session_id=session.id, task="first")
+    second = Run(project_id=project.id, session_id=session.id, task="second")
+    store.create_run(first)
+    store.create_run(second)
+
+    assert store.list_runs_for_session(session.id) == [first, second]
+
+
+def test_sessions_are_ordered_by_latest_activity_and_runs_update_activity(
+    tmp_path: Path,
+) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+    project = Project(canonical_root=tmp_path)
+    store.create_project(project)
+    created_at = datetime(2026, 1, 1, tzinfo=UTC)
+    older = InteractiveSession(
+        project_id=project.id,
+        title="older",
+        created_at=created_at,
+        updated_at=created_at,
+    )
+    newer = InteractiveSession(
+        project_id=project.id,
+        title="newer",
+        created_at=created_at,
+        updated_at=created_at + timedelta(minutes=1),
+    )
+    store.create_interactive_session(older)
+    store.create_interactive_session(newer)
+    run_time = created_at + timedelta(minutes=2)
+    store.create_run(
+        Run(
+            project_id=project.id,
+            session_id=older.id,
+            task="revive older session",
+            created_at=run_time,
+            updated_at=run_time,
+        )
+    )
+
+    sessions = store.list_interactive_sessions(project.id)
+
+    assert sessions == [
+        older.model_copy(update={"updated_at": run_time}),
+        newer,
+    ]
+
+
+def test_legacy_database_migrates_without_losing_runs(tmp_path: Path) -> None:
+    path = tmp_path / "legacy.db"
+    project = Project(canonical_root=tmp_path)
+    run = Run(project_id=project.id, task="legacy task")
+    event = Event.new(
+        "run.legacy",
+        run.id,
+        {"preserved": True},
+        datetime.now(UTC),
+    )
+    with sqlite3.connect(path) as connection:
+        connection.executescript(
+            """
+            PRAGMA foreign_keys = ON;
+            CREATE TABLE projects (
+                id TEXT PRIMARY KEY,
+                canonical_root TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE runs (
+                id TEXT PRIMARY KEY,
+                project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+                task TEXT NOT NULL,
+                permission_mode TEXT NOT NULL,
+                state TEXT NOT NULL,
+                stop_reason TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE events (
+                sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT NOT NULL UNIQUE,
+                run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+                version INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                timestamp TEXT NOT NULL
+            );
+            PRAGMA user_version = 0;
+            """
+        )
+        connection.execute(
+            "INSERT INTO projects (id, canonical_root, created_at) VALUES (?, ?, ?)",
+            (str(project.id), str(project.canonical_root), project.created_at.isoformat()),
+        )
+        connection.execute(
+            """
+            INSERT INTO runs (
+                id, project_id, task, permission_mode, state, stop_reason,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(run.id),
+                str(run.project_id),
+                run.task,
+                run.permission_mode.value,
+                run.state.value,
+                None,
+                run.created_at.isoformat(),
+                run.updated_at.isoformat(),
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO events (id, run_id, version, event_type, payload_json, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(event.id),
+                str(event.run_id),
+                event.version,
+                event.event_type,
+                json.dumps(event.payload),
+                event.timestamp.isoformat(),
+            ),
+        )
+
+    SqliteEventStore(path)
+    reopened = SqliteEventStore(path)
+
+    assert reopened.get_run(run.id) == run
+    assert reopened.get_run(run.id).session_id is None  # type: ignore[union-attr]
+    assert reopened.list_for_run(run.id) == [event]
+    with sqlite3.connect(path) as connection:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(runs)")}
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+    assert "session_id" in columns
+    assert version == 1
 
 
 def test_store_closes_connections_after_successful_operations(tmp_path: Path) -> None:
