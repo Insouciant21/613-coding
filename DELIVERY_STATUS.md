@@ -393,6 +393,16 @@ Every completed plan task must link a commit and fresh verification output here.
   nonterminal `PAUSED` Run without a stop reason. No `tmp/cube`, Web removal, packaging, or remote
   deployment files changed.
 
+## TUI-04 Evidence
+
+- Verification timestamp: `2026-08-10 04:20:00 Asia/Shanghai`.
+- Status: interactive session application service locally complete; independent review is deferred
+  because external Codex authentication returns `refresh_token_invalidated`.
+- Evidence: focused suite 20 passed; full offline suite 352 passed with the existing Web warning;
+  Ruff, mypy for 87 source files, lock, and diff checks passed.
+- Boundary: SQLite remains authoritative; transcript deltas are not persisted; session context is
+  bounded and redacted; no Web, packaging, `tmp/cube`, deployment, or credential path changed.
+
 ## CI and Deployment Manifest Evidence
 
 - Verification timestamp: `2026-08-09 07:14:20 Asia/Shanghai`.

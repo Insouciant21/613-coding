@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID
@@ -13,6 +14,7 @@ from coding613.application.approvals import (
     StaleApprovalError,
 )
 from coding613.application.loop import AgentLoop, LoopDependencies
+from coding613.application.progress import CancellationToken
 from coding613.domain.models import (
     ApprovalRequest,
     PermissionMode,
@@ -20,11 +22,13 @@ from coding613.domain.models import (
     RunSummary,
 )
 from coding613.domain.models_base import DomainModel
+from coding613.ports.progress import ProgressSink
 
 
 class RunRequest(DomainModel):
     task: str
     project_id: UUID | None = None
+    session_id: UUID | None = None
     permission_mode: PermissionMode | None = None
 
 
@@ -54,15 +58,29 @@ class RunService:
     def create_run(self, request: RunRequest) -> Run:
         run = Run(
             project_id=request.project_id,
+            session_id=request.session_id,
             task=request.task,
             permission_mode=request.permission_mode or PermissionMode.BALANCED,
         )
         self._store.create_run(run)
         return run
 
-    def resume(self, run_id: UUID) -> RunSummary:
+    def resume(
+        self,
+        run_id: UUID,
+        *,
+        progress: ProgressSink | None = None,
+        cancellation: CancellationToken | None = None,
+    ) -> RunSummary:
         run = self._require_run(run_id)
         dependencies = self._get_dependencies(run)
+        if progress is not None or cancellation is not None:
+            dependencies = replace(
+                dependencies,
+                progress=progress or dependencies.progress,
+                cancellation=cancellation or dependencies.cancellation,
+            )
+            self._dependencies[run.id] = dependencies
         if run.state.is_terminal:
             return self._terminal_summary(run, dependencies)
         dependencies.cancellation.reset()

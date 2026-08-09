@@ -10,8 +10,9 @@ from coding613.adapters.embeddings.openai_compatible import OpenAICompatibleEmbe
 from coding613.adapters.storage.lancedb_index import MemoryQuery, VectorHit
 from coding613.adapters.storage.memory import MemoryRepository
 from coding613.adapters.storage.sqlite import SqliteEventStore
-from coding613.application.context import ContextAssembler
+from coding613.application.context import ContextAssembler, SessionContextBuilder
 from coding613.domain.events import Event
+from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import MemoryEntry, MemoryType, Project, Run
 
 
@@ -146,6 +147,38 @@ def test_context_keeps_goal_directed_worker_instructions_ahead_of_run_history(
     assert "objective validation" in instruction.content
     assert context.messages[-2].content == "implement the missing file"
     assert context.messages[-1].content.startswith("Event feedback.tool_error:")
+
+
+def test_session_context_bounds_and_redacts_prior_transcript(tmp_path: Path) -> None:
+    repository, project, _, _, _ = setup_memory(tmp_path)
+    store = SqliteEventStore(repository.path)
+    session = InteractiveSession(project_id=project.id)
+    store.create_interactive_session(session)
+    prior: list[Run] = []
+    for index in range(13):
+        run = Run(
+            project_id=project.id,
+            session_id=session.id,
+            task=f"history {index} sk-test-secret-1234",
+        )
+        store.create_run(run)
+        prior.append(run)
+    current = Run(project_id=project.id, session_id=session.id, task="current task")
+    store.create_run(current)
+    builder = SessionContextBuilder(
+        ContextAssembler(repository, FakeIndex(), RecordingEmbedding()),
+        store,
+    )
+
+    context = builder.build(current.id, current.task, ())
+
+    transcript = [
+        message for message in context.messages if message.role == "user" and "history" in message.content
+    ]
+    assert len(transcript) == 12
+    assert all("sk-test-secret-1234" not in message.content for message in transcript)
+    assert any(message.content == "Omitted 1 earlier transcript entries." for message in context.messages)
+    assert context.messages[-1].content == "current task"
 
 
 def test_openai_compatible_embedding_maps_single_request() -> None:

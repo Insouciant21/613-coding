@@ -826,3 +826,18 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   mypy application checks passed.
 - Human intervention: controller implemented the bounded changes after the task implementer slot
   was unavailable; independent task review remains pending and is recorded as such.
+
+### 2026-08-10 04:20:00 Asia/Shanghai - TUI distribution Task 4 implementation
+
+- Task: implement persisted interactive session workflows and bounded prior-session context using
+  `test-driven-development` and `verification-before-completion`.
+- RED: five new workflow tests failed because `LocalServices.interactive` was absent.
+- Implementation: added session create/submit/execute/resume, persisted transcript reconstruction,
+  active Run selection, 12-entry/12,000-character context bounds, repeat redaction, and per-execution
+  progress/cancellation injection.
+- Test collection repair: the plan-required application test name collided with the existing domain
+  test under classic pytest imports; added package markers instead of renaming either required file.
+- GREEN: focused suite 20 passed; full offline suite 352 passed with one existing Web deprecation
+  warning; Ruff, mypy, lock, and diff checks passed.
+- Review/delegation: external Codex review attempt failed with HTTP 401
+  `refresh_token_invalidated`; no review claim was fabricated and the final broad review retains it.

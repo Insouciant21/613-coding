@@ -26,8 +26,9 @@ from coding613.adapters.storage.sqlite import SqliteEventStore
 from coding613.adapters.tools.repository import build_repository_tools
 from coding613.application.approvals import ApprovalService
 from coding613.application.budgets import BudgetLimits
-from coding613.application.context import ContextAssembler
+from coding613.application.context import ContextAssembler, SessionContextBuilder
 from coding613.application.feedback import FeedbackClassifier
+from coding613.application.interactive import InteractiveSessionService
 from coding613.application.loop import AgentLoop, LoopDependencies
 from coding613.application.policy import PolicyEngine
 from coding613.application.progress import CancellationToken
@@ -80,9 +81,15 @@ class ConfiguredRunService(RunService):
 
 
 class LocalServices:
-    def __init__(self, run_service: ConfiguredRunService, events: SqliteEventStore) -> None:
+    def __init__(
+        self,
+        run_service: ConfiguredRunService,
+        events: SqliteEventStore,
+        interactive: InteractiveSessionService,
+    ) -> None:
         self.run_service = run_service
         self._events = events
+        self.interactive = interactive
 
     def list_events(self, run_id: UUID) -> list[Event]:
         return self._events.list_for_run(run_id)
@@ -108,7 +115,7 @@ def build_services(
     embedding = DeterministicEmbedding(dimension=8)
     memory = MemoryRepository(store.path)
     index = LanceMemoryIndex(state_root / "vectors", dimension=8)
-    context = ContextAssembler(memory, index, embedding)
+    context = SessionContextBuilder(ContextAssembler(memory, index, embedding), store)
     policy = PolicyEngine()
     if provider is None and config.llm is not None:
         store_for_credentials = credential_store or KeyringCredentialStore()
@@ -155,7 +162,8 @@ def build_services(
         events=store,
         permission_mode=config.permission_mode,
     )
-    return LocalServices(service, store)
+    interactive = InteractiveSessionService(project.id, store, service)
+    return LocalServices(service, store, interactive)
 
 
 def _repository_revision(root: Path, state_root: Path) -> str:

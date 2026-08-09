@@ -266,6 +266,17 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   `PAUSED` with no stop reason; `RunService.pause()` supports active and idle nonterminal runs.
 - Regression repair: non-streaming progress fallback now ignores raw malformed provider values
   until Loop schema validation, preserving the pre-existing invalid-response repair path.
+
+## TUI-04 Task Evidence
+
+- Status: implementation locally complete; independent task review unavailable because the external
+  Codex refresh token is invalidated.
+- TDD RED: five workflow tests failed on absent `LocalServices.interactive`.
+- GREEN: interactive/context/composition suite passed 20; full offline suite passed 352 with the
+  existing Web test deprecation warning; Ruff, mypy, lock, and diff checks passed.
+- Behavior: sessions and linked Runs restore from SQLite, transcripts use persisted final response
+  content only, newest nonterminal Run is active, and history injection is capped at 12 entries and
+  12,000 characters with repeat redaction.
 - Source record: `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-2-report.md`.
 
 ## SSH Deployment Follow-up
