@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import os
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 
 import pytest
 
+from coding613.adapters.tools.filesystem import (
+    FilesystemTools,
+    PathOutsideRepositoryError,
+)
 from coding613.adapters.tools.patch import (
     InvalidPatchError,
+    PatchCommitError,
     PatchConflictError,
     PatchLimitError,
     PatchOperation,
@@ -172,3 +179,121 @@ def test_prepare_patch_wraps_invalid_utf8_from_reader() -> None:
 def test_prepare_patch_wraps_invalid_utf8_for_existing_add_target() -> None:
     with pytest.raises(PatchLimitError):
         prepare_patch(ADD, lambda path: chr(0xDFFF))
+
+
+def test_apply_patch_adds_updates_and_deletes_in_order(tmp_path: Path) -> None:
+    (tmp_path / "update.txt").write_text("before\n", encoding="utf-8")
+    (tmp_path / "delete.txt").write_text("remove\n", encoding="utf-8")
+    patch = """--- /dev/null
++++ b/new/nested.txt
+@@ -0,0 +1 @@
++created
+--- a/update.txt
++++ b/update.txt
+@@ -1 +1 @@
+-before
++after
+--- a/delete.txt
++++ /dev/null
+@@ -1 +0,0 @@
+-remove
+"""
+
+    result = FilesystemTools(tmp_path).apply_patch(patch)
+
+    assert (tmp_path / "new/nested.txt").read_text(encoding="utf-8") == "created\n"
+    assert (tmp_path / "update.txt").read_text(encoding="utf-8") == "after\n"
+    assert not (tmp_path / "delete.txt").exists()
+    assert result.added == 1
+    assert result.updated == 1
+    assert result.deleted == 1
+    assert result.changed_files == ("delete.txt", "new/nested.txt", "update.txt")
+
+
+def test_apply_patch_preflights_every_file_before_mutation(tmp_path: Path) -> None:
+    (tmp_path / "first.txt").write_text("one\n", encoding="utf-8")
+    (tmp_path / "second.txt").write_text("unexpected\n", encoding="utf-8")
+    patch = """--- a/first.txt
++++ b/first.txt
+@@ -1 +1 @@
+-one
++changed
+--- a/second.txt
++++ b/second.txt
+@@ -1 +1 @@
+-two
++changed
+"""
+
+    with pytest.raises(PatchConflictError):
+        FilesystemTools(tmp_path).apply_patch(patch)
+
+    assert (tmp_path / "first.txt").read_text(encoding="utf-8") == "one\n"
+    assert (tmp_path / "second.txt").read_text(encoding="utf-8") == "unexpected\n"
+
+
+def test_apply_patch_rejects_symlink_parent_without_touching_outside(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"patch-outside-{tmp_path.name}"
+    outside.mkdir()
+    outside_target = outside / "target.txt"
+    outside_target.write_text("outside\n", encoding="utf-8")
+    os.symlink(outside, tmp_path / "alias")
+    patch = """--- /dev/null
++++ b/alias/new.txt
+@@ -0,0 +1 @@
++created
+"""
+
+    with pytest.raises(PathOutsideRepositoryError):
+        FilesystemTools(tmp_path).apply_patch(patch)
+
+    assert outside_target.read_text(encoding="utf-8") == "outside\n"
+    assert not (outside / "new.txt").exists()
+
+
+def test_apply_patch_reports_only_committed_files_and_cleans_temps(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "a.txt").write_text("old-a\n", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("old-b\n", encoding="utf-8")
+    patch = """--- a/a.txt
++++ b/a.txt
+@@ -1 +1 @@
+-old-a
++new-a
+--- a/b.txt
++++ b/b.txt
+@@ -1 +1 @@
+-old-b
++new-b
+"""
+    real_replace = os.replace
+    calls = 0
+
+    def fail_second_replace(
+        source: str,
+        target: str,
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+    ) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("disk full")
+        real_replace(
+            source,
+            target,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+
+    monkeypatch.setattr(os, "replace", fail_second_replace)
+
+    with pytest.raises(PatchCommitError) as raised:
+        FilesystemTools(tmp_path).apply_patch(patch)
+
+    assert raised.value.changed_files == ("a.txt",)
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "new-a\n"
+    assert (tmp_path / "b.txt").read_text(encoding="utf-8") == "old-b\n"
+    assert not [path for path in tmp_path.iterdir() if path.name.startswith(".")]

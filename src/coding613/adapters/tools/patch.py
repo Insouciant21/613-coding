@@ -31,6 +31,14 @@ class PatchLimitError(PatchError):
     """The patch or resulting change exceeds the configured size limit."""
 
 
+class PatchCommitError(RuntimeError):
+    """A patch failed after zero or more changes were committed."""
+
+    def __init__(self, message: str, changed_files: tuple[str, ...]) -> None:
+        super().__init__(message)
+        self.changed_files = changed_files
+
+
 class PatchOperation(StrEnum):
     ADD = "add"
     UPDATE = "update"
@@ -48,6 +56,14 @@ class PreparedChange:
 @dataclass(frozen=True, slots=True)
 class PreparedPatch:
     changes: tuple[PreparedChange, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PatchResult:
+    added: int
+    updated: int
+    deleted: int
+    changed_files: tuple[str, ...]
 
 
 _PROTECTED_ROOTS = frozenset({".git", ".613-coding"})

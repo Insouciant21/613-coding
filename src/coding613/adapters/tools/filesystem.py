@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import os
+import secrets
 import stat
 import tempfile
 from pathlib import Path
 from typing import ClassVar
 
+from .patch import (
+    PatchCommitError,
+    PatchOperation,
+    PatchResult,
+    prepare_patch,
+)
 from .search import SearchMatch, search_repository
 
 
@@ -28,7 +35,9 @@ class InvalidUtf8Error(FilesystemToolError):
 
 
 class FilesystemTools:
-    _PROTECTED_DELETE_ROOTS: ClassVar[frozenset[str]] = frozenset({".613-coding", ".git"})
+    _PROTECTED_MUTATION_ROOTS: ClassVar[frozenset[str]] = frozenset(
+        {".613-coding", ".git"}
+    )
     _IGNORED_DIRECTORIES: ClassVar[frozenset[str]] = frozenset(
         {
             ".613-coding",
@@ -111,11 +120,126 @@ class FilesystemTools:
         finally:
             os.close(parent_fd)
 
+    def apply_patch(self, patch: str) -> PatchResult:
+        prepared = prepare_patch(
+            patch,
+            self._read_patch_source,
+            max_patch_bytes=self.max_file_bytes,
+        )
+        changed_files: list[str] = []
+        try:
+            for change in prepared.changes:
+                if change.operation is PatchOperation.DELETE:
+                    self.delete_file(change.path)
+                else:
+                    if change.after is None:
+                        raise RuntimeError("prepared write change has no content")
+                    self._write_patch_text(Path(change.path), change.after)
+                changed_files.append(change.path)
+        except OSError as error:
+            committed = tuple(sorted(changed_files))
+            raise PatchCommitError(str(error), committed) from error
+
+        return PatchResult(
+            added=sum(
+                change.operation is PatchOperation.ADD for change in prepared.changes
+            ),
+            updated=sum(
+                change.operation is PatchOperation.UPDATE for change in prepared.changes
+            ),
+            deleted=sum(
+                change.operation is PatchOperation.DELETE for change in prepared.changes
+            ),
+            changed_files=tuple(sorted(changed_files)),
+        )
+
+    def _read_patch_source(self, path: str) -> str:
+        parent_fd, name = self._parent_descriptor(Path(path))
+        descriptor: int | None = None
+        try:
+            flags = (
+                os.O_RDONLY
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+            )
+            descriptor = os.open(name, flags, dir_fd=parent_fd)
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise PathOutsideRepositoryError("patch source must be a regular file")
+            chunks: list[bytes] = []
+            total = 0
+            while True:
+                chunk = os.read(descriptor, min(65_536, self.max_file_bytes + 1 - total))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                total += len(chunk)
+                if total > self.max_file_bytes:
+                    raise FileTooLargeError(
+                        f"file exceeds {self.max_file_bytes} bytes"
+                    )
+            try:
+                return b"".join(chunks).decode("utf-8")
+            except UnicodeDecodeError as error:
+                raise InvalidUtf8Error("file is not valid UTF-8") from error
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+            os.close(parent_fd)
+
+    def _write_patch_text(self, path: Path, content: str) -> None:
+        data = content.encode("utf-8")
+        if len(data) > self.max_file_bytes:
+            raise FileTooLargeError(f"content exceeds {self.max_file_bytes} bytes")
+        parent_fd, name = self._parent_descriptor(path, create=True)
+        temporary_name = f".{name}.613-tmp-{secrets.token_hex(8)}"
+        descriptor: int | None = None
+        staged = False
+        try:
+            flags = (
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_CLOEXEC", 0)
+            )
+            descriptor = os.open(
+                temporary_name,
+                flags,
+                0o600,
+                dir_fd=parent_fd,
+            )
+            staged = True
+            view = memoryview(data)
+            while view:
+                written = os.write(descriptor, view)
+                if written < 1:
+                    raise OSError("could not write patch staging file")
+                view = view[written:]
+            os.fsync(descriptor)
+            os.close(descriptor)
+            descriptor = None
+            os.replace(
+                temporary_name,
+                name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+            staged = False
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+            if staged:
+                try:
+                    os.unlink(temporary_name, dir_fd=parent_fd)
+                except FileNotFoundError:
+                    pass
+            os.close(parent_fd)
+
     def _parent_descriptor(self, path: Path, *, create: bool = False) -> tuple[int, str]:
         if "\x00" in str(path) or path.is_absolute() or ".." in path.parts or not path.parts:
             raise PathOutsideRepositoryError("path must be repository-relative")
-        if path.parts[0] in self._PROTECTED_DELETE_ROOTS:
-            raise PathOutsideRepositoryError("delete path is protected")
+        if path.parts[0] in self._PROTECTED_MUTATION_ROOTS:
+            raise PathOutsideRepositoryError("mutation path is protected")
 
         directory_flags = (
             os.O_RDONLY
