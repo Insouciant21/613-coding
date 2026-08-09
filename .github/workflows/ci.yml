@@ -46,3 +46,4 @@ jobs:
       - run: uv sync --frozen
       - run: uv build
       - run: docker build --pull -t 613-coding:${{ github.sha }} .
+      - run: scripts/smoke_container.sh 613-coding:${{ github.sha }}

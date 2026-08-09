@@ -1,3 +1,4 @@
+import re
 import tomllib
 from pathlib import Path
 
@@ -12,7 +13,11 @@ def test_package_declares_console_entrypoint_and_runtime_metadata() -> None:
 
 def test_dockerfile_is_pinned_non_root_and_does_not_mount_socket() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-    assert "python:3.12" in dockerfile
+    assert re.search(
+        r"^FROM python:3\.12\.8-slim-bookworm@sha256:[0-9a-f]{64}$",
+        dockerfile,
+        re.MULTILINE,
+    )
     assert "USER coding" in dockerfile
     assert "HEALTHCHECK" in dockerfile
     assert "docker.sock" not in dockerfile
@@ -35,6 +40,11 @@ def test_dockerfile_copies_sources_before_project_sync() -> None:
     assert dockerfile.index("COPY src ./src") < dockerfile.index("uv sync --frozen")
 
 
+def test_dockerfile_exposes_synced_virtualenv_on_runtime_path() -> None:
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert 'ENV PATH="/app/.venv/bin:$PATH"' in dockerfile
+
+
 def test_ci_defines_unit_and_container_jobs() -> None:
     gitlab = (ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
     github = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
@@ -43,6 +53,8 @@ def test_ci_defines_unit_and_container_jobs() -> None:
     assert "docker build" in gitlab
     assert "unit-test:" in github
     assert "docker build" in github
+    assert "scripts/smoke_container.sh" in gitlab
+    assert "scripts/smoke_container.sh" in github
 
 
 def test_render_manifest_exposes_health_check() -> None:

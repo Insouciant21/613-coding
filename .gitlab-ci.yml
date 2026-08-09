@@ -52,3 +52,4 @@ docker-build:
     DOCKER_TLS_CERTDIR: ""
   script:
     - docker build --pull -t 613-coding:"$CI_COMMIT_SHA" .
+    - scripts/smoke_container.sh "613-coding:$CI_COMMIT_SHA"
