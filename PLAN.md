@@ -40,7 +40,7 @@ LanceDB, `keyring`, Docker Engine API/BuildKit, HTTPX streaming for OpenAI-compa
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | complete through Docker smoke repair `774c07a`; real provider remains injectable |
 | `docs/superpowers/plans/2026-08-09-613-coding-package-rename.md` | Strict distribution/import/runtime/documentation rename | completed Tasks 1-3 | complete through reviewed CI and SSH deployment at `eefee2d` |
 | `docs/superpowers/plans/2026-08-09-safe-repository-mutations.md` | Schema-validated apply_patch and descriptor-relative delete | existing provider/context repair branch | committed in `9ee205d`; pending execution approval |
-| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | committed in `9ee205d`; pending execution approval |
+| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | TUI-01 complete through `66c11d8`, `b45bb71`; TUI-02 through TUI-09 pending |
 | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | committed in `9ee205d`; pending execution approval |
 | `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
 
@@ -201,6 +201,26 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
   1d87af44-3373-409d-86de-44c8a1bbe61d showed provider/no-progress
   behavior. Controller takeover and all deviations are recorded in
   AGENT_LOG.md and the SDD ledger.
+
+## TUI-01 Task Evidence
+
+- Status: implementation and review fix round complete in the TUI/distribution worktree; an
+  independent scoped re-review remains required before Task 2 starts.
+- Commits: `66c11d8` (`feat: persist interactive coding sessions`) and `b45bb71`
+  (`fix: make session migration atomic`).
+- TDD evidence: the original domain/storage collection RED failed because `InteractiveSession`
+  was absent. Fix-round RED failed 3 targeted tests: late SQLite index denial left v1 schema
+  objects behind, a later UTC Run did not advance an offset-bearing session, and existing offset
+  session rows sorted lexically rather than chronologically.
+- Fix: schema statements, v1 table/index additions, and `PRAGMA user_version = 1` now run in one
+  explicit SQLite transaction. Run and interactive-session timestamps persist in UTC; existing
+  relevant rows normalize transactionally on opening, preserving chronological ordering and
+  microsecond precision.
+- Verification: focused domain/storage suite passed 19 tests; full harness suite passed 322 tests
+  with one existing Starlette/httpx deprecation warning. Ruff, mypy for 15 relevant source files,
+  `uv lock --check`, and `git diff --check` passed.
+- Boundaries: migration remains additive and retains legacy Run/Event data. No WebUI, Cube,
+  credentials, deployment, `.claude/`, or course-requirement file changed.
 
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 

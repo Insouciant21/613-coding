@@ -717,3 +717,34 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Merge: `69caa09` integrates `fix/provider-context-history` into `main`; tracked source and tests are clean after merge.
 - Verification: `uv run ruff check .`, `uv run mypy src` (83 files), `uv lock --check`, and `git diff --check` passed. Unfiltered `uv run pytest -q` first stopped during collection in the user-owned `tmp/cube` tree because `cube_api` is not on the default import path; after removing only stale ignored `src/coding_harness` bytecode/empty directories, harness verification `uv run pytest -q --ignore=tmp` passed 313 tests with one existing Starlette/httpx deprecation warning.
 - Boundary: `tmp/cube` remains untouched and its independent test/import setup is still outside harness verification; the user-owned untracked paths remain untracked.
+
+### 2026-08-10 02:43:45 Asia/Shanghai - TUI distribution Task 1 review fix round 1
+
+- Task: review interactive-session domain and SQLite migration commit `66c11d8`; triggered
+  `subagent-driven-development`, `requesting-code-review`, `receiving-code-review`,
+  `systematic-debugging`, and `test-driven-development`.
+- Implementer evidence: focused storage/domain suite passed 16 tests; full harness suite passed 319
+  tests with one existing warning; Ruff, mypy, and diff checks passed.
+- Independent review: no Critical findings; two Important findings remain. `executescript()` applies
+  v1 schema objects before the explicit migration transaction, so a late migration failure can
+  leave partial schema changes. Offset-bearing ISO timestamps are compared lexically, so linked
+  Run activity and session ordering can disagree with absolute time.
+- Root cause: transaction ownership starts after the schema script, and persisted timestamp text
+  is not normalized to a single offset before SQL comparison. The original Task 1 implementer is
+  resumed for a TDD fix and scoped re-review.
+- Boundary: no `tmp/cube`, credential, deployment, `.claude/`, or course requirement file was
+  touched.
+
+### 2026-08-10 02:50:22 Asia/Shanghai - TUI distribution Task 1 review fix outcome
+
+- TDD RED: `uv run pytest` for the three new storage regressions failed 3/3: a late SQLite index
+  denial retained v1 objects, offset-text comparison did not advance session activity, and legacy
+  offset session rows sorted non-chronologically.
+- Fix: `b45bb71` executes schema and v1 migration work in one explicit transaction, normalizes
+  persisted Run/session timestamps to UTC, and preserves precise UTC text ordering after
+  transaction-time normalization of existing rows.
+- GREEN: the Task 1 domain/storage suite passed 19 tests; full harness verification passed 322
+  tests with one existing FastAPI/Starlette `httpx` deprecation warning. Relevant Ruff/mypy,
+  `uv lock --check`, and `git diff --check` passed.
+- Boundary: no `tmp/cube`, credential, deployment, `.claude/`, or course requirement path changed.
+- Next: independent scoped re-review is required before starting TUI-02.

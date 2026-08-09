@@ -1,14 +1,14 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 01:56:00 (Asia/Shanghai)
-Responsible actor: `/root`; safe repository mutations Tasks 1-4 are reviewed, locally verified, and integrated into `main` at `69caa09`; the approved local TUI/distribution implementation remains pending; published deployment remains unchanged.
+Last updated: 2026-08-10 02:50:22 (Asia/Shanghai)
+Responsible actor: `/root`; safe repository mutations Tasks 1-4 are reviewed, locally verified, and integrated into `main` at `69caa09`; TUI-01 persisted interactive sessions are locally verified in the TUI/distribution worktree; published deployment remains unchanged.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
-| Claude Code-like TUI | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | complete safe mutations, then begin TUI-01 |
+| Claude Code-like TUI | TUI-01 session persistence and migration complete locally; TUI-02 through TUI-09 pending | design `e7f7ece`; plan `9ee205d`; commits `66c11d8`, `b45bb71`; TUI-01 evidence below | independent TUI-01 re-review, then TUI-02 streaming |
 | Binary/wheel/sdist artifact builder | design approved; implementation pending | TUI/distribution design; Docker and CI contract | build and execute artifacts after TDD implementation |
 | Main Web/HTTP removal | design approved; implementation pending | revised `SPEC.md` and `AGENTS.md` | prove code, dependency, test, manifest, and documentation removal |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
@@ -342,6 +342,20 @@ Every completed plan task must link a commit and fresh verification output here.
 - Source records: `PLAN.md`, `AGENT_LOG.md`, and `.superpowers/sdd/2026-08-09-safe-repository-mutations/progress.md`.
 
 - Main integration evidence: merge commit `69caa09`; `uv run pytest -q --ignore=tmp` passed 313 tests, Ruff, mypy, lock, and diff checks passed. Unfiltered pytest collection remains blocked by the user-owned `tmp/cube` package import path and is not claimed.
+
+## TUI-01 Evidence
+
+- Status: persisted interactive-session domain/storage implementation and its first review-fix
+  round are locally verified; independent scoped re-review is pending.
+- Commits: `66c11d8` and `b45bb71`.
+- Fix evidence: a real SQLite authorizer denial after v1 mutations now rolls the schema and
+  `user_version` back together. Offset-bearing session/Run timestamps persist in UTC, legacy
+  offset rows normalize on reopen, and chronological activity ordering is covered.
+- Latest verification: focused domain/storage suite 19 passed; full harness suite 322 passed with
+  one existing Starlette/httpx deprecation warning; relevant Ruff/mypy, `uv lock --check`, and
+  `git diff --check` passed.
+- Source records: `PLAN.md`, `AGENT_LOG.md`, and
+  `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-1-report.md`.
 
 ## CI and Deployment Manifest Evidence
 
