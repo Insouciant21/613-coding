@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import stat
 import tempfile
 from pathlib import Path
 from typing import ClassVar
@@ -100,23 +101,48 @@ class FilesystemTools:
 
     def delete_file(self, path: str | Path) -> None:
         relative = Path(path)
-        if relative.is_absolute() or ".." in relative.parts or not relative.parts:
+        parent_fd, name = self._parent_descriptor(relative)
+        try:
+            metadata = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            if stat.S_ISDIR(metadata.st_mode):
+                raise IsADirectoryError(self.root / relative)
+            os.unlink(name, dir_fd=parent_fd)
+        finally:
+            os.close(parent_fd)
+
+    def _parent_descriptor(self, path: Path, *, create: bool = False) -> tuple[int, str]:
+        if "\x00" in str(path) or path.is_absolute() or ".." in path.parts or not path.parts:
             raise PathOutsideRepositoryError("path must be repository-relative")
-        parent = self.root
-        for component in relative.parent.parts:
-            candidate = parent / component
-            if candidate.is_symlink():
-                raise PathOutsideRepositoryError("delete parent cannot be a symlink")
-            parent = candidate
-        parent = parent.resolve(strict=True)
-        if not parent.is_relative_to(self.root):
-            raise PathOutsideRepositoryError("parent escaped repository root")
-        entry = parent / relative.name
-        if not entry.exists() and not entry.is_symlink():
-            raise FileNotFoundError(entry)
-        if entry.is_dir() and not entry.is_symlink():
-            raise IsADirectoryError(entry)
-        entry.unlink()
+
+        directory_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        current_fd = os.open(self.root, directory_flags)
+        try:
+            for component in path.parent.parts:
+                try:
+                    metadata = os.stat(component, dir_fd=current_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    if not create:
+                        raise
+                    os.mkdir(component, dir_fd=current_fd)
+                    metadata = os.stat(
+                        component, dir_fd=current_fd, follow_symlinks=False
+                    )
+                if stat.S_ISLNK(metadata.st_mode):
+                    raise PathOutsideRepositoryError("delete parent cannot be a symlink")
+                if not stat.S_ISDIR(metadata.st_mode):
+                    raise NotADirectoryError(component)
+                next_fd = os.open(component, directory_flags, dir_fd=current_fd)
+                os.close(current_fd)
+                current_fd = next_fd
+            return current_fd, path.name
+        except BaseException:
+            os.close(current_fd)
+            raise
 
     def _resolve(self, path: str | Path) -> Path:
         relative = Path(path)

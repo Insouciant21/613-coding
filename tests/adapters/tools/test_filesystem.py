@@ -103,6 +103,35 @@ def test_filesystem_rejects_symlink_in_delete_parent_path(
     assert target.read_text(encoding="utf-8") == "keep\n"
 
 
+def test_delete_file_is_anchored_when_parent_path_is_swapped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    safe = tmp_path / "safe"
+    safe.mkdir()
+    (safe / "victim.txt").write_text("inside\n", encoding="utf-8")
+    outside = tmp_path.parent / f"outside-{tmp_path.name}"
+    outside.mkdir()
+    outside_victim = outside / "victim.txt"
+    outside_victim.write_text("outside\n", encoding="utf-8")
+    parked = tmp_path / "parked"
+    real_unlink = os.unlink
+    raced = False
+
+    def swap_then_unlink(path: str, *, dir_fd: int | None = None) -> None:
+        nonlocal raced
+        if not raced:
+            raced = True
+            safe.rename(parked)
+            os.symlink(outside, safe)
+        real_unlink(path, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "unlink", swap_then_unlink)
+    FilesystemTools(tmp_path).delete_file("safe/victim.txt")
+
+    assert not (parked / "victim.txt").exists()
+    assert outside_victim.read_text(encoding="utf-8") == "outside\n"
+
+
 def test_filesystem_enforces_size_and_utf8_limits(tmp_path: Path) -> None:
     (tmp_path / "large.txt").write_text("12345", encoding="utf-8")
     (tmp_path / "binary.dat").write_bytes(b"\xff")
