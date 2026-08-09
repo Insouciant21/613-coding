@@ -44,6 +44,18 @@ def test_local_composition_persists_runs_and_can_cancel_without_provider(tmp_pat
     assert services.list_events(run.id)
 
 
+def test_local_composition_reads_new_run_after_service_restart(tmp_path: Path) -> None:
+    services = build_services(tmp_path)
+    run = services.run_service.create_run(RunRequest(task="inspect after restart"))
+
+    restarted = build_services(tmp_path)
+    summary = restarted.run_service.get_summary(run.id)
+
+    assert summary.run_id == run.id
+    assert summary.status is RunState.RUNNING
+    assert summary.stop_reason is None
+
+
 def test_local_composition_reports_provider_boundary_on_resume(tmp_path: Path) -> None:
     services = build_services(tmp_path)
     run = services.run_service.create_run(RunRequest(task="make a change"))

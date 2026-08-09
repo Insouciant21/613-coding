@@ -83,7 +83,14 @@ class RunService:
 
     def get_summary(self, run_id: UUID) -> RunSummary:
         run = self._require_run(run_id)
-        return self._loop.get_summary(run_id, self._get_dependencies(run))
+        dependencies = self._get_dependencies(run)
+        if dependencies.sessions.get_loop_session(run_id) is None:
+            return RunSummary(
+                run_id=run.id,
+                status=run.state,
+                stop_reason=run.stop_reason,
+            )
+        return self._loop.get_summary(run_id, dependencies)
 
     def _resolve(
         self, request_id: UUID, decision: ApprovalDecision
