@@ -19,4 +19,4 @@ The API adapter is created with `coding_harness.api.create_app(services)`. CLI/A
 
 The public console boundary is intentionally narrow: it may operate an example repository or an isolated upload, never an arbitrary host path. SQLite remains authoritative for structured state and memory text; LanceDB is rebuildable retrieval metadata.
 
-CI definitions are provided for GitLab (`.gitlab-ci.yml`) and GitHub Actions (`.github/workflows/ci.yml`); both run tests, quality checks, demos, packaging, and a Docker build. `render.yaml` declares a Docker Web Service and `/healthz` check for operator-controlled deployment. No public URL is claimed until that manifest is deployed in a user-controlled account.
+CI definitions are provided for GitLab (`.gitlab-ci.yml`) and GitHub Actions (`.github/workflows/ci.yml`); both run tests, quality checks, demos, packaging, a pinned Docker build, and the reusable container health/user smoke gate. `render.yaml` declares a Docker Web Service and `/healthz` check for operator-controlled deployment. No public URL is claimed until that manifest is deployed in a user-controlled account.

@@ -28,7 +28,7 @@
 | `docs/superpowers/plans/2026-08-08-613-coding-core.md` | Domain contracts, tools, feedback, memory, credentials, agent loop | Cold-start gate | complete after final-review repair at `9af4f03` |
 | `docs/superpowers/plans/2026-08-08-613-coding-sandbox.md` | Task workspaces and Docker runtime isolation | Core ports and artifacts | complete through `fb1c222` |
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | complete through `376fd41` |
-| `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | complete through runtime-composition repair; local bundle is wired, real provider remains injectable |
+| `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | complete through Docker smoke repair `774c07a`; real provider remains injectable |
 
 The implementation critical path is `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. Core storage and domain work can proceed before sandbox; delivery documentation and test harness scaffolding can proceed after core interfaces are stable.
 
@@ -248,3 +248,11 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Demonstration output: all seven summary boundaries were `true`: two isolated workers, privileged command denial, Docker socket denial, default-deny network, timeout/resource mapping, artifact export, and cleanup.
 - Verification: full project suite passed 169 tests; Ruff, mypy across 54 source files, `uv lock --check`, and `git diff --check` passed.
 - Real Docker smoke was guarded and skipped without pulling an unapproved image because no pinned worker image was local.
+
+## Delivery Container Smoke Repair Evidence
+
+- Status: complete; commit `774c07a` (`test: smoke container distribution in ci`).
+- Root cause: the built image created `/app/.venv/bin/coding-harness` but did not expose that directory on `PATH`; the first local container exited `127` with `coding-harness: not found`.
+- TDD evidence: the runtime-path contract and reusable smoke-script behavior both failed before implementation, then passed after adding the image `PATH`, pinned base digest, and `scripts/smoke_container.sh`.
+- Verification: the delivery-focused suite passed 9 tests; the full isolated suite passed 237 tests; Ruff, mypy, and `git diff --check` passed. Local `613-coding:smoke-fix` output was `container smoke passed: health=healthy user=coding` with no retained container.
+- Remote evidence: GitHub Actions run [31288180749](https://github.com/Insouciant21/613-coding/actions/runs/31288180749) passed all four jobs; package/container job [93180685167](https://github.com/Insouciant21/613-coding/actions/runs/31288180749/job/93180685167) passed both the pinned Docker build and `scripts/smoke_container.sh`.

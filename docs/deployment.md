@@ -41,11 +41,11 @@ SQLite is the source of truth for runs, events, approvals, task graphs, memory t
 
 ## GitLab CI/CD
 
-`.gitlab-ci.yml` defines `unit-test`, `lint`, `typecheck`, `demo`, `build`, and `docker-build` stages. `.github/workflows/ci.yml` provides equivalent push/PR checks when the repository is hosted on GitHub. Jobs use locked `uv` dependencies, run tests/demos, build the package, and build the Docker image. `scripts.record_delivery` validates a Git commit and appends command/result evidence without converting failures into passes.
+`.gitlab-ci.yml` defines `unit-test`, `lint`, `typecheck`, `demo`, `build`, and `docker-build` stages. `.github/workflows/ci.yml` provides equivalent push/PR checks when the repository is hosted on GitHub. Jobs use locked `uv` dependencies, run tests/demos, build the package, build the digest-pinned Docker image, and run `scripts/smoke_container.sh` to verify the health check, non-root `coding` user, and cleanup. `scripts.record_delivery` validates a Git commit and appends command/result evidence without converting failures into passes.
 
 ## Limitations And Evidence
 
-The Docker Engine is an operator prerequisite for real worker containers. The current environment has a Docker daemon, but the latest Docker build could not retrieve the Docker Hub OAuth token because the network connection reset; no image pull or container smoke pass is claimed. `render.yaml` is an operator-controlled deployment declaration, not evidence of a deployed service. No unverified deployment claim is made. A deployed URL: not verified.
+The Docker Engine is an operator prerequisite for real worker containers. In IPv6-restricted environments, Docker Hub OAuth may reset before a build; an approved registry mirror can be used only when it resolves to the Dockerfile's pinned digest. Local verification built `613-coding:smoke-fix` and passed `scripts/smoke_container.sh` with `health=healthy` and `user=coding`. GitHub Actions run [31288180749](https://github.com/Insouciant21/613-coding/actions/runs/31288180749), job [93180685167](https://github.com/Insouciant21/613-coding/actions/runs/31288180749/job/93180685167), repeated the pinned build and smoke gate successfully. `render.yaml` is an operator-controlled deployment declaration, not evidence of a deployed service. No unverified deployment claim is made. A deployed URL: not verified.
 
 ## Directory Layout
 

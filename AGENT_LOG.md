@@ -497,3 +497,38 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Result: `git push -u origin main` published `main` at `f4b9984` and established upstream tracking. The protected untracked paths were not staged.
 - CI boundary: the push triggers `.github/workflows/ci.yml`, but the repository is private to anonymous API requests and `gh` lacks an authenticated session, so the final run status cannot yet be read and is not claimed.
 - Lesson: SSH Git authorization and GitHub API authorization are separate; publication can succeed while CI inspection still requires `gh auth login`.
+
+### 2026-08-09 09:01:24 CST (Asia/Shanghai) - REMOTE-CI-01
+
+- Evidence: REMOTE-CI-01 | 341d880dae20fcfb881e0cc65c9b1e2e7527161e
+- Status: pass
+- Command: `gh run watch 31287334414 --repo Insouciant21/613-coding --exit-status`
+- Result: GitHub Actions run 31287334414 passed: unit-test, quality, demo, package-and-container; Docker image build passed
+
+### 2026-08-09 09:01:33 Asia/Shanghai - GitHub CI diagnosis and repair
+
+- Task: inspect the initial private-repository workflows after the user authenticated `gh`; followed `systematic-debugging`, `test-driven-development`, and `verification-before-completion`.
+- RED evidence: runs `31286984595` and `31287048578` failed only in `quality`; Ruff reported `EXE001` because `scripts/bootstrap_dev.py` contained a shebang while Git stored mode `100644`. Unit tests, demo, package build, and Docker build already passed remotely.
+- Root cause: local WSL2 Ruff does not report this Unix executable-bit rule, while the GitHub Ubuntu runner consistently does; the Git index confirmed the incorrect mode.
+- Fix: commit `341d880` changed only the script mode from `100644` to `100755`; no source content changed.
+- GREEN evidence: run `31287334414` completed successfully. Jobs `93178446305` (`unit-test`), `93178446312` (`quality`), `93178446327` (`demo`), and `93178446326` (`package-and-container`) all passed.
+- Human intervention: user completed `gh` authentication; no credential material was copied into project files or logs.
+- Lesson: platform-dependent lint rules need a clean Linux CI checkout as authoritative evidence; file modes must be reviewed alongside text diffs.
+
+### 2026-08-09 09:27:31 CST (Asia/Shanghai) - DELIVERY-05-SMOKE
+
+- Evidence: DELIVERY-05-SMOKE | 774c07abed7c16200b341277a094bbe1f4e844fb
+- Status: pass
+- Command: `docker build --pull=false -t 613-coding:smoke-fix . && scripts/smoke_container.sh 613-coding:smoke-fix`
+- Result: Local image built and smoke passed: health=healthy user=coding; no smoke container remained
+
+### 2026-08-09 09:31:00 Asia/Shanghai - Docker distribution smoke completion
+
+- Task: close the Docker demonstration runtime gap identified by local smoke; followed `brainstorming` against the already approved delivery design, `executing-plans`, `using-git-worktrees`, `test-driven-development`, `systematic-debugging`, and `verification-before-completion`.
+- Isolated implementation: `.worktrees/docker-smoke-ci` on `agent/docker-smoke-ci`; fast-forwarded to `main` as commit `774c07a`.
+- RED: the first local image exited `127` with `/usr/local/bin/613-entrypoint: exec: coding-harness: not found`; the new smoke behavior test and runtime PATH contract failed before implementation. The cause was `/app/.venv/bin` missing from the image `PATH`.
+- Implementation: pinned the Python base image to digest `sha256:2199a62885a12290dc9c5be3ca0681d367576ab7bf037da120e564723292a2f0`, exposed `/app/.venv/bin`, added executable `scripts/smoke_container.sh`, and wired it after Docker build in both GitHub Actions and GitLab CI. The script verifies health, configured non-root user `coding`, logs failures, and always removes the test container.
+- GREEN: focused distribution/smoke tests passed 9; full isolated suite passed 237; Ruff, mypy, and `git diff --check` passed. Local `613-coding:smoke-fix` built successfully and returned `container smoke passed: health=healthy user=coding`; no test container remained.
+- Remote GREEN: GitHub Actions run `31288180749` passed all jobs; package/container job `93180685167` passed the pinned Docker build and smoke script. Source: https://github.com/Insouciant21/613-coding/actions/runs/31288180749
+- Boundary: direct Docker Hub OAuth can reset on this host's IPv6 path; the local verification used a digest-matching approved mirror cache. Render deployment and public URL remain operator-controlled and unverified.
+- Lesson: a successful image build is insufficient distribution evidence; the image must start under its declared user, pass its health contract, and clean up in the CI environment.

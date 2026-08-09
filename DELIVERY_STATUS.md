@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 08:49:55 (Asia/Shanghai)
-Responsible actor: `/root`; source is published to GitHub; remote CI status and deployment evidence remain external.
+Last updated: 2026-08-09 09:31:00 (Asia/Shanghai)
+Responsible actor: `/root`; source, GitHub Actions, and Docker runtime smoke are verified; public deployment remains external.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -18,12 +18,13 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
 | Container sandbox | complete | SANDBOX-01 `9df471d`; SANDBOX-02 `aa3600a`; SANDBOX-03 `3ec6ac1`; SANDBOX-04 `439540f`; SANDBOX-05 `fb1c222`; reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | retain regression gate |
 | Multi-agent orchestration | complete | MULTI-01 `9744339`; MULTI-02 `5910d7b`; MULTI-03 `43f51fc`; MULTI-04 `11eaef8`; MULTI-05 `376fd41`; reports under `.superpowers/sdd/2026-08-08-613-coding-multi-agent/` | retain regression gate |
-| README and distribution | implemented; locally verified | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata; commits `773bc2a`, `a0f55b4`, `d657369` | Docker build/smoke requires registry access and approved image |
+| README and distribution | implemented; local and remote smoke verified | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata, `scripts/smoke_container.sh`; commit `774c07a`; local and Actions evidence below | retain regression gate |
 | GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
-| GitHub source publication | complete | `git@github.com:Insouciant21/613-coding.git`; `main` at `f4b9984`; SSH push output and publication evidence below | keep delivery records synchronized with pushed commits |
-| CI and deployment manifests | published; remote result pending authentication | `.gitlab-ci.yml`, `.github/workflows/ci.yml`, `render.yaml`, Dockerfile ordering test; GitHub Actions was triggered by the initial push | authenticate `gh`, record the final workflow result, then deploy the manifest |
+| GitHub source publication | complete | `git@github.com:Insouciant21/613-coding.git`; initial source snapshot `f4b9984`; CI repair `341d880`; publication evidence below | keep delivery records synchronized with pushed commits |
+| GitHub Actions CI | passed | run `31288180749`; `unit-test`, `quality`, `demo`, and `package-and-container` all succeeded for `774c07a`; package/container job `93180685167` includes build and smoke | retain as the remote regression gate |
+| Deployment manifest | published; deployment pending | `render.yaml`; pinned image build and runtime smoke passed in job `93180685167` | deploy with a user-controlled Render account and record the public URL |
 | Public WebUI URL | not verified | `docs/deployment.md` explicitly records no deployed URL | deploy isolated demonstration with user-controlled infrastructure |
 | Reflection | reserved for student | `REFLECTION.md` contains an explicit student-authored boundary and no AI-written narrative | student writes the final report |
 | Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |
@@ -342,5 +343,17 @@ Every completed plan task must link a commit and fresh verification output here.
 - Verification timestamp: `2026-08-09 08:49:55 Asia/Shanghai`.
 - Remote: `git@github.com:Insouciant21/613-coding.git` configured as `origin`; `git ls-remote --symref origin` confirmed the repository was empty before publication.
 - Authentication: `ssh -T git@github.com` identified `Insouciant21`; `git push -u origin main` published `main` at `f4b9984` and established upstream tracking.
-- CI boundary: the push triggered `.github/workflows/ci.yml`, but the private repository returns `404` to the anonymous Actions API and this host has no authenticated `gh` session. No workflow pass or failure is claimed until API authentication is provided.
+- CI result: after GitHub API authentication, runs `31286984595` and `31287048578` exposed a deterministic Ruff `EXE001` failure. Commit `341d880` preserved the bootstrap script executable bit; follow-up run `31287334414` passed all four jobs, including package and Docker image builds.
 - Protected paths: `.claude/` and both user-owned requirement documents remain untracked and were not staged.
+
+- REMOTE-CI-01 | 341d880dae20fcfb881e0cc65c9b1e2e7527161e | pass | GitHub Actions run 31287334414 passed: unit-test, quality, demo, package-and-container; Docker image build passed
+
+## Delivery Container Smoke Evidence
+
+- Verification timestamp: `2026-08-09 09:31:00 Asia/Shanghai`.
+- Commit: `774c07a`; the Dockerfile now pins `python:3.12.8-slim-bookworm@sha256:2199a62885a12290dc9c5be3ca0681d367576ab7bf037da120e564723292a2f0`, exposes `/app/.venv/bin`, and runs as `coding`.
+- TDD: the original image smoke failed with exit `127` (`coding-harness: not found`); the PATH contract, smoke behavior, and CI wiring then passed their RED/GREEN cycles.
+- Local evidence: `docker build --pull=false -t 613-coding:smoke-fix .` succeeded; `scripts/smoke_container.sh 613-coding:smoke-fix` returned `container smoke passed: health=healthy user=coding`; `docker ps -a` showed no retained smoke container.
+- Remote evidence: [GitHub Actions run 31288180749](https://github.com/Insouciant21/613-coding/actions/runs/31288180749) passed; [package-and-container job 93180685167](https://github.com/Insouciant21/613-coding/actions/runs/31288180749/job/93180685167) passed Docker build and smoke. The full isolated suite passed `237 tests`; Ruff, mypy, and `git diff --check` passed.
+
+- DELIVERY-05-SMOKE | 774c07abed7c16200b341277a094bbe1f4e844fb | pass | Local image built and smoke passed: health=healthy user=coding; no smoke container remained
