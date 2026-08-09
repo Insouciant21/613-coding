@@ -140,27 +140,41 @@ class FilesystemTools:
                 max_patch_bytes=self.max_file_bytes,
             )
         except Exception:
-            os.close(root_fd)
+            try:
+                os.close(root_fd)
+            except OSError:
+                pass
             raise
+        commit_error: PatchCommitError | None = None
         try:
-            for change in prepared.changes:
-                record_commit = lambda path=change.path: changed_files.append(path)
-                if change.operation is PatchOperation.DELETE:
-                    self._delete_file(Path(change.path), record_commit, root_fd=root_fd)
-                else:
-                    if change.after is None:
-                        raise RuntimeError("prepared write change has no content")
-                    self._write_patch_text(
-                        Path(change.path),
-                        change.after,
-                        record_commit,
-                        root_fd=root_fd,
-                    )
-        except Exception as error:
-            committed = tuple(sorted(changed_files))
-            raise PatchCommitError(str(error), committed) from error
+            try:
+                for change in prepared.changes:
+                    record_commit = lambda path=change.path: changed_files.append(path)
+                    if change.operation is PatchOperation.DELETE:
+                        self._delete_file(Path(change.path), record_commit, root_fd=root_fd)
+                    else:
+                        if change.after is None:
+                            raise RuntimeError("prepared write change has no content")
+                        self._write_patch_text(
+                            Path(change.path),
+                            change.after,
+                            record_commit,
+                            root_fd=root_fd,
+                        )
+            except Exception as error:  # noqa: BLE001
+                committed = tuple(sorted(changed_files))
+                commit_error = PatchCommitError(str(error), committed)
         finally:
-            os.close(root_fd)
+            try:
+                os.close(root_fd)
+            except OSError as error:
+                if commit_error is None:
+                    commit_error = PatchCommitError(
+                        str(error), tuple(sorted(changed_files))
+                    )
+
+        if commit_error is not None:
+            raise commit_error
 
         return PatchResult(
             added=sum(

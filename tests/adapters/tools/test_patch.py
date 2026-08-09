@@ -468,3 +468,38 @@ def test_prepare_patch_rejects_target_hunk_length_mismatch() -> None:
 
     with pytest.raises(InvalidPatchError):
         prepare_patch(patch, lambda path: "old\n")
+
+
+def test_apply_patch_reports_root_close_failure_after_commit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    target = tmp_path / "value.txt"
+    target.write_text("old\n", encoding="utf-8")
+    patch = """--- a/value.txt
++++ b/value.txt
+@@ -1 +1 @@
+-old
++new
+"""
+    root_fds: list[int] = []
+    real_open_root = FilesystemTools._open_root_descriptor
+    real_close = os.close
+
+    def capture_root(self: FilesystemTools) -> int:
+        descriptor = real_open_root(self)
+        root_fds.append(descriptor)
+        return descriptor
+
+    def fail_root_close(descriptor: int) -> None:
+        real_close(descriptor)
+        if root_fds and descriptor == root_fds[0]:
+            raise OSError("root close failed")
+
+    monkeypatch.setattr(FilesystemTools, "_open_root_descriptor", capture_root)
+    monkeypatch.setattr(os, "close", fail_root_close)
+
+    with pytest.raises(PatchCommitError) as raised:
+        FilesystemTools(tmp_path).apply_patch(patch)
+
+    assert raised.value.changed_files == ("value.txt",)
+    assert target.read_text(encoding="utf-8") == "new\n"
