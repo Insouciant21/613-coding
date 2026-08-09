@@ -8,7 +8,8 @@ The central engineering contribution is a deterministic feedback loop that remai
 
 ## 2. User Stories
 
-1. As a developer, I can submit a task and a local repository path through the CLI.
+1. As a developer, I can start a Claude Code-like TUI in a local repository, submit tasks, and
+   continue a persisted interactive session.
 2. As a developer, I can see tests, lint, and type-check results classified into actionable feedback.
 3. As a safety-conscious developer, I can choose strict, balanced, or autonomous permissions.
 4. As a developer, I can approve or reject a concrete risky action and resume the run.
@@ -16,14 +17,18 @@ The central engineering contribution is a deterministic feedback loop that remai
 6. As a developer, I can ask a Supervisor to split work among planner, coder, tester, reviewer, and security workers.
 7. As a returning user, I can retrieve project conventions, validation settings, decisions, task summaries, and failure patterns from SQLite and LanceDB.
 8. As an evaluator, I can reproduce the feedback repair, guardrail, sandbox, multi-agent, and vector-memory demonstrations offline with a mock LLM.
+9. As a user without Python installed, I can run a CI-produced Linux x86_64 executable.
 
 ## 3. Functional Specification
 
 ### 3.1 Run Lifecycle
 
-Input: a task string, canonical local Git repository path, configuration, and permission mode.
+Input: an interactive session or one-shot task, canonical local Git repository path,
+configuration, and permission mode.
 
-Behavior: create a run, load repository instructions and relevant memory, enter the owned agent loop, persist every state transition, and expose pause/resume/cancel operations.
+Behavior: create or resume an `InteractiveSession`, create an auditable Run for each submitted
+task, load repository instructions and relevant session context, enter the owned agent loop,
+persist every state transition, and expose pause/resume/cancel operations.
 
 Output: terminal status, stop reason, changed-file summary, validation evidence, approvals, resource usage, and unresolved risks.
 
@@ -31,9 +36,16 @@ Errors: invalid repository, invalid configuration, cancelled run, unavailable pr
 
 ### 3.2 Agent Loop And Tools
 
-The loop accepts a versioned LLM response containing text and zero or more tool calls. Tool schemas cover `list_files`, `search_files`, `read_file`, `edit_file`, `git_diff`, `run_validation`, `request_approval`, and `finish`.
+The loop accepts a streamed, versioned LLM response containing text and zero or more tool calls.
+Tool schemas cover `list_files`, `search_files`, `read_file`, `edit_file`, `apply_patch`,
+`delete_file`, `git_diff`, `run_validation`, `request_approval`, and `finish`.
 
-Every call is schema-validated, policy-checked, executed or rejected, persisted as events, and returned to the model. Independent read-only calls may run concurrently; writes and commands remain ordered. `finish` is accepted only after fresh required validation passes and no approval is pending.
+Every call is schema-validated, policy-checked, executed or rejected, persisted as events, and
+returned to the model. `apply_patch` uses a strict unified-diff schema and descriptor-relative
+no-follow mutation. `delete_file` traverses and unlinks through held directory descriptors to
+prevent parent-path races. Independent read-only calls may run concurrently; writes and commands
+remain ordered. `finish` is accepted only after fresh required validation passes and no approval
+is pending.
 
 ### 3.3 Objective Feedback
 
@@ -67,9 +79,14 @@ Independent read-only nodes may run concurrently. Overlapping write sets are ser
 
 ### 3.8 Interfaces
 
-The CLI is the complete local interface: run, status, events, approve, reject, resume, cancel, memory, credentials, demo, and WebUI startup. FastAPI exposes the same `RunService` for task creation, run events, task graph status, feedback, approvals, artifacts, and summaries.
+The Textual TUI is the primary local interface. `613-coding` opens it in the current repository;
+an optional task argument starts immediately, and `--resume` restores an interactive session. It
+shows streaming text, tool activity, diffs, validation, budgets, approvals, and pause/resume state
+without owning business rules.
 
-The public WebUI runs only a packaged example repository or isolated uploaded copy and never accepts an arbitrary host path.
+Credentials, configuration, run inspection, approvals, cancellation, and deterministic demos
+remain scriptable CLI subcommands. The product exposes no FastAPI, browser WebUI, HTTP server, or
+remote deployment surface.
 
 ## 4. Non-Functional Requirements
 
@@ -80,26 +97,45 @@ The public WebUI runs only a packaged example repository or isolated uploaded co
 - Persisted output is redacted before storage; API keys never enter source, databases, logs, prompts, subprocess arguments, or containers.
 - Subprocesses have explicit working directories, environment allowlists, timeouts, output caps, and resource limits.
 - Interactive and unattended budgets are configurable and visible in run summaries.
-- CLI and WebUI contain no business rules; both call the same application services.
-- Docker images use pinned base-image digests and reproducible build inputs.
+- CLI and TUI contain no business rules; both call the same application services.
+- Docker release builders use pinned base-image digests and reproducible build inputs.
 
 ## 5. Architecture
 
-The domain layer defines value objects, states, events, policies, task graphs, and interfaces without infrastructure imports. The application layer contains `AgentLoop`, `RunService`, `Supervisor`, context assembly, artifact integration, and credential use cases. Adapters implement OpenAI-compatible providers, mock providers, filesystem/subprocess tools, SQLite, LanceDB, keyring, Docker, CLI, and FastAPI.
+The domain layer defines value objects, states, events, policies, task graphs, and interfaces
+without infrastructure imports. The application layer contains `AgentLoop`, `RunService`,
+interactive sessions, streaming progress, `Supervisor`, context assembly, artifact integration,
+and credential use cases. Adapters implement OpenAI-compatible providers, mock providers,
+filesystem/subprocess tools, SQLite, LanceDB, keyring, Docker worker execution, Typer CLI, and
+Textual TUI.
 
 The product does not use LangChain AgentExecutor, AutoGen, CrewAI, LlamaIndex agents, or a coding-agent SDK runner. It may use lower-level HTTP, parsing, persistence, and Docker libraries.
 
 ## 6. Data Model
 
-Primary entities are `Project`, `Run`, `IterationRecord`, `Event`, `ApprovalRequest`, `TaskGraph`, `TaskNode`, `WorkArtifact`, and `MemoryEntry`.
+Primary entities are `Project`, `InteractiveSession`, `Run`, `IterationRecord`, `Event`,
+`ApprovalRequest`, `TaskGraph`, `TaskNode`, `WorkArtifact`, and `MemoryEntry`.
 
-`Project` identifies a canonical repository and configuration. `Run` belongs to a project and stores task, mode, budgets, status, and stop reason. `IterationRecord` belongs to a run and stores context summary, model response, tool calls, tool results, validation, feedback, and state transition. `TaskNode` belongs to a graph and stores dependencies, role, write set, retry budget, and state. `WorkArtifact` belongs to a node and stores patch, file list, evidence, assumptions, and integration state. `MemoryEntry` stores redacted text, type, project, permission tags, timestamps, and vector-index status.
+`Project` identifies a canonical repository and configuration. `InteractiveSession` belongs to a
+project and groups ordered user messages and Runs. `Run` belongs to a project and optional session
+and stores task, mode, budgets, status, and stop reason. `IterationRecord` belongs to a run and
+stores context summary, model response, tool calls, tool results, validation, feedback, and state
+transition. `TaskNode` belongs to a graph and stores dependencies, role, write set, retry budget,
+and state. `WorkArtifact` belongs to a node and stores patch, file list, evidence, assumptions, and
+integration state. `MemoryEntry` stores redacted text, type, project, permission tags, timestamps,
+and vector-index status.
 
 ## 7. Credentials And Distribution
 
 The operating-system keyring is the primary key store. CLI commands hide entry and provide status/update/clear without revealing key material. `.env` is an explicit development fallback, must be ignored, and is documented as plaintext with process-environment exposure.
 
-The project is distributed as a Python package installable through `uv tool install` and as a Docker image that starts the sandboxed demonstration WebUI. README must describe local CLI use, WebUI boundaries, Docker requirements, keyring setup, platform limits, and sandbox limitations. GitLab CI includes a `unit-test` job and builds the selected image.
+The project is distributed as a Python package installable through `uv tool install` and as a
+self-contained Linux x86_64 PyInstaller executable. A pinned multi-stage Dockerfile is the
+canonical reproducible builder and exports the executable, wheel, sdist, and checksums; it does
+not contain a product runtime stage. README must describe TUI and CLI use, artifact verification,
+Docker Engine requirements for worker sandboxes, keyring setup, platform limits, and sandbox
+limitations. GitLab CI includes a `unit-test` job, and GitLab/GitHub pipelines execute and upload
+the exported artifacts.
 
 ## 8. Domain And Mechanism Design
 
@@ -111,16 +147,26 @@ Feedback classification is the main contribution because it is objective, determ
 
 Unit tests cover loop transitions, tool schemas, policy, approvals, classifiers, no-progress detection, budgets, SQLite/LanceDB retrieval, credentials, task scheduling, artifacts, and sandbox lifecycle. Integration tests use temporary Git repositories and controlled subprocess/container fixtures.
 
-The initial package-scaffold test uses only the Python standard-library `unittest` runner so a fresh environment can verify the source layout before third-party development tools are installed. Pydantic, pytest, Ruff, mypy, FastAPI, LanceDB, Docker, and provider adapters begin only after the documented dependency-provisioning check succeeds.
+The initial package-scaffold test uses only the Python standard-library `unittest` runner so a fresh environment can verify the source layout before third-party development tools are installed. Pydantic, pytest, Ruff, mypy, Textual, LanceDB, Docker, and provider adapters begin only after the documented dependency-provisioning check succeeds.
 
 The offline demo must reproduce: planner task graph creation; wrong coder patch; tester `test_failure`; feedback-driven repair; reviewer approval; Supervisor integration; dangerous-action blocking; strict/balanced/autonomous differences; vector-memory retrieval; and worker cleanup. A real LLM run is supplementary evidence only.
 
 ## 10. Acceptance Criteria
 
-The project is accepted when the owned loop runs with a mock LLM, objective failure feedback changes the next action, all core mechanisms have deterministic tests, governance and approval are enforced, workers run in isolated containers, Supervisor integrates versioned artifacts, SQLite and LanceDB persistence/retrieval work with fallback, CLI and WebUI share `RunService`, credentials remain out of persisted output, `uv` installation and Docker demo work, GitLab `unit-test` passes, and delivery records trace each completed plan task to a commit and fresh verification output.
+The project is accepted when the owned loop runs with a mock LLM, objective failure feedback
+changes the next action, all core mechanisms have deterministic tests, governance and approval
+are enforced, safe patch/delete behavior resists path races, workers run in isolated containers,
+Supervisor integrates versioned artifacts, SQLite and LanceDB persistence/retrieval work with
+fallback, the TUI streams and restores sessions through shared application services, credentials
+remain out of persisted output, `uv tool install` works, the Docker builder exports a tested
+Linux executable plus wheel/sdist/checksums, GitLab `unit-test` passes, both CI systems publish
+artifacts, and delivery records trace each completed plan task to a commit and fresh verification
+output.
 
 ## 11. Risks And Scope Boundaries
 
 Model output differences are controlled by schema validation and bounded feedback. Generic command risk is controlled by argv configuration, policies, resource limits, and containers. LanceDB is rebuildable from SQLite. Multi-agent conflict is explicit rather than silently merged. Docker does not guarantee kernel-level isolation.
 
-The first release does not implement GitHub/GitLab PR automation, arbitrary public-host filesystem access, a hierarchy of supervisors, or language-specific AST analyzers for every language.
+The first release does not implement GitHub/GitLab PR automation, arbitrary public-host filesystem
+access, a hierarchy of supervisors, language-specific AST analyzers for every language, remote
+server deployment, or non-Linux native binaries.

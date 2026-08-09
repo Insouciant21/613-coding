@@ -618,3 +618,25 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Rollback: `613-coding:71c281d` retained on host.
 - No public URL; proxy and ports 80/443 remain outside deployment scope.
 - Local gates: pytest 241 passed (pre-existing Starlette warning); Ruff passed; mypy 82 source files passed; lock check passed; diff check passed.
+
+### 2026-08-09 23:35:22 Asia/Shanghai - TUI, safe mutation, and Cube recovery design
+
+- Task: redesign 613 Coding as a local Claude Code-like TUI/CLI, replace server deployment with
+  binary/package artifacts, harden repository mutation, then finish Cube through the redesigned
+  harness.
+- Skills: `using-superpowers`, `brainstorming`.
+- Credential check: `uv run 613-coding credentials status ai2` returned
+  `ai2: configured (source=keyring)`; no key material was read or emitted.
+- Human decisions: PyInstaller self-contained binary; root command opens the TUI; complete core
+  streaming/approval/diff/resume experience; Linux x86_64 first; Docker as the canonical BuildKit
+  artifact builder; remove the entire main FastAPI/Web/Render surface; retain Cube's local
+  React/FastAPI interface; split work into safe mutation, TUI/distribution, and Cube recovery.
+- Security decision: strict unified-diff `apply_patch`; descriptor-relative no-follow traversal
+  for `delete_file`; preflight semantic errors before mutation and report exact partial I/O state.
+- Current Cube evidence: Task 2 remains committed at `8c052ee`; Task 3 remains worker-authored RED
+  work with 42 focused failures and is not manually replaced.
+- Design artifacts: `2026-08-09-safe-repository-mutations-design.md`,
+  `2026-08-09-613-coding-tui-distribution-design.md`, and
+  `2026-08-09-cube-solver-recovery-design.md` under `docs/superpowers/specs/`.
+- Scope boundary: no implementation code changed during brainstorming. Existing remote-deployment
+  evidence remains historical; no new remote action is required.

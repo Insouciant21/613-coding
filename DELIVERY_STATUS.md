@@ -1,12 +1,18 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-09 14:49:47 (Asia/Shanghai)
-Responsible actor: `/root`; strict package naming is published, CI-verified, and deployed on the loopback SSH service; public reverse proxy remains external.
+Last updated: 2026-08-09 23:35:22 (Asia/Shanghai)
+Responsible actor: `/root`; a user-approved redesign now replaces the Web/remote-deployment
+delivery surface with a local TUI and CI-built executable. Implementation has not started.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
+| Safe repository mutations | design approved; implementation pending | `docs/superpowers/specs/2026-08-09-safe-repository-mutations-design.md` | write and approve implementation plan |
+| Claude Code-like TUI | design approved; implementation pending | `docs/superpowers/specs/2026-08-09-613-coding-tui-distribution-design.md` | write and approve implementation plan |
+| Binary/wheel/sdist artifact builder | design approved; implementation pending | TUI/distribution design; Docker and CI contract | build and execute artifacts after TDD implementation |
+| Main Web/HTTP removal | design approved; implementation pending | revised `SPEC.md` and `AGENTS.md` | prove code, dependency, test, manifest, and documentation removal |
+| Cube recovery through 613 Coding | design approved; blocked on the two harness stages | `docs/superpowers/specs/2026-08-09-cube-solver-recovery-design.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
 | Approved design | complete | `docs/superpowers/specs/2026-08-07-613-coding-design.md`; commits `6ad0eec`, `c4fd219`, `ba03b70` | none |
 | `AGENTS.md` workflow rules | complete | `AGENTS.md`; commit `ba03b70` | keep updated per task |
 | `SPEC.md` | approved with bootstrap revision | `SPEC.md`; commits `a2909c7`, `fc7bf53`; cold-start report incorporated | begin CORE-01 |
@@ -18,16 +24,16 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
 | Container sandbox | complete | SANDBOX-01 `9df471d`; SANDBOX-02 `aa3600a`; SANDBOX-03 `3ec6ac1`; SANDBOX-04 `439540f`; SANDBOX-05 `fb1c222`; reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | retain regression gate |
 | Multi-agent orchestration | complete | MULTI-01 `9744339`; MULTI-02 `5910d7b`; MULTI-03 `43f51fc`; MULTI-04 `11eaef8`; MULTI-05 `376fd41`; reports under `.superpowers/sdd/2026-08-08-613-coding-multi-agent/` | retain regression gate |
-| README and distribution | implemented; local and remote smoke verified | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata, `scripts/smoke_container.sh`; commit `774c07a`; local and Actions evidence below | retain regression gate |
+| README and distribution | existing Web distribution is historical and must be replaced | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata, `scripts/smoke_container.sh`; prior commit `774c07a` | document and verify local TUI/binary distribution |
 | Strict package rename documentation and artifacts | deployed and verified | `eefee2d`; Task 3 artifacts and Task 4 CI/deployment evidence below | retain as regression gate |
 | GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
 | GitHub source publication | complete | `git@github.com:Insouciant21/613-coding.git`; initial source snapshot `f4b9984`; CI repair `341d880`; publication evidence below | keep delivery records synchronized with pushed commits |
 | GitHub Actions CI | passed | branch run `31299368456` and exact-main run `31299431092`; all four jobs succeeded for `eefee2d`, including image build and smoke | retain as the remote regression gate |
-| SSH deployment | complete on loopback | `edward@int21`; image `613-coding:eefee2d`; `127.0.0.1:8613`; renamed CLI, legacy absence, health, WebUI, security settings, old state, and new-run restart persistence verified | operator configures reverse proxy without changing the application bind |
-| Deployment manifest | published; optional | `render.yaml`; SSH deployment is the currently verified runtime | use only if an additional Render deployment is desired |
-| Public WebUI URL | not verified | SSH service is intentionally loopback-only; `docs/deployment.md` records the proxy target | operator configures and validates the domain/reverse proxy |
+| Historical SSH deployment | prior evidence retained; no longer a deliverable | `edward@int21`; image `613-coding:eefee2d`; prior loopback evidence below | no new deployment or reverse proxy work |
+| Deployment manifest | removal pending | `render.yaml` is superseded by the approved local-artifact design | delete during Web/HTTP removal task |
+| Public WebUI URL | removed from product scope | approved TUI/distribution design | no action |
 | Reflection | reserved for student | `REFLECTION.md` contains an explicit student-authored boundary and no AI-written narrative | student writes the final report |
 | Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |
 

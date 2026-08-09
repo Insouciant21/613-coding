@@ -58,11 +58,63 @@ This file records the human decisions and evidence that produced the approved 61
 - User direction: automatically record delivery requirements in project record files.
 - Decision: maintain `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, and a new `DELIVERY_STATUS.md` summary. Record successes, failures, pauses, approvals, user edits, deviations, commits, commands, verification output, and CI/CD evidence. Never mark an unrun command as passing.
 
+### Iteration 8: Local TUI product direction
+
+- User direction: remove the 613 Coding WebUI, replace it with a Claude Code-like interactive
+  TUI, stop treating remote deployment as a deliverable, and use Docker as the reproducible
+  release builder.
+- Entry-point decision: `613-coding` opens the TUI in the current repository;
+  `613-coding "task"` starts with an initial task; existing operational subcommands remain
+  scriptable.
+- Interaction decision: the first TUI release includes real streaming, tool state, diffs,
+  validation, approval, multiline input, interruption, follow-up turns, and session recovery.
+- Framework decision: use Textual as a presentation adapter over application services, with
+  SQLite-authoritative `InteractiveSession` state and an ephemeral progress sink.
+- Removed boundary: the main project will have no FastAPI, browser assets, HTTP server, Render
+  manifest, reverse proxy contract, remote host, or public URL requirement.
+
+### Iteration 9: Binary and build distribution
+
+- Binary choice: PyInstaller single-file Linux x86_64 executable, requiring no host Python, while
+  continuing to publish wheel and sdist.
+- Docker choice: a pinned multi-stage Dockerfile is the sole canonical artifact builder and has no
+  product runtime stage.
+- CI/CD choice: GitHub and GitLab execute and upload the binary, wheel, sdist, and checksums. Tag
+  builds attach the verified files to releases.
+- Runtime boundary: Docker Engine remains required only when users execute isolated workers.
+
+### Iteration 10: Safe mutation and Cube recovery
+
+- Security direction: add a versioned schema-validated unified-diff `apply_patch` and redesign
+  `delete_file` with descriptor-relative `O_NOFOLLOW` traversal and unlinking.
+- Scope split: (1) safe repository mutations, (2) TUI/Web removal/distribution, then (3) Cube
+  recovery and completion through 613 Coding.
+- Cube boundary: the Cube Solver keeps its React/Three.js/FastAPI local browser architecture;
+  WebUI removal applies only to 613 Coding.
+- Recovery decision: preserve Task 2 commit and all worker-authored RED Task 3 artifacts. Resume
+  with small patch operations after the harness mutation and TUI work is verified.
+- Credential evidence: `ai2: configured (source=keyring)` was verified without reading or
+  displaying key material.
+
+Iterations 8 through 10 supersede only the WebUI, remote-deployment, release-container, terminal
+interaction, and repository-mutation decisions recorded in Iterations 2 and 3. The owned feedback
+loop, governance, SQLite/LanceDB authority, worker sandbox, and multi-agent decisions remain in
+force.
+
 ## Approaches Considered
 
 1. Core state machine with CLI/WebUI adapters: selected because it gives clear injectable boundaries and a deep feedback mechanism.
 2. Full event-sourced workflow engine: adopted only for structured events, not full replay infrastructure, to control scope.
 3. Plugin-first platform: rejected as the primary structure because it would dilute the feedback-loop contribution.
+
+### 2026-08-09 Redesign Approaches
+
+1. Three sequential subprojects: selected because safe mutation is a prerequisite for reliable
+   TUI-driven Cube work and each stage has an independent security or product acceptance boundary.
+2. One combined harness rewrite followed by Cube: rejected because mutation security, streaming
+   state, presentation removal, and binary packaging would be too large for one reviewable unit.
+3. TUI before mutation hardening: rejected because it would expose a polished interface while the
+   agent still lacked a reliable focused-edit primitive.
 
 ## Cold-Start Validation
 

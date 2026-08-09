@@ -23,19 +23,17 @@ Record any justified deviation from the course workflow in `AGENT_LOG.md` with t
 
 ## Current Phase Gate
 
-The approved brainstorming design is stored at:
+The original approved design remains at
+`docs/superpowers/specs/2026-08-07-613-coding-design.md`. The current redesign is defined by:
 
-`docs/superpowers/specs/2026-08-07-613-coding-design.md`
+- `docs/superpowers/specs/2026-08-09-safe-repository-mutations-design.md`;
+- `docs/superpowers/specs/2026-08-09-613-coding-tui-distribution-design.md`;
+- `docs/superpowers/specs/2026-08-09-cube-solver-recovery-design.md`.
 
-Do not write implementation code until all of the following are complete:
-
-- `SPEC.md` is approved.
-- `PLAN.md` is approved.
-- `SPEC_PROCESS.md` records the required brainstorming iterations.
-- A different agent type has cold-started 1-2 plan tasks using only `SPEC.md` and `PLAN.md`.
-- Defects found by the cold-start trial are incorporated into the spec and plan.
-
-Documentation and planning changes are allowed during this phase.
+The older WebUI/runtime-container plans and evidence are historical, not authorization to retain
+those product surfaces. Do not write implementation code for the redesign until detailed plans
+have been written with `writing-plans` and approved by the user. Documentation and planning
+changes are allowed during this phase.
 
 ## Required Superpowers Workflow
 
@@ -74,9 +72,10 @@ Keep these responsibilities separate:
 - `domain`: value objects, states, events, policies, and interfaces with no infrastructure imports.
 - `application`: `AgentLoop`, `RunService`, `Supervisor`, context assembly, artifact integration, and use cases.
 - `ports`: LLM, embedding, tools, policy, validators, memory, events, sandbox, and artifact interfaces.
-- `adapters`: OpenAI-compatible APIs, mock providers, filesystem, subprocess, SQLite, LanceDB, keyring, Docker, CLI, and FastAPI.
+- `adapters`: OpenAI-compatible APIs, mock providers, filesystem, subprocess, SQLite, LanceDB,
+  keyring, Docker worker execution, CLI, and Textual TUI.
 
-Do not let CLI or WebUI contain business rules. Both must call the same application services.
+Do not let CLI or TUI contain business rules. Both must call the same application services.
 
 Prefer focused modules with explicit interfaces over large manager classes. Do not add an abstraction unless it protects a real boundary or removes meaningful duplication.
 
@@ -255,9 +254,16 @@ GitLab CI must include a job named `unit-test`. CI must run the offline unit sui
 Provide both:
 
 - a Python package installable through the documented `uv tool install` path;
-- a Docker image that starts the sandboxed demonstration WebUI.
+- a self-contained Linux x86_64 TUI/CLI executable built with PyInstaller.
 
-README must document installation, local CLI use, WebUI use, Docker requirements, keyring setup, `.env` risks, supported platforms, sandbox limits, and public-demo boundaries.
+The pinned multi-stage Dockerfile is a reproducible artifact builder only. It exports the binary,
+wheel, sdist, and checksums and does not start a WebUI or other product service. GitLab and GitHub
+CI must execute and upload these artifacts.
+
+README must document installation, local TUI and CLI use, artifact verification, Docker Engine
+requirements for worker sandboxes, keyring setup, `.env` risks, supported platforms, and sandbox
+limits. Do not require Render, SSH deployment, reverse proxy configuration, a domain, or a public
+server URL.
 
 ## Required Project Documents
 
