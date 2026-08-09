@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 03:21:46 (Asia/Shanghai)
+Last updated: 2026-08-10 03:35:00 (Asia/Shanghai)
 Responsible actor: `/root/tui_task2_finish` for locally verified TUI-02 recovery; safe repository mutations Tasks 1-4 are reviewed and integrated into `main` at `69caa09`; TUI-01 and TUI-02 are locally verified in the TUI/distribution worktree; published deployment remains unchanged.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -8,7 +8,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
-| Claude Code-like TUI | TUI-01 session persistence and TUI-02 streaming/progress contracts complete locally; TUI-03 through TUI-09 pending | design `e7f7ece`; plan `9ee205d`; commits `66c11d8`, `b45bb71`, `c23f217`, `330d4a5`; Task 2 evidence below | begin TUI-03 loop progress and cooperative pause |
+| Claude Code-like TUI | TUI-01 complete; TUI-02 implementation and review fix verified locally; TUI-03 through TUI-09 pending | design `e7f7ece`; plan `9ee205d`; commits `66c11d8`, `b45bb71`, `c23f217`, `330d4a5`, pending fix commit; Task 2 evidence below | scoped re-review, then begin TUI-03 loop progress and cooperative pause |
 | Binary/wheel/sdist artifact builder | design approved; implementation pending | TUI/distribution design; Docker and CI contract | build and execute artifacts after TDD implementation |
 | Main Web/HTTP removal | design approved; implementation pending | revised `SPEC.md` and `AGENTS.md` | prove code, dependency, test, manifest, and documentation removal |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
@@ -377,6 +377,10 @@ Every completed plan task must link a commit and fresh verification output here.
   `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-2-report.md`.
 - CI/CD: no Task 2 remote pipeline was triggered. The latest recorded GitHub Actions result remains
   `31299431092` passed; the next pipeline must cover the TUI branch changes before remote delivery.
+- Review fix round 1: missing streamed tool-call IDs now raise `ProviderResponseError` instead of
+  receiving a fabricated audit ID. Focused suite passed 31; full offline suite passed 343 with the
+  existing Starlette/httpx warning; Ruff, mypy, lock, and diff checks passed. Scoped re-review is
+  still required before marking TUI-02 complete.
 
 ## CI and Deployment Manifest Evidence
 

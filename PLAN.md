@@ -247,6 +247,11 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   `uv lock --check` and `git diff --check` passed.
 - Boundaries: no `tmp/cube`, `.claude/`, course requirement, credential, deployment, Web removal,
   TUI view, or later-task file changed. `RunProgress` remains ephemeral; no progress is persisted.
+- Review fix round 1: independent review found streamed tool calls fabricated `call-{index}` when
+  the provider omitted an ID. TDD RED failed the new missing-ID regression; the parser now rejects
+  incomplete streamed tool calls and uses only provider-supplied IDs. Focused suite passed 31,
+  full offline suite passed 343 with the same existing warning, Ruff/mypy/lock/diff checks passed.
+- Review status: fix finding addressed; scoped re-review remains required before TUI-02 is closed.
 - Source record: `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-2-report.md`.
 
 ## SSH Deployment Follow-up

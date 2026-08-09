@@ -106,11 +106,13 @@ class OpenAICompatibleLLM:
                     self._accumulate_stream_chunk(chunk, content_parts, tool_calls, on_text_delta)
                 if not saw_done:
                     raise ProviderResponseError("provider stream ended before [DONE]")
+                if any(not value["id"] for value in tool_calls.values()):
+                    raise ProviderResponseError("provider stream tool call has no id")
                 message: dict[str, Any] = {
                     "content": "".join(part for index in sorted(content_parts) for part in content_parts[index]),
                     "tool_calls": [
                         {
-                            "id": value.get("id", f"call-{index}"),
+                            "id": value["id"],
                             "type": "function",
                             "function": {
                                 "name": value.get("name", ""),

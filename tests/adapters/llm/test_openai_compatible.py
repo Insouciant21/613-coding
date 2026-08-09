@@ -261,3 +261,36 @@ def test_openai_adapter_rejects_invalid_stream_tool_call_containers_and_fragment
         provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
         with pytest.raises(ProviderResponseError):
             provider.complete_stream(ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False)
+
+
+def test_openai_adapter_rejects_stream_tool_call_without_provider_id() -> None:
+    event = json.dumps(
+        {
+            "choices": [
+                {
+                    "delta": {
+                        "tool_calls": [
+                            {
+                                "index": 0,
+                                "function": {"name": "read_file", "arguments": "{}"},
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    )
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=f"data: {event}\n\ndata: [DONE]\n\n",
+            request=request,
+        )
+    )
+    with httpx.Client(transport=transport) as client:
+        provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+        with pytest.raises(ProviderResponseError):
+            provider.complete_stream(
+                ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False
+            )

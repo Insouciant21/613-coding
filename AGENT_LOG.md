@@ -785,3 +785,19 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   exceptions.
 - Commit: `330d4a5` (`feat: stream provider progress through application ports`). No human
   implementation edit, deployment action, real credential read, or remote CI run occurred.
+### 2026-08-10 03:35:00 Asia/Shanghai - TUI distribution Task 2 review fix round 1
+
+- Task: address the independent Task 2 review finding that streamed tool calls fabricated a
+  `call-{index}` ID when the provider omitted one; triggered `receiving-code-review`,
+  `systematic-debugging`, `test-driven-development`, and `verification-before-completion`.
+- Root cause evidence: the aggregate state used an empty ID sentinel, but final message assembly
+  called `value.get("id", f"call-{index}")`, so an explicitly empty/missing ID bypassed the normal
+  parser's required-ID validation.
+- TDD RED: the new missing-ID SSE regression failed with `Failed: DID NOT RAISE
+  ProviderResponseError`.
+- Fix: reject any aggregated tool call with an empty provider ID after `[DONE]`; final assembly now
+  passes only the provider-supplied ID. No other behavior changed.
+- GREEN: focused Task 2 suite passed 31; full offline suite passed 343 with one existing
+  Starlette/httpx warning; Ruff, mypy for 14 source files, `uv lock --check`, and `git diff --check`
+  passed.
+- Review state: initial Important finding addressed in the fix diff; scoped re-review required.
