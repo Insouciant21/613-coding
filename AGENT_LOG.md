@@ -640,3 +640,4 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   `2026-08-09-cube-solver-recovery-design.md` under `docs/superpowers/specs/`.
 - Scope boundary: no implementation code changed during brainstorming. Existing remote-deployment
   evidence remains historical; no new remote action is required.
+- Design commit: `e7f7ece` (`docs: redesign local tui and artifact delivery`).
