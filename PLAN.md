@@ -123,9 +123,9 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 
 ## Real-provider Worker Reliability Repair Evidence
 
-- Status: implementation and review repair complete through `80f6c85` and `da9cda5`; scoped re-review pending.
+- Status: implementation and two review repair rounds complete through `80f6c85`, `da9cda5`, and `ee05b2a`; second scoped re-review pending.
 - Scope: stable goal-directed worker context, configured permission-mode inheritance, repository file deletion, policy/role/progress integration, and symlink-safe unlink semantics.
-- Verification: real-provider Cube foundation run `46ec4663-1c43-41e7-95d7-ce31f3b7d489` completed successfully; fresh harness verification passed 258 tests, Ruff, mypy across 82 source files, lock check, and diff check.
+- Verification: real-provider Cube foundation run `46ec4663-1c43-41e7-95d7-ce31f3b7d489` completed successfully; fresh harness verification passed 260 tests, Ruff, mypy across 82 source files, lock check, and diff check.
 - Evidence: `AGENT_LOG.md` entry `2026-08-09 22:20:00 Asia/Shanghai`; target operation details remain append-only in `tmp/cube/AGENT_LOG.md`.
 
 ## CI and Deployment Manifest Evidence
