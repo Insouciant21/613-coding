@@ -361,3 +361,5 @@ Every completed plan task must link a commit and fresh verification output here.
 - REMOTE-CI-02 | 60ce34bf795f04f3c33d2d25fb24468d1c9cad82 | pass | main 60ce34b passed: unit-test, quality, demo, package-and-container; Docker build and smoke passed
 
 - REMOTE-CI-03 | cf7f8a5ee387965003f76bd1f374a288bc0067c0 | pass | main cf7f8a5 passed: unit-test, quality, demo, package-and-container; Docker build and smoke passed
+
+- DEPLOY-01 | 35a383a9bed47d5fc50c691655e71eb18d630348 | blocked | Render API returned HTTP 401; no Render credential or deployed service URL is available

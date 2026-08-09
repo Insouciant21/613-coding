@@ -559,3 +559,10 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Status: pass
 - Command: `gh run watch 31288535830 --repo Insouciant21/613-coding --exit-status`
 - Result: main cf7f8a5 passed: unit-test, quality, demo, package-and-container; Docker build and smoke passed
+
+### 2026-08-09 09:43:50 CST (Asia/Shanghai) - DEPLOY-01
+
+- Evidence: DEPLOY-01 | 35a383a9bed47d5fc50c691655e71eb18d630348
+- Status: blocked
+- Command: `curl -sS -o /tmp/613-render-api-response -w render_api_http=%{http_code} https://api.render.com/v1/services`
+- Result: Render API returned HTTP 401; no Render credential or deployed service URL is available
