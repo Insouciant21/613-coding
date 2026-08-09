@@ -103,6 +103,20 @@ def test_filesystem_rejects_symlink_in_delete_parent_path(
     assert target.read_text(encoding="utf-8") == "keep\n"
 
 
+@pytest.mark.parametrize("path", [".git/config", ".613-coding/state.db"])
+def test_filesystem_rejects_deletion_under_protected_root(
+    tmp_path: Path, path: str
+) -> None:
+    target = tmp_path / path
+    target.parent.mkdir()
+    target.write_text("protected\n", encoding="utf-8")
+
+    with pytest.raises(PathOutsideRepositoryError):
+        FilesystemTools(tmp_path).delete_file(path)
+
+    assert target.read_text(encoding="utf-8") == "protected\n"
+
+
 def test_delete_file_is_anchored_when_parent_path_is_swapped(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

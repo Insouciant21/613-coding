@@ -28,6 +28,7 @@ class InvalidUtf8Error(FilesystemToolError):
 
 
 class FilesystemTools:
+    _PROTECTED_DELETE_ROOTS: ClassVar[frozenset[str]] = frozenset({".613-coding", ".git"})
     _IGNORED_DIRECTORIES: ClassVar[frozenset[str]] = frozenset(
         {
             ".613-coding",
@@ -113,6 +114,8 @@ class FilesystemTools:
     def _parent_descriptor(self, path: Path, *, create: bool = False) -> tuple[int, str]:
         if "\x00" in str(path) or path.is_absolute() or ".." in path.parts or not path.parts:
             raise PathOutsideRepositoryError("path must be repository-relative")
+        if path.parts[0] in self._PROTECTED_DELETE_ROOTS:
+            raise PathOutsideRepositoryError("delete path is protected")
 
         directory_flags = (
             os.O_RDONLY
