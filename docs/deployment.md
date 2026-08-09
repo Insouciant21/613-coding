@@ -1,58 +1,65 @@
-# Deployment And Operations
+# Local Distribution And Operations
 
-## Acquisition
+613 Coding is a local TUI/CLI application. There is no product server process to configure.
+
+## Python Package
 
 Use Python 3.12+ managed by `uv`:
 
 ```bash
-uv sync --all-extras
-uv run pytest
+uv sync --all-extras --frozen
+uv run pytest -q --ignore=tmp
 uv build
 uv tool install .
-613-coding web --host 127.0.0.1 --port 8000
+613-coding --help
 ```
 
-The Docker demonstration uses `docker build -t 613-coding .` and `docker run --rm -p 8000:8000 613-coding`. The image starts the local FastAPI console and exposes `/healthz`. CLI/API adapters use the local SQLite/LanceDB composition by default; resuming a run requires an injected real `LLMProvider`, and provider/policy composition stays outside presentation code.
+Run a repository task with `uv run 613-coding --repo PATH "task"`, resume with
+`uv run 613-coding --resume latest`, and use the management commands for credentials, config, runs,
+and deterministic demos.
 
 ## Credentials And Configuration
 
-`613-coding credentials set PROVIDER` reads the key with hidden terminal input and stores it in the operating-system keyring. Status output contains only provider, configured state, and source metadata. `credentials clear` removes the entry.
+Configure only non-secret provider metadata in `harness.toml` and store the provider key through
+the OS keyring. Status output is metadata-only. `.env` is an explicit development fallback with
+plaintext and process-environment exposure risk; it is ignored by Git and never copied into build
+layers.
 
-`.env` is an explicit development fallback only. It is ignored by Git and Docker, remains plaintext, and can leak through process environments. Never put a provider key in `harness.toml`, SQLite, LanceDB, prompts, event payloads, CI files, or worker containers.
+SQLite remains the source of truth for runs, events, approvals, sessions, task graphs, memory text,
+and audit state. LanceDB stores redacted, rebuildable vectors linked to SQLite IDs.
 
-Configure a real OpenAI-compatible provider with metadata only:
+## Artifact Verification
 
-```toml
-[llm]
-provider = "openai-compatible"
-base_url = "https://api.openai.com/v1"
-model = "gpt-4o-mini"
-credential = "openai"
-timeout_seconds = 60.0
+The pinned multi-stage Dockerfile is an artifact builder only. It exports a Linux x86_64 executable,
+wheel, sdist, and `SHA256SUMS`; it does not start a product service. Verify downloaded files before
+installation:
+
+```bash
+sha256sum -c SHA256SUMS
+uv tool install 613_coding-*.whl
+./613-coding
 ```
 
-Then run `613-coding credentials set openai`. The provider reads the key lazily from the OS keyring on its first call and keeps it only in the ephemeral HTTP client. The local composition registers bounded file/search/diff tools and executes only validation commands declared in `harness.toml`. Missing credentials remain a controlled provider error; no key is written to repository configuration, SQLite, LanceDB, events, prompts, subprocess arguments, or container environments.
+The standalone executable runs without host Python. The Python package is the portable option on
+platforms without a published executable.
 
-## Runtime Boundary
+## Worker Sandbox
 
-The public WebUI calls only the API and must be limited to an example repository or isolated upload. It must never accept an arbitrary host path. Worker execution uses short-lived non-root containers with read-only roots, dropped capabilities, default-deny network, finite CPU/memory/PID/disk/time/output limits, and no Docker socket mount. The Docker adapter passes the disk bound through `storage_opt`; the host Docker storage driver must support project quotas, otherwise container creation fails and its workspace is cleaned up. These controls reduce ordinary untrusted-code impact but do not guarantee protection from kernel or runtime vulnerabilities.
+Real repository tool execution requires Docker Engine. Each worker is short-lived and runs as a
+non-root user with a read-only root filesystem, dropped Linux capabilities, default-deny network,
+bounded CPU/memory/PIDs/disk/time/output, and cleanup after terminal state. The original repository,
+host home, credential directories, SSH agents, and Docker socket are never mounted writable. These
+limits reduce ordinary untrusted-code impact but do not protect against kernel or runtime
+vulnerabilities.
 
-SQLite is the source of truth for runs, events, approvals, task graphs, memory text, and audit state. LanceDB stores redacted vectors linked to SQLite IDs and can be rebuilt. If embeddings fail, SQLite keyword retrieval remains available.
+## CI
 
-## GitLab CI/CD
+GitLab CI has a required `unit-test` job and builds the same artifacts as the Docker builder. GitHub
+Actions runs the offline suite, deterministic mechanism demo, quality checks, and artifact upload.
+No network access or real provider key is needed for unit tests.
 
-`.gitlab-ci.yml` defines `unit-test`, `lint`, `typecheck`, `demo`, `build`, and `docker-build` stages. `.github/workflows/ci.yml` provides equivalent push/PR checks when the repository is hosted on GitHub. Jobs use locked `uv` dependencies, run tests/demos, build the package, build the digest-pinned Docker image, and run `scripts/smoke_container.sh` to verify the health check, non-root `coding` user, and cleanup. `scripts.record_delivery` validates a Git commit and appends command/result evidence without converting failures into passes.
+## Limitations
 
-## SSH Deployment
-
-Commit `eefee2dd2a2f33ea9921fe0ce147e88719d4b14d` is deployed on `edward@int21` as image `613-coding:eefee2d` with image ID `sha256:61d42ea1397ba878caf0a04592b3b6c1637c9ee9537deb3b2657ab91a913b0b2`. The service binds only to `127.0.0.1:8613`; an operator-managed reverse proxy should target `http://127.0.0.1:8613` and use `/healthz` for health checks. Ports 80 and 443 are intentionally untouched.
-
-The immutable release source is under `/home/edward/services/613-coding/releases/eefee2d`. Persistent SQLite and LanceDB state lives under `/home/edward/services/613-coding/data`, mounted at `/app/.613-coding`. Back up this data directory before migrations or destructive maintenance. The `613-coding` container runs as UID 10001 with a read-only root, a bounded `/tmp` tmpfs, all capabilities dropped, `no-new-privileges`, 1 GiB memory, one CPU, a 256 PID limit, and `unless-stopped` restart policy.
-
-## Limitations And Evidence
-
-The Docker Engine is an operator prerequisite for real worker containers. In IPv6-restricted environments, Docker Hub OAuth may reset before a build; an approved registry mirror can be used only when it resolves to the Dockerfile's pinned digest. Main commit `eefee2dd2a2f33ea9921fe0ce147e88719d4b14d` passed [GitHub Actions run 31299431092](https://github.com/Insouciant21/613-coding/actions/runs/31299431092), including the pinned build and smoke gate. The deployed container exposes the renamed `613-coding` command, and the legacy executable is absent. The SSH verification returned 200 for `/`, `/healthz`, existing runs `c0313a2c-7513-4a7b-a594-9afe0d31dc70` and `b9bc83a2-dac2-48c3-a15a-8bae7568118b`, and new run `de1c5292-d40f-4924-8d0d-2d85df1b4731` both before and after container restart. `render.yaml` remains an optional operator-controlled deployment declaration. The SSH service has no verified public URL until the operator configures and validates the reverse proxy. Deployed URL: not verified; any public endpoint remains unverified.
-
-## Directory Layout
-
-`src/coding613/domain` contains infrastructure-free value objects; `application` owns the loop, RunService, Supervisor, policy, feedback, and integration; `adapters` contain SQLite/LanceDB, keyring, Docker, filesystem, CLI, API, and WebUI boundaries. `tests/` mirrors those contracts and all tests run without a real LLM.
+The initial standalone release supports Linux x86_64. Interactive model calls require a configured
+OpenAI-compatible endpoint and keyring entry. Unattended runs require a finite model-call or cost
+budget. Docker Engine and a compatible storage driver are prerequisites for worker sandbox runs.
