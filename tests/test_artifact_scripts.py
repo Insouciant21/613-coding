@@ -115,3 +115,13 @@ def test_smoke_artifacts_propagates_checksum_failure(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 7
+
+
+def test_smoke_executes_runtime_commands_from_binary_and_wheel() -> None:
+    script = (ROOT / "scripts/smoke_artifacts.sh").read_text(encoding="utf-8")
+
+    assert '"$BINARY" config check' in script
+    assert '"$BINARY" demo core' in script
+    assert '"$TEMP_DIR/venv/bin/613-coding" config check' in script
+    assert '"$TEMP_DIR/venv/bin/613-coding" demo core' in script
+    assert "uv run 613-coding" not in script

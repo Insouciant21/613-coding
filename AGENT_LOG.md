@@ -920,3 +920,19 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   and retained its direct smoke call. A stricter job-boundary RED reproduced both omissions;
   `docker-build` now declares `before_script: []` and only exports artifacts, while the dependent
   Python job exclusively owns smoke validation.
+
+### 2026-08-10 05:19:25 Asia/Shanghai - final TUI recovery and artifact review fixes
+
+- Independent merge review reported incomplete paused-run continuation, missing approval recovery
+  after process restart, and a weak artifact smoke that executed only `--help` from deliverables.
+- TDD RED: four tests failed on no same-run execution after paused resume, absent reconstructed
+  approval IDs/view, and missing binary/wheel runtime commands.
+- Fix: controller resume rebuilds the authoritative Run summary, continues the same `PAUSED` run,
+  preserves `WAITING_APPROVAL` without executing it, resets cancellation before execution, and
+  lets the TUI restore the exact pending approval while the composer remains disabled.
+- Artifact fix: both standalone binary and clean-installed wheel now run `config check` and the
+  complete offline core feedback demo in isolated directories; source-checkout `uv run
+  613-coding` no longer substitutes for deliverable execution.
+- Verification: focused recovery/artifact suite passed 17; TUI/CLI/application/distribution suite
+  passed 111; full offline suite passed 392; Ruff, mypy, lock, and diff checks passed. Fresh build
+  produced a 155M x86-64 ELF plus wheel/sdist/checksums, and enhanced artifact smoke passed.

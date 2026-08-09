@@ -10,7 +10,7 @@ from uuid import UUID
 from coding613.application.interactive import InteractiveSnapshot
 from coding613.application.progress import CancellationToken
 from coding613.domain.interactive import InteractiveSession
-from coding613.domain.models import ApprovalRequest, PermissionMode, RunSummary
+from coding613.domain.models import ApprovalRequest, PermissionMode, RunState, RunSummary
 from coding613.ports.progress import ProgressSink, RunProgress
 
 
@@ -44,6 +44,8 @@ class RunActions(Protocol):
     def reject(self, request_id: UUID) -> Any: ...
 
     def get_approval(self, request_id: UUID) -> ApprovalRequest: ...
+
+    def get_summary(self, run_id: UUID) -> RunSummary: ...
 
 
 class QueueProgressSink:
@@ -84,6 +86,7 @@ class TuiController:
             )
             self.active_run_id = run.id
             self._pause_requested_for = None
+            self._cancellation.reset()
             summary = await asyncio.to_thread(
                 self._interactive.execute,
                 run.id,
@@ -142,6 +145,15 @@ class TuiController:
         self.active_run_id = (
             self._snapshot.active_run.id if self._snapshot.active_run is not None else None
         )
+        self.last_summary = None
+        if self._snapshot.active_run is not None:
+            self.last_summary = await asyncio.to_thread(
+                self._runs.get_summary, self._snapshot.active_run.id
+            )
+            if self._snapshot.active_run.state is RunState.PAUSED:
+                continued = await self._continue_active()
+                assert continued is not None
+                return continued
         return self._snapshot
 
     async def list_sessions(self) -> list[InteractiveSession]:
@@ -160,6 +172,7 @@ class TuiController:
         session = await asyncio.to_thread(self._interactive.create)
         self._session_id = session.id
         self.active_run_id = None
+        self.last_summary = None
         self._snapshot = await asyncio.to_thread(
             self._interactive.resume_session, session.id
         )
@@ -176,6 +189,8 @@ class TuiController:
     async def _continue_active(self) -> InteractiveSnapshot | None:
         if self.active_run_id is None or self._session_id is None:
             return self._snapshot
+        self._pause_requested_for = None
+        self._cancellation.reset()
         summary = await asyncio.to_thread(
             self._interactive.execute,
             self.active_run_id,

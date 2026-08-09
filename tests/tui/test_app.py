@@ -164,6 +164,24 @@ class FakeUiServices:
     def get_approval(self, request_id):
         return self.approvals[request_id]
 
+    def get_summary(self, run_id):
+        run = next(run for run in self.runs if run.id == run_id)
+        approvals = tuple(
+            request.id
+            for request in self.approvals.values()
+            if request.run_id == run_id and request.status is ApprovalStatus.PENDING
+        )
+        return RunSummary(
+            run_id=run_id,
+            status=run.state,
+            stop_reason=(
+                StopReason.APPROVAL_REQUIRED
+                if run.state is RunState.WAITING_APPROVAL
+                else run.stop_reason
+            ),
+            approvals=approvals,
+        )
+
 
 def _long_patch() -> str:
     additions = "".join(f"+line {index}\n" for index in range(200))
@@ -293,6 +311,32 @@ async def test_tui_approval_keyboard_action_resumes_same_run() -> None:
         assert fake.approve_calls == [approval_id]
         assert not app.query(ApprovalView)
         assert not composer.disabled
+
+
+@pytest.mark.asyncio
+async def test_tui_resume_restores_pending_approval_view() -> None:
+    fake = FakeUiServices()
+    run = fake.submit(fake.session.id, "approval")
+    request = ApprovalRequest(
+        run_id=run.id,
+        action=ToolCall(name="apply_patch", arguments={"patch": _long_patch()}),
+        reason="strict mode requires approval",
+    )
+    fake.approvals[request.id] = request
+    fake.runs[-1] = run.model_copy(
+        update={"state": RunState.WAITING_APPROVAL, "updated_at": datetime.now(UTC)}
+    )
+    app = CodingApp(controller=_controller(fake), resume="latest")
+
+    async with app.run_test(size=(80, 24)) as pilot:
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if app.query(ApprovalView):
+                break
+
+        approval = app.query_one(ApprovalView)
+        assert approval.action_fingerprint
+        assert app.query_one(TaskComposer).disabled
 
 
 @pytest.mark.asyncio

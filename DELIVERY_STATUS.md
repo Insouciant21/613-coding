@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 05:10:46 (Asia/Shanghai)
+Last updated: 2026-08-10 05:19:25 (Asia/Shanghai)
 Responsible actor: `/root` for locally verified TUI-08; safe repository mutations Tasks 1-4 are reviewed and integrated into `main` at `69caa09`; TUI-01 through TUI-08 are locally verified in the TUI/distribution worktree; published deployment remains unchanged.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -8,7 +8,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
-| Claude Code-like TUI | TUI-01 through TUI-08 implementation/fix verified locally; TUI-09 documentation/Cube handoff pending | design `e7f7ece`; plan `9ee205d`; commits `048bdbc`, `4877a7f`; TUI-08 evidence below | broad branch review must include an independent review of the recorded external-review gap, then begin TUI-09 |
+| Claude Code-like TUI | TUI-01 through TUI-08 implementation/fix verified locally; final recovery review fixes verified | design `e7f7ece`; plan `9ee205d`; commits `048bdbc`, `4877a7f`; paused/approval recovery evidence in `AGENT_LOG.md` | merge verified branch to main and rerun acceptance gates |
 | Binary/wheel/sdist artifact builder | locally built and Docker-exported; CI workflows updated | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08 evidence below | commit after broad review and retain CI artifact upload gate |
 | Main Web/HTTP removal | design approved; implementation pending | revised `SPEC.md` and `AGENTS.md` | prove code, dependency, test, manifest, and documentation removal |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |

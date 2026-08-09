@@ -17,6 +17,7 @@ class FakeInteractive:
         self.session = InteractiveSession(project_id=uuid4())
         self.runs: list[Run] = []
         self.transcript: list[TranscriptEntry] = []
+        self.execute_calls: list[object] = []
 
     def create(self, title=None):
         self.session = InteractiveSession(project_id=self.session.project_id, title=title)
@@ -37,6 +38,7 @@ class FakeInteractive:
         return run
 
     def execute(self, run_id, progress, cancellation):
+        self.execute_calls.append(run_id)
         progress.publish(RunProgress(run_id=run_id, kind=ProgressKind.TEXT_DELTA, text="hel"))
         progress.publish(RunProgress(run_id=run_id, kind=ProgressKind.TEXT_DELTA, text="lo"))
         self.transcript.append(TranscriptEntry(role="assistant", text="hello", run_id=run_id))
@@ -54,9 +56,11 @@ class FakeInteractive:
         )
 
     def resume_session(self, session_id):
+        active = next((run for run in reversed(self.runs) if not run.state.is_terminal), None)
         return InteractiveSnapshot(
             session=self.session,
             runs=tuple(self.runs),
+            active_run=active,
             transcript=tuple(self.transcript),
         )
 
@@ -64,6 +68,7 @@ class FakeInteractive:
 class FakeRuns:
     def __init__(self) -> None:
         self.pause_calls: list[object] = []
+        self.summaries: dict[object, RunSummary] = {}
 
     def pause(self, run_id):
         self.pause_calls.append(run_id)
@@ -74,6 +79,9 @@ class FakeRuns:
 
     def reject(self, request_id):
         return request_id
+
+    def get_summary(self, run_id):
+        return self.summaries[run_id]
 
 
 @pytest.mark.asyncio
@@ -108,3 +116,52 @@ async def test_controller_pause_calls_run_service_once() -> None:
     await controller.pause()
 
     assert runs.pause_calls == [run.id]
+
+
+@pytest.mark.asyncio
+async def test_controller_resume_continues_same_paused_run() -> None:
+    interactive = FakeInteractive()
+    paused = Run(
+        project_id=interactive.session.project_id,
+        session_id=interactive.session.id,
+        task="repair",
+        state=RunState.PAUSED,
+    )
+    interactive.runs.append(paused)
+    runs = FakeRuns()
+    runs.summaries[paused.id] = RunSummary(run_id=paused.id, status=RunState.PAUSED)
+    controller = TuiController(interactive, runs)
+
+    snapshot = await controller.resume("latest")
+
+    assert interactive.execute_calls == [paused.id]
+    assert snapshot.runs[-1].id == paused.id
+    assert snapshot.runs[-1].state is RunState.COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_controller_resume_reconstructs_pending_approval_summary() -> None:
+    interactive = FakeInteractive()
+    waiting = Run(
+        project_id=interactive.session.project_id,
+        session_id=interactive.session.id,
+        task="approval",
+        state=RunState.WAITING_APPROVAL,
+    )
+    interactive.runs.append(waiting)
+    approval_id = uuid4()
+    runs = FakeRuns()
+    runs.summaries[waiting.id] = RunSummary(
+        run_id=waiting.id,
+        status=RunState.WAITING_APPROVAL,
+        stop_reason=StopReason.APPROVAL_REQUIRED,
+        approvals=(approval_id,),
+    )
+    controller = TuiController(interactive, runs)
+
+    snapshot = await controller.resume("latest")
+
+    assert snapshot.active_run == waiting
+    assert controller.last_summary is not None
+    assert controller.last_summary.approvals == (approval_id,)
+    assert interactive.execute_calls == []

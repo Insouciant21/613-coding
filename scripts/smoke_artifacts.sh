@@ -23,11 +23,14 @@ cleanup() {
 trap cleanup EXIT
 
 "$BINARY" --help > "$HELP_FILE"
-uv run 613-coding config check --repo "$ROOT_DIR" >/dev/null
-uv run 613-coding demo core --repo "$TEMP_DIR" --json >/dev/null
+mkdir -p "$TEMP_DIR/binary-repo" "$TEMP_DIR/wheel-repo"
+"$BINARY" config check --repo "$TEMP_DIR/binary-repo" >/dev/null
+"$BINARY" demo core --repo "$TEMP_DIR/binary-repo" --json >/dev/null
 
 uv venv "$TEMP_DIR/venv" >/dev/null
 uv pip install --python "$TEMP_DIR/venv/bin/python" "$WHEEL" >/dev/null
 "$TEMP_DIR/venv/bin/613-coding" --help > "$TEMP_DIR/wheel-help"
+"$TEMP_DIR/venv/bin/613-coding" config check --repo "$TEMP_DIR/wheel-repo" >/dev/null
+"$TEMP_DIR/venv/bin/613-coding" demo core --repo "$TEMP_DIR/wheel-repo" --json >/dev/null
 cmp -s "$HELP_FILE" "$TEMP_DIR/wheel-help"
 echo "artifact smoke passed"

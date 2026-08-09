@@ -197,11 +197,19 @@ class CodingApp(App[None]):
     async def _restore_session(self) -> None:
         if self.controller is None:
             return
+        self._executing = True
+        self._update_input_state()
+        self.query_one(ActiveOperation).update("Restoring session")
         try:
             snapshot = await self.controller.resume(self.resume or "latest")
             await self._render_snapshot(snapshot, clear=True)
         except Exception as error:
             await self.query_one(ConversationLog).mount(render_error(error))
+        finally:
+            self._executing = False
+            self._update_input_state()
+            if self._approval_id is None:
+                self.query_one(ActiveOperation).update("Idle")
 
     async def _pause_run(self) -> None:
         if self.controller is None:

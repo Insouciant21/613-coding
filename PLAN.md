@@ -327,6 +327,10 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   full 388-test offline suite, Ruff, mypy, lock, and diff checks passed.
 - Review fix: GitLab's Docker CLI producer explicitly disables inherited Python setup and contains
   no smoke invocation; the dependent Python/uv job is the sole artifact smoke consumer.
+- Final review fixes: session resume reconstructs persisted summaries, continues the same paused
+  Run, and restores pending approval actions after restart. Fresh deliverables each passed config
+  inspection and the offline core demo; focused 111 and full 392-test suites plus all static gates
+  passed.
 
 ## SSH Deployment Follow-up
 
