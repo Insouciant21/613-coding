@@ -62,7 +62,7 @@ class FeedbackClassifier:
                 kind=FeedbackKind.INVALID_ACTION,
                 message="action or objective validation result is missing",
             )
-        fingerprint = self._fingerprint(result)
+        fingerprint = self._fingerprint(result, changes)
         kind = self._kind(result)
         if result.passed and action.name in self._CHANGE_ACTIONS and not changes:
             kind = FeedbackKind.NO_PROGRESS
@@ -111,8 +111,9 @@ class FeedbackClassifier:
         }.get(kind, f"objective validation produced {kind.value}")
 
     @staticmethod
-    def _fingerprint(result: ValidationResult) -> str:
+    def _fingerprint(result: ValidationResult, changes: Sequence[str]) -> str:
         value = {
+            "changed_files": sorted(set(changes)),
             "command": result.command,
             "exit_code": result.exit_code,
             "kind": result.kind.value,

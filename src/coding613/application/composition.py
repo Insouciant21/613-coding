@@ -50,14 +50,24 @@ class DeferredLLMProvider(LLMProvider):
 
 
 class ConfiguredRunService(RunService):
-    def __init__(self, project: Project, *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        project: Project,
+        *args: Any,
+        events: SqliteEventStore,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.project = project
+        self._events = events
 
     def create_run(self, request: RunRequest) -> Run:
         if request.project_id is None:
             request = request.model_copy(update={"project_id": self.project.id})
         return super().create_run(request)
+
+    def list_events(self, run_id: UUID) -> list[Event]:
+        return self._events.list_for_run(run_id)
 
 
 class LocalServices:
@@ -131,6 +141,7 @@ def build_services(
         store,
         AgentLoop(),
         dependencies,
+        events=store,
     )
     return LocalServices(service, store)
 

@@ -71,7 +71,7 @@ class ContextAssembler:
             payload = json.dumps(event.payload, sort_keys=True, separators=(",", ":"))
             messages.append(
                 ModelMessage(
-                    role="tool",
+                    role="user",
                     content=f"Event {event.event_type}: {payload}"[: self._max_message_chars],
                 )
             )

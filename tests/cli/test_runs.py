@@ -116,3 +116,10 @@ def test_default_factory_creates_and_cancels_a_real_local_run(tmp_path: Path) ->
 
     assert cancelled.exit_code == 0
     assert json.loads(cancelled.stdout)["status"] == "cancelled"
+
+    events = CliRunner().invoke(
+        app, ["runs", "events", run_id, "--repo", str(tmp_path), "--json"]
+    )
+
+    assert events.exit_code == 0
+    assert "run.cancelled" in events.stdout

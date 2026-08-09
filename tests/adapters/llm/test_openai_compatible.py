@@ -13,7 +13,7 @@ from coding613.adapters.llm.openai_compatible import (
     ProviderResponseError,
     ProviderTimeoutError,
 )
-from coding613.domain.actions import ToolCall
+from coding613.domain.actions import FinishAction, ToolCall
 from coding613.ports.llm import ModelContext, ModelMessage, ToolDefinition
 
 
@@ -74,6 +74,42 @@ def test_openai_adapter_rejects_invalid_response() -> None:
         )
         with pytest.raises(ProviderResponseError):
             provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+
+
+def test_openai_adapter_maps_finish_tool_call() -> None:
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "call-finish",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "finish",
+                                        "arguments": '{"summary":"verified"}',
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                ]
+            },
+            request=request,
+        )
+    )
+    with httpx.Client(transport=transport) as client:
+        provider = OpenAICompatibleLLM(
+            base_url="https://provider.invalid", model="test-model", http_client=client
+        )
+
+        response = provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+
+    assert response.actions[0].action == FinishAction(summary="verified")
 
 
 def test_openai_adapter_maps_timeout() -> None:

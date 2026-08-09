@@ -84,6 +84,28 @@ def test_repeated_failure_becomes_no_progress() -> None:
     assert not no_progress.retryable
 
 
+def test_repeated_failure_allows_progressive_file_changes() -> None:
+    classifier = FeedbackClassifier(repeated_failure_limit=3)
+    failure = result(ValidationKind.TEST, 1, "same failure")
+    call = ToolCall(name="edit_file", arguments={"path": "next.py", "content": "x"})
+
+    assert classifier.classify(failure, call, ("a.py",)).kind is FeedbackKind.TEST_FAILURE
+    assert classifier.classify(failure, call, ("a.py", "b.py")).kind is FeedbackKind.TEST_FAILURE
+    assert (
+        classifier.classify(failure, call, ("a.py", "b.py", "c.py")).kind
+        is FeedbackKind.TEST_FAILURE
+    )
+
+    assert (
+        classifier.classify(failure, call, ("a.py", "b.py", "c.py")).kind
+        is FeedbackKind.TEST_FAILURE
+    )
+    assert (
+        classifier.classify(failure, call, ("a.py", "b.py", "c.py")).kind
+        is FeedbackKind.NO_PROGRESS
+    )
+
+
 def test_feedback_classifier_restores_repeated_failure_state() -> None:
     failure = result(ValidationKind.TEST, 1, "same failure")
     call = ToolCall(name="run_command", arguments={"argv": ["pytest"]})

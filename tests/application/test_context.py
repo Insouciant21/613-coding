@@ -107,6 +107,24 @@ def test_context_falls_back_to_sqlite_keyword_search_and_bounds_events(tmp_path:
     assert all("old" not in message.content for message in context.messages)
 
 
+def test_context_serializes_persisted_events_without_unmatched_tool_messages(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    event = Event.new(
+        "state.transition",
+        run.id,
+        {"from": "running", "to": "waiting_model"},
+        datetime.now(UTC),
+    )
+
+    context = assembler.build(run.id, "fix parser", (event,))
+
+    assert context.messages[-1].role == "user"
+    assert context.messages[-1].content.startswith("Event state.transition:")
+
+
 def test_openai_compatible_embedding_maps_single_request() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
