@@ -18,7 +18,7 @@ class KeyringCredentialStore:
     def __init__(
         self,
         *,
-        service_name: str = "coding-harness",
+        service_name: str = "613-coding",
         keyring_backend: Any = keyring,
         allow_env_fallback: bool = False,
     ) -> None:

@@ -32,7 +32,7 @@ def test_set_uses_hidden_keyring_input_and_status_is_redacted(
 
     credentials.set("openai", "sk-super-secret-123")
 
-    assert fake.values["coding-harness", "openai"] == "sk-super-secret-123"
+    assert fake.values["613-coding", "openai"] == "sk-super-secret-123"
     assert credentials.status("openai").configured is True
     print(credentials.status("openai"))
     assert "sk-super-secret-123" not in repr(credentials.status("openai"))

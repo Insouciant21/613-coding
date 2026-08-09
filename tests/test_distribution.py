@@ -37,9 +37,10 @@ def test_docker_context_excludes_secrets_and_local_state() -> None:
         assert entry in ignored
 
 
-def test_entrypoint_exposes_web_command() -> None:
+def test_entrypoint_exposes_renamed_web_command() -> None:
     script = (ROOT / "docker/entrypoint.sh").read_text(encoding="utf-8")
-    assert "uvicorn" in script
+    assert 'exec 613-coding web --host' in script
+    assert "coding-harness" not in script
     assert "0.0.0.0" in script
 
 
