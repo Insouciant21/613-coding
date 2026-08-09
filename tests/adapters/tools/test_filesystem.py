@@ -31,6 +31,28 @@ def test_filesystem_lists_searches_reads_and_edits_deterministically(tmp_path: P
     assert not (tmp_path / "new/file.txt").exists()
 
 
+@pytest.mark.parametrize(
+    "directory",
+    [
+        ".613-coding",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        "dist",
+        "node_modules",
+    ],
+)
+def test_filesystem_omits_generated_directory_trees(
+    tmp_path: Path, directory: str
+) -> None:
+    generated = tmp_path / directory
+    generated.mkdir()
+    (generated / "large-generated-file.txt").write_text("generated\n", encoding="utf-8")
+    (tmp_path / "source.txt").write_text("source\n", encoding="utf-8")
+
+    assert FilesystemTools(tmp_path).list_files() == ["source.txt"]
+
+
 @pytest.mark.parametrize("path", ["../outside.txt", "/tmp/outside.txt"])
 def test_filesystem_rejects_path_escape(tmp_path: Path, path: str) -> None:
     with pytest.raises(PathOutsideRepositoryError):

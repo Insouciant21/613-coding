@@ -28,7 +28,17 @@ class InvalidUtf8Error(FilesystemToolError):
 
 class FilesystemTools:
     _IGNORED_DIRECTORIES: ClassVar[frozenset[str]] = frozenset(
-        {".git", ".venv", "__pycache__"}
+        {
+            ".613-coding",
+            ".git",
+            ".mypy_cache",
+            ".pytest_cache",
+            ".ruff_cache",
+            ".venv",
+            "__pycache__",
+            "dist",
+            "node_modules",
+        }
     )
 
     def __init__(self, root: str | Path, max_file_bytes: int = 1_000_000) -> None:
