@@ -546,3 +546,16 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Evidence: commit `60ce34b`; GitHub Actions run `31288395120` passed. Jobs `93181247911` (`unit-test`), `93181247963` (`quality`), `93181247927` (`demo`), and `93181247973` (`package-and-container`) all completed successfully.
 - Container evidence: job `93181247973` built the digest-pinned image and ran `scripts/smoke_container.sh`; no failed annotations were present beyond the upstream Node.js 20 deprecation notices.
 - Boundary: GitHub CI is verified for the published main branch; GitLab has configuration and local-equivalent evidence but no configured GitLab remote pipeline. Render remains an operator-controlled deployment, and no public URL is claimed.
+
+### 2026-08-09 09:36:35 Asia/Shanghai - final published-main CI evidence
+
+- Evidence: commit `cf7f8a5`; GitHub Actions run `31288535830` passed. Jobs `93181629275` (`package-and-container`), `93181629310` (`demo`), `93181629340` (`unit-test`), and `93181629345` (`quality`) completed successfully.
+- Container evidence: the final main run built the digest-pinned image and ran `scripts/smoke_container.sh` successfully; only upstream Node.js 20 deprecation annotations were reported.
+- This verification closes the code and delivery-record publication gate. Public Render deployment and the student-authored reflection remain outside this agent's authority.
+
+### 2026-08-09 09:35:40 CST (Asia/Shanghai) - REMOTE-CI-03
+
+- Evidence: REMOTE-CI-03 | cf7f8a5ee387965003f76bd1f374a288bc0067c0
+- Status: pass
+- Command: `gh run watch 31288535830 --repo Insouciant21/613-coding --exit-status`
+- Result: main cf7f8a5 passed: unit-test, quality, demo, package-and-container; Docker build and smoke passed
