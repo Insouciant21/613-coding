@@ -562,14 +562,14 @@ commit `048bdbc`; focused regression suite passed 95 tests with Ruff, mypy, lock
 - Removes: `613-coding web`, `coding613.api`, `coding613.web`, FastAPI, Uvicorn, `/healthz`, and Render.
 - Preserves: TUI root command, all management CLI subcommands, RunService, SQLite/LanceDB, worker Docker runtime, and multi-agent orchestration.
 
-- [ ] **Step 1: Replace old positive-Web tests with RED absence contracts**
+- [x] **Step 1: Replace old positive-Web tests with RED absence contracts**
 
 Assert `pyproject.toml` has no FastAPI/Uvicorn dependency, root help has no `web`, removed import
 specs are `None`, `render.yaml` and runtime entrypoint are absent, and current README/deployment
 guidance contains no WebUI/Render/SSH/proxy instructions. Keep historical evidence files out of the
 current-guidance scan.
 
-- [ ] **Step 2: Run RED removal tests**
+- [x] **Step 2: Run RED removal tests**
 
 ```bash
 uv run pytest tests/test_distribution.py tests/test_docs.py -q
@@ -577,13 +577,13 @@ uv run pytest tests/test_distribution.py tests/test_docs.py -q
 
 Expected: FAIL on the still-present command, dependencies, files, and guidance.
 
-- [ ] **Step 3: Delete HTTP code and dependencies**
+- [x] **Step 3: Delete HTTP code and dependencies**
 
 Remove only the listed main-project files. Remove FastAPI/Uvicorn imports and dependencies, run
 `uv lock`, and verify no application/domain code imported the deleted adapter. Do not touch
 `tmp/cube/apps/api` or its FastAPI dependency.
 
-- [ ] **Step 4: Pass removal and regression tests**
+- [x] **Step 4: Pass removal and regression tests**
 
 ```bash
 uv run pytest tests/test_distribution.py tests/test_docs.py tests/cli tests/application -q
@@ -593,12 +593,15 @@ uv lock --check
 git diff --check
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A src/coding613/api src/coding613/web tests/api tests/web render.yaml docker/entrypoint.sh scripts/smoke_container.sh tests/test_container_smoke_script.py pyproject.toml uv.lock src/coding613/cli/main.py tests/test_distribution.py tests/test_docs.py
 git commit -m "refactor: replace web console with local tui"
 ```
+
+Task 7 evidence: commit `4877a7f`; removal/CLI/application suite passed 143 tests, full offline
+suite passed 380 tests, and Ruff/mypy/lock/diff checks passed.
 
 ### Task 8: PyInstaller And Docker Artifact Builder
 

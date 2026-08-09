@@ -867,3 +867,18 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   raw string; no credentials, remote deployment, or `tmp/cube` files were touched.
 - Review boundary: external Codex review attempts still return HTTP 401 `refresh_token_invalidated`;
   this limitation is recorded and retained for the broad branch review.
+
+### 2026-08-10 04:39:05 Asia/Shanghai - TUI distribution Task 7 implementation
+
+- Task: remove the main Web/HTTP/runtime deployment surface while preserving local TUI/CLI,
+  SQLite/LanceDB, worker sandbox, and multi-agent orchestration; triggered `executing-plans`,
+  `test-driven-development`, and `verification-before-completion`.
+- RED: replacement absence tests failed on FastAPI/Uvicorn dependencies, root `web` command, old
+  import specs, removed files, and server/deployment guidance.
+- Implementation: commit `4877a7f` deletes `src/coding613/api`, `src/coding613/web`, their tests,
+  Render/runtime/smoke files; removes the root web command and HTTP dependencies; rewrites current
+  README/deployment guidance for local TUI/CLI and artifact-only operation; regenerates `uv.lock`.
+- GREEN: removal/CLI/application suite passed 143; full offline suite passed 380; Ruff, mypy,
+  `uv lock --check`, and `git diff --check` passed.
+- Human intervention: cleaned only generated `__pycache__` directories left in deleted paths so
+  import absence reflected the checkout; no `tmp/cube`, credentials, or remote deployment changed.
