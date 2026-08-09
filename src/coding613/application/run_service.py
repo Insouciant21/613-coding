@@ -128,6 +128,12 @@ class RunService:
             )
         return self._loop.get_summary(run_id, dependencies)
 
+    def get_approval(self, request_id: UUID) -> ApprovalRequest:
+        request = self._store.get_approval(request_id)
+        if request is None:
+            raise KeyError(f"unknown approval: {request_id}")
+        return request
+
     def _resolve(
         self, request_id: UUID, decision: ApprovalDecision
     ) -> ApprovalResolution:

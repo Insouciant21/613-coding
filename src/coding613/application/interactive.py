@@ -23,6 +23,10 @@ class InteractiveStore(Protocol):
 
     def list_runs_for_session(self, session_id: UUID) -> list[Run]: ...
 
+    def list_interactive_sessions(
+        self, project_id: UUID, limit: int = 50
+    ) -> list[InteractiveSession]: ...
+
     def list_iterations(self, run_id: UUID) -> list[IterationRecord]: ...
 
 
@@ -115,6 +119,9 @@ class InteractiveSessionService:
             active_run=active_run,
             transcript=transcript_for_runs(self._store, runs),
         )
+
+    def list_sessions(self) -> list[InteractiveSession]:
+        return self._store.list_interactive_sessions(self._project_id)
 
     def _require_session(self, session_id: UUID) -> InteractiveSession:
         session = self._store.get_interactive_session(session_id)

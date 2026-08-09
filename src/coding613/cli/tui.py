@@ -54,4 +54,5 @@ def launch_tui(
         services=services,
         initial_task=request.initial_task,
         resume=request.resume,
+        permission_mode=services.permission_mode,
     ).run()

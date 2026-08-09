@@ -12,6 +12,34 @@ ConversationLog {
     scrollbar-background: #1a1e21;
 }
 
+.conversation-entry {
+    width: 100%;
+    height: auto;
+    margin: 0 0 1 0;
+    padding: 0 1;
+}
+
+.user-message {
+    color: #d4c59a;
+}
+
+.assistant-message {
+    color: #e8e8e2;
+}
+
+.approval-view {
+    height: 10;
+    max-height: 1fr;
+    overflow-y: scroll;
+    border: solid #d4c59a;
+    padding: 0 1;
+}
+
+.approval-header {
+    height: auto;
+    padding: 0 0 1 0;
+}
+
 ActiveOperation {
     width: 100%;
     height: 1;

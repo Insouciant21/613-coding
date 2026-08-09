@@ -44,6 +44,7 @@ from coding613.domain.models import (
     SchemaValidationEvidence,
     StopReason,
 )
+from coding613.domain.redaction import redact_text
 from coding613.ports.llm import LLMProvider, LLMResponse, ModelContext, ToolDefinition
 from coding613.ports.policy import PolicyDecision, PolicyEffect
 from coding613.ports.progress import NullProgressSink, ProgressKind, ProgressSink, RunProgress
@@ -60,6 +61,13 @@ _FINISH_TOOL = ToolDefinition(
         "additionalProperties": False,
     },
 )
+
+
+def _progress_text(value: str, limit: int = 8_000) -> str:
+    safe = redact_text(value)
+    if len(safe) <= limit:
+        return safe
+    return f"{safe[:limit]}\n... output truncated ({len(safe) - limit} characters omitted)"
 
 
 class ContextBuilder(Protocol):
@@ -1016,7 +1024,10 @@ class AgentLoop:
             run_id,
             ProgressKind.TOOL_STARTED,
             dependencies,
-            payload={"tool": call.name},
+            payload={
+                "tool": call.name,
+                "arguments": redact_payload(call.arguments),
+            },
         )
         try:
             tool_result = ToolResult.model_validate(
@@ -1069,7 +1080,13 @@ class AgentLoop:
             run_id,
             ProgressKind.TOOL_FINISHED,
             dependencies,
-            payload={"tool": call.name, "success": tool_result.success},
+            payload={
+                "tool": call.name,
+                "success": tool_result.success,
+                "output": _progress_text(tool_result.output),
+                "error": _progress_text(tool_result.error or "") if tool_result.error else "",
+                "changed_files": tool_result.changed_files,
+            },
         )
 
         for path in tool_result.changed_files:
@@ -1150,7 +1167,10 @@ class AgentLoop:
             run_id,
             ProgressKind.VALIDATION_FINISHED,
             dependencies,
-            payload={"success": validation.passed},
+            payload={
+                "success": validation.passed,
+                "result": redact_payload(validation.model_dump(mode="json")),
+            },
         )
         try:
             revision = dependencies.revision()
@@ -1558,7 +1578,6 @@ class AgentLoop:
             )
         except Exception:
             return
-
     def _terminal(
         self,
         run_id: UUID,

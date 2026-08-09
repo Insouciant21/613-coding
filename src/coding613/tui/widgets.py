@@ -11,6 +11,14 @@ class ConversationLog(VerticalScroll):
     """Scrollable conversation output owned by the controller."""
 
 
+class UserMessage(Static):
+    """A bounded, non-markup user task entry."""
+
+    def __init__(self, text: str) -> None:
+        self.message_text = text
+        super().__init__(f"> {text}", classes="conversation-entry user-message", markup=False)
+
+
 class ActiveOperation(Static):
     """Single-line current operation state."""
 

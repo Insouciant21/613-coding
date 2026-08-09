@@ -385,6 +385,14 @@ def test_loop_publishes_streamed_progress_at_owned_boundaries(tmp_path: Path) ->
     assert ProgressKind.TOOL_FINISHED in kinds
     assert ProgressKind.VALIDATION_STARTED in kinds
     assert ProgressKind.VALIDATION_FINISHED in kinds
+    tool_started = next(
+        update for update in progress.updates if update.kind is ProgressKind.TOOL_STARTED
+    )
+    assert tool_started.payload["arguments"] == {"path": "a.py", "content": "ok"}
+    tool_finished = next(
+        update for update in progress.updates if update.kind is ProgressKind.TOOL_FINISHED
+    )
+    assert tool_finished.payload["changed_files"] == ("a.py",)
     assert [update.text for update in progress.updates if update.kind is ProgressKind.TEXT_DELTA] == [
         "working",
         "working",
@@ -645,6 +653,7 @@ def test_run_service_creates_approves_resumes_and_cancels(tmp_path: Path) -> Non
     run = service.create_run(RunRequest(task="fix", permission_mode=PermissionMode.STRICT))
     paused = service.resume(run.id)
     assert paused.status is RunState.WAITING_APPROVAL
+    assert service.get_approval(paused.approvals[-1]) == records.get_approval(paused.approvals[-1])
     service.approve(paused.approvals[-1])
     completed = service.resume(run.id)
     assert completed.status is RunState.COMPLETED

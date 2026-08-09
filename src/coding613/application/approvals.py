@@ -18,6 +18,15 @@ from coding613.ports.policy import PolicyDecision, PolicyEffect
 from coding613.ports.storage import ApprovalStore
 
 
+def action_fingerprint(call: ToolCall) -> str:
+    """Return the stable fingerprint used for one-time exact-action approval."""
+
+    encoded = json.dumps(
+        call.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
 class ApprovalError(RuntimeError):
     pass
 
@@ -98,7 +107,7 @@ class ApprovalService:
             request_id, ApprovalStatus.PENDING, resolved
         ):
             raise StaleApprovalError("approval request is no longer pending")
-        fingerprint = self._fingerprint(request.action)
+        fingerprint = action_fingerprint(request.action)
         return ApprovalResolution(
             request_id=request_id,
             run_id=self.run_id,
@@ -140,7 +149,7 @@ class ApprovalService:
                 request_id, ApprovalStatus.APPROVED, expired
             )
             return ApprovalClaim(request=request, acquired=False)
-        if self._fingerprint(request.action) != self._fingerprint(call):
+        if action_fingerprint(request.action) != action_fingerprint(call):
             return ApprovalClaim(request=request, acquired=False)
         executing = request.model_copy(update={"status": ApprovalStatus.EXECUTING})
         return ApprovalClaim(
@@ -177,14 +186,14 @@ class ApprovalService:
         return request, rejected
 
     def consume(self, call: ToolCall, request_id: UUID | None = None) -> bool:
-        fingerprint = self._fingerprint(call)
+        fingerprint = action_fingerprint(call)
         requests = (
             [self.get_request(request_id)]
             if request_id is not None
             else self._store.list_approvals(self.run_id)
         )
         for request in requests:
-            if self._fingerprint(request.action) != fingerprint:
+            if action_fingerprint(request.action) != fingerprint:
                 continue
             claim = self.claim(request.id, call)
             if claim.acquired:
@@ -197,10 +206,3 @@ class ApprovalService:
         if now.tzinfo is None:
             raise ValueError("approval clock must return timezone-aware timestamps")
         return now
-
-    @staticmethod
-    def _fingerprint(call: ToolCall) -> str:
-        encoded = json.dumps(
-            call.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
-        ).encode()
-        return hashlib.sha256(encoded).hexdigest()
