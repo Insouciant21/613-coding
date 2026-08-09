@@ -116,10 +116,11 @@ Run:
 
 ```bash
 uv run pytest tests/test_distribution.py tests/test_package.py -q
-rg -n 'coding_harness' src tests pyproject.toml uv.lock
+rg -n '(from|import) coding_harness|coding_harness\.' src tests pyproject.toml
+rg -n 'name = "coding-harness"' uv.lock
 ```
 
-Expected: tests pass and `rg` exits 1 with no legacy import/package references.
+Expected: tests pass and both `rg` commands exit 1 with no active legacy import, monkeypatch target, entrypoint, or lock-package reference. The intentional negative assertion `find_spec("coding_harness") is None` remains in the contract test.
 
 - [ ] **Step 5: Commit the core rename**
 
