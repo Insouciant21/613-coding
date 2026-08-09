@@ -49,6 +49,7 @@ class RunService:
         self._loop = loop
         self._dependency_factory = dependencies
         self._dependencies: dict[UUID, LoopDependencies] = {}
+        self._active_runs: set[UUID] = set()
 
     def create_run(self, request: RunRequest) -> Run:
         run = Run(
@@ -64,7 +65,23 @@ class RunService:
         dependencies = self._get_dependencies(run)
         if run.state.is_terminal:
             return self._terminal_summary(run, dependencies)
-        summary = self._loop.run(run_id, run.task, dependencies)
+        dependencies.cancellation.reset()
+        self._active_runs.add(run_id)
+        try:
+            summary = self._loop.run(run_id, run.task, dependencies)
+        finally:
+            self._active_runs.discard(run_id)
+        return self._persist_status(run, summary)
+
+    def pause(self, run_id: UUID) -> RunSummary:
+        run = self._require_run(run_id)
+        dependencies = self._get_dependencies(run)
+        dependencies.cancellation.cancel()
+        if run_id in self._active_runs:
+            return self.get_summary(run_id)
+        if run.state.is_terminal:
+            return self._terminal_summary(run, dependencies)
+        summary = self._loop.pause(run_id, run.task, dependencies)
         return self._persist_status(run, summary)
 
     def approve(self, request_id: UUID) -> ApprovalResolution:
@@ -78,6 +95,7 @@ class RunService:
         dependencies = self._get_dependencies(run)
         if run.state.is_terminal:
             return self._terminal_summary(run, dependencies)
+        dependencies.cancellation.cancel()
         summary = self._loop.cancel(run_id, run.task, dependencies)
         return self._persist_status(run, summary)
 

@@ -383,6 +383,16 @@ Every completed plan task must link a commit and fresh verification output here.
   The focused regression and scoped diff verification address the finding; an independent scoped
   re-review was unavailable in this turn and is explicitly carried into the broad branch review.
 
+## TUI-03 Evidence
+
+- Verification timestamp: `2026-08-10 04:00:00 Asia/Shanghai`.
+- Status: implementation locally verified; independent task review pending.
+- Focused evidence: loop/composition suite `50 passed`; loop/composition/CLI regression suite
+  `55 passed`; Ruff and mypy application checks passed.
+- Boundary: progress remains ephemeral, cancellation is cooperative, and idle pause persists a
+  nonterminal `PAUSED` Run without a stop reason. No `tmp/cube`, Web removal, packaging, or remote
+  deployment files changed.
+
 ## CI and Deployment Manifest Evidence
 
 - Verification timestamp: `2026-08-09 07:14:20 Asia/Shanghai`.

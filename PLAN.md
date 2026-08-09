@@ -254,6 +254,18 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Review status: fix finding addressed by the focused regression and scoped diff verification;
   independent re-review dispatch was unavailable in this turn and remains a process follow-up for
   the broad branch review.
+
+## TUI-03 Task Evidence
+
+- Status: implementation locally verified; independent task review pending.
+- TDD RED: the two new progress/cancellation tests failed because `LoopDependencies` had no
+  `progress` or `cancellation` fields.
+- GREEN: focused loop/composition suite passed 50; loop/composition/CLI regression suite passed 55;
+  Ruff and mypy for application code passed.
+- Behavior: progress is ephemeral and sink failures are isolated; provider cancellation persists
+  `PAUSED` with no stop reason; `RunService.pause()` supports active and idle nonterminal runs.
+- Regression repair: non-streaming progress fallback now ignores raw malformed provider values
+  until Loop schema validation, preserving the pre-existing invalid-response repair path.
 - Source record: `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-2-report.md`.
 
 ## SSH Deployment Follow-up

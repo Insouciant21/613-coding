@@ -30,11 +30,13 @@ from coding613.application.context import ContextAssembler
 from coding613.application.feedback import FeedbackClassifier
 from coding613.application.loop import AgentLoop, LoopDependencies
 from coding613.application.policy import PolicyEngine
+from coding613.application.progress import CancellationToken
 from coding613.application.run_service import RunRequest, RunService
 from coding613.config import load_config
 from coding613.domain.events import Event
 from coding613.domain.models import PermissionMode, Project, Run
 from coding613.ports.llm import LLMProvider, LLMResponse, ModelContext, ToolDefinition
+from coding613.ports.progress import NullProgressSink
 
 
 class ProviderConfigurationError(RuntimeError):
@@ -141,6 +143,8 @@ def build_services(
             revision=lambda: _repository_revision(root, state_root),
             changed_files=lambda: tuple(changed_files),
             clock=lambda: datetime.now(UTC),
+            progress=NullProgressSink(),
+            cancellation=CancellationToken(),
         )
 
     service = ConfiguredRunService(

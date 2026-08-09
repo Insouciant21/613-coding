@@ -811,3 +811,18 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Process note: an independent scoped re-review agent could not be dispatched in this turn. The
   finding and this limitation are carried into the broad whole-branch review; no Critical or
   Important issue is knowingly open in the code.
+
+### 2026-08-10 04:00:00 Asia/Shanghai - TUI distribution Task 3 implementation
+
+- Task: connect streamed progress and cooperative pause to the AgentLoop, RunService, and local
+  composition; triggered `test-driven-development` and `verification-before-completion`.
+- RED: two new loop tests failed because the progress/cancellation dependency fields were absent.
+- Implementation: added progress publication at state/tool/validation boundaries, cancellation
+  handling that snapshots `PAUSED` with no terminal reason, active-run tracking and `pause()`, and
+  default no-op composition dependencies.
+- Regression: a pre-existing malformed-provider test initially failed because the progress fallback
+  touched raw dict `.content`; fixed by emitting fallback text only for validated `LLMResponse`.
+- GREEN: focused loop/composition suite 50 passed; loop/composition/CLI suite 55 passed; Ruff and
+  mypy application checks passed.
+- Human intervention: controller implemented the bounded changes after the task implementer slot
+  was unavailable; independent task review remains pending and is recorded as such.

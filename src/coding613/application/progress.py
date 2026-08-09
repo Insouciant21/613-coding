@@ -42,6 +42,6 @@ def complete_with_progress(
     if isinstance(provider, StreamingLLMProvider):
         return provider.complete_stream(context, tools, on_text_delta, cancelled)
     response = provider.complete(context, tools)
-    if response.content:
+    if isinstance(response, LLMResponse) and response.content:
         on_text_delta(response.content)
     return response
