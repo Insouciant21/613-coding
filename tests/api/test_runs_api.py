@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from coding_harness.api.app import create_app
 from coding_harness.application.approvals import ApprovalDecision, ApprovalResolution
+from coding_harness.application.composition import build_services
 from coding_harness.domain.models import Run, RunState, RunSummary, StopReason
 
 
@@ -102,3 +103,12 @@ def test_invalid_request_and_service_error_are_safe() -> None:
     response = test_client.get(f"/api/runs/{services.run_service.run.id}")
     assert response.status_code == 404
     assert "secret-internal-id" not in response.text
+
+
+def test_unknown_run_from_real_composition_returns_404(tmp_path) -> None:
+    test_client = TestClient(create_app(build_services(tmp_path)))
+
+    response = test_client.get(f"/api/runs/{uuid4()}")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "resource not found"}

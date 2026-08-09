@@ -54,6 +54,15 @@ def test_local_composition_reads_new_run_after_service_restart(tmp_path: Path) -
     assert summary.run_id == run.id
     assert summary.status is RunState.RUNNING
     assert summary.stop_reason is None
+    assert summary.changed_files == ()
+    assert summary.validation_evidence == ()
+    assert summary.approvals == ()
+    assert summary.unresolved_risks == ()
+    assert summary.completion_blockers == ()
+    assert summary.resource_usage.agent_turns == 0
+    assert summary.resource_usage.model_calls == 0
+    assert summary.resource_usage.wall_time_seconds == 0
+    assert summary.resource_usage.provider_cost == 0
 
 
 def test_local_composition_reports_provider_boundary_on_resume(tmp_path: Path) -> None:
