@@ -92,7 +92,13 @@ class FilesystemTools:
         relative = Path(path)
         if relative.is_absolute() or ".." in relative.parts or not relative.parts:
             raise PathOutsideRepositoryError("path must be repository-relative")
-        parent = (self.root / relative).parent.resolve(strict=True)
+        parent = self.root
+        for component in relative.parent.parts:
+            candidate = parent / component
+            if candidate.is_symlink():
+                raise PathOutsideRepositoryError("delete parent cannot be a symlink")
+            parent = candidate
+        parent = parent.resolve(strict=True)
         if not parent.is_relative_to(self.root):
             raise PathOutsideRepositoryError("parent escaped repository root")
         entry = parent / relative.name
