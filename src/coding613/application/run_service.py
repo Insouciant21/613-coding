@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID
@@ -13,6 +14,7 @@ from coding613.application.approvals import (
     StaleApprovalError,
 )
 from coding613.application.loop import AgentLoop, LoopDependencies
+from coding613.application.progress import CancellationToken
 from coding613.domain.models import (
     ApprovalRequest,
     PermissionMode,
@@ -20,11 +22,13 @@ from coding613.domain.models import (
     RunSummary,
 )
 from coding613.domain.models_base import DomainModel
+from coding613.ports.progress import ProgressSink
 
 
 class RunRequest(DomainModel):
     task: str
     project_id: UUID | None = None
+    session_id: UUID | None = None
     permission_mode: PermissionMode | None = None
 
 
@@ -49,22 +53,53 @@ class RunService:
         self._loop = loop
         self._dependency_factory = dependencies
         self._dependencies: dict[UUID, LoopDependencies] = {}
+        self._active_runs: set[UUID] = set()
 
     def create_run(self, request: RunRequest) -> Run:
         run = Run(
             project_id=request.project_id,
+            session_id=request.session_id,
             task=request.task,
             permission_mode=request.permission_mode or PermissionMode.BALANCED,
         )
         self._store.create_run(run)
         return run
 
-    def resume(self, run_id: UUID) -> RunSummary:
+    def resume(
+        self,
+        run_id: UUID,
+        *,
+        progress: ProgressSink | None = None,
+        cancellation: CancellationToken | None = None,
+    ) -> RunSummary:
         run = self._require_run(run_id)
         dependencies = self._get_dependencies(run)
+        if progress is not None or cancellation is not None:
+            dependencies = replace(
+                dependencies,
+                progress=progress or dependencies.progress,
+                cancellation=cancellation or dependencies.cancellation,
+            )
+            self._dependencies[run.id] = dependencies
         if run.state.is_terminal:
             return self._terminal_summary(run, dependencies)
-        summary = self._loop.run(run_id, run.task, dependencies)
+        dependencies.cancellation.reset()
+        self._active_runs.add(run_id)
+        try:
+            summary = self._loop.run(run_id, run.task, dependencies)
+        finally:
+            self._active_runs.discard(run_id)
+        return self._persist_status(run, summary)
+
+    def pause(self, run_id: UUID) -> RunSummary:
+        run = self._require_run(run_id)
+        dependencies = self._get_dependencies(run)
+        dependencies.cancellation.cancel()
+        if run_id in self._active_runs:
+            return self.get_summary(run_id)
+        if run.state.is_terminal:
+            return self._terminal_summary(run, dependencies)
+        summary = self._loop.pause(run_id, run.task, dependencies)
         return self._persist_status(run, summary)
 
     def approve(self, request_id: UUID) -> ApprovalResolution:
@@ -78,6 +113,7 @@ class RunService:
         dependencies = self._get_dependencies(run)
         if run.state.is_terminal:
             return self._terminal_summary(run, dependencies)
+        dependencies.cancellation.cancel()
         summary = self._loop.cancel(run_id, run.task, dependencies)
         return self._persist_status(run, summary)
 
@@ -91,6 +127,12 @@ class RunService:
                 stop_reason=run.stop_reason,
             )
         return self._loop.get_summary(run_id, dependencies)
+
+    def get_approval(self, request_id: UUID) -> ApprovalRequest:
+        request = self._store.get_approval(request_id)
+        if request is None:
+            raise KeyError(f"unknown approval: {request_id}")
+        return request
 
     def _resolve(
         self, request_id: UUID, decision: ApprovalDecision

@@ -174,6 +174,7 @@ class LoopSession(DomainModel):
 class Run(DomainModel):
     id: UUID = Field(default_factory=uuid4)
     project_id: UUID | None = None
+    session_id: UUID | None = None
     task: str = Field(min_length=1)
     permission_mode: PermissionMode = PermissionMode.BALANCED
     state: RunState = RunState.RUNNING

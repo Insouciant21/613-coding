@@ -6,9 +6,21 @@ CREATE TABLE IF NOT EXISTS projects (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS interactive_sessions (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    title TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_interactive_sessions_project_updated
+    ON interactive_sessions(project_id, updated_at DESC, id ASC);
+
 CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY,
     project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+    session_id TEXT REFERENCES interactive_sessions(id) ON DELETE SET NULL,
     task TEXT NOT NULL,
     permission_mode TEXT NOT NULL,
     state TEXT NOT NULL,

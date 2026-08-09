@@ -20,6 +20,7 @@ from coding613.application.budgets import BudgetLimits
 from coding613.application.feedback import FeedbackClassifier
 from coding613.application.loop import AgentLoop, LoopDependencies
 from coding613.application.policy import PolicyEngine, RepositoryPolicyConfig
+from coding613.application.progress import CancellationToken, ProviderCancelledError
 from coding613.application.run_service import RunRequest, RunService
 from coding613.application.tool_registry import ToolRegistry
 from coding613.application.validation import ValidationKind, ValidationResult
@@ -43,6 +44,7 @@ from coding613.ports.llm import (
     ModelMessage,
     ToolDefinition,
 )
+from coding613.ports.progress import ProgressKind, RunProgress
 from coding613.ports.tools import ToolContext, ToolResult
 
 
@@ -61,6 +63,29 @@ class Provider:
 class RaisingProvider:
     def complete(self, context: ModelContext, tools: Sequence[ToolDefinition]) -> Any:
         raise RuntimeError("provider unavailable")
+
+
+class StreamingProvider(Provider):
+    def __init__(self, responses: Sequence[Any], deltas: Sequence[str]) -> None:
+        super().__init__(responses)
+        self.deltas = tuple(deltas)
+
+    def complete_stream(self, context, tools, on_text_delta, cancelled):
+        self.contexts.append(context)
+        self.tool_batches.append(tuple(tools))
+        for delta in self.deltas:
+            if cancelled():
+                raise ProviderCancelledError("cancelled")
+            on_text_delta(delta)
+        return self.responses.popleft()
+
+
+class RecordingProgress:
+    def __init__(self) -> None:
+        self.updates: list[RunProgress] = []
+
+    def publish(self, update: RunProgress) -> None:
+        self.updates.append(update)
 
 
 class ContextBuilder:
@@ -338,6 +363,66 @@ def test_failure_feedback_drives_repair_and_fresh_finish(tmp_path: Path) -> None
     assert records.iterations[-1].state_after is RunState.COMPLETED
 
 
+def test_loop_publishes_streamed_progress_at_owned_boundaries(tmp_path: Path) -> None:
+    provider = StreamingProvider(
+        (
+            response(ToolCall(name="edit_file", arguments={"path": "a.py", "content": "ok"})),
+            response(FinishAction(summary="done")),
+        ),
+        ("working",),
+    )
+    deps, _, _, _ = dependencies(tmp_path, provider, Validator((validation(0),)))
+    progress = RecordingProgress()
+    deps = replace(deps, progress=progress, cancellation=CancellationToken())
+
+    summary = AgentLoop().run(uuid4(), "stream", deps)
+
+    assert summary.status is RunState.COMPLETED
+    kinds = [update.kind for update in progress.updates]
+    assert ProgressKind.STATE in kinds
+    assert ProgressKind.TEXT_DELTA in kinds
+    assert ProgressKind.TOOL_STARTED in kinds
+    assert ProgressKind.TOOL_FINISHED in kinds
+    assert ProgressKind.VALIDATION_STARTED in kinds
+    assert ProgressKind.VALIDATION_FINISHED in kinds
+    tool_started = next(
+        update for update in progress.updates if update.kind is ProgressKind.TOOL_STARTED
+    )
+    assert tool_started.payload["arguments"] == {"path": "a.py", "content": "ok"}
+    tool_finished = next(
+        update for update in progress.updates if update.kind is ProgressKind.TOOL_FINISHED
+    )
+    assert tool_finished.payload["changed_files"] == ("a.py",)
+    assert [update.text for update in progress.updates if update.kind is ProgressKind.TEXT_DELTA] == [
+        "working",
+        "working",
+    ]
+
+
+def test_provider_cancellation_pauses_without_persisting_token_deltas(tmp_path: Path) -> None:
+    token = CancellationToken()
+
+    class CancellingProvider(StreamingProvider):
+        def complete_stream(self, context, tools, on_text_delta, cancelled):
+            on_text_delta("partial")
+            token.cancel()
+            raise ProviderCancelledError("cancelled")
+
+    deps, records, _, _ = dependencies(
+        tmp_path, CancellingProvider((response(FinishAction(summary="done")),), ()), Validator(())
+    )
+    progress = RecordingProgress()
+    deps = replace(deps, progress=progress, cancellation=token)
+    run_id = uuid4()
+
+    summary = AgentLoop().run(run_id, "pause", deps)
+
+    assert summary.status is RunState.PAUSED
+    assert summary.stop_reason is None
+    assert [update.text for update in progress.updates if update.kind is ProgressKind.TEXT_DELTA] == ["partial"]
+    assert all("token" not in event.event_type for event in records.events)
+
+
 def test_loop_exposes_finish_tool_to_provider(tmp_path: Path) -> None:
     provider = Provider(
         (
@@ -568,6 +653,7 @@ def test_run_service_creates_approves_resumes_and_cancels(tmp_path: Path) -> Non
     run = service.create_run(RunRequest(task="fix", permission_mode=PermissionMode.STRICT))
     paused = service.resume(run.id)
     assert paused.status is RunState.WAITING_APPROVAL
+    assert service.get_approval(paused.approvals[-1]) == records.get_approval(paused.approvals[-1])
     service.approve(paused.approvals[-1])
     completed = service.resume(run.id)
     assert completed.status is RunState.COMPLETED
@@ -594,6 +680,20 @@ def test_run_service_creates_approves_resumes_and_cancels(tmp_path: Path) -> Non
     with pytest.raises(StaleApprovalError):
         service.approve(pending_request)
     assert records.get_approval(pending_request).status is ApprovalStatus.REJECTED  # type: ignore[union-attr]
+
+
+def test_run_service_pause_persists_nonterminal_paused_state(tmp_path: Path) -> None:
+    store = RunRecords()
+    deps, records, _, _ = dependencies(tmp_path, Provider(()), Validator(()))
+    service = RunService(store, AgentLoop(), lambda run: deps)
+    run = service.create_run(RunRequest(task="pause before execution"))
+
+    summary = service.pause(run.id)
+
+    assert summary.status is RunState.PAUSED
+    assert summary.stop_reason is None
+    assert store.get_run(run.id).state is RunState.PAUSED  # type: ignore[union-attr]
+    assert records.get_loop_session(run.id).state is RunState.PAUSED  # type: ignore[union-attr]
 
 
 @pytest.mark.parametrize("operation", ("resume", "cancel"))

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
+from coding613.application.progress import ProviderCancelledError
 from coding613.ports.llm import LLMResponse, ModelContext, ToolDefinition
 
 
@@ -26,3 +27,24 @@ class ScriptedLLM:
         if not self._responses:
             raise MockScriptExhausted("scripted LLM response sequence is exhausted")
         return self._responses.popleft()
+
+
+class ScriptedStreamingLLM(ScriptedLLM):
+    def __init__(self, deltas: Sequence[str], response: LLMResponse) -> None:
+        super().__init__((response,))
+        self._deltas = tuple(deltas)
+
+    def complete_stream(
+        self,
+        context: ModelContext,
+        tools: Sequence[ToolDefinition],
+        on_text_delta: Callable[[str], None],
+        cancelled: Callable[[], bool],
+    ) -> LLMResponse:
+        for delta in self._deltas:
+            if cancelled():
+                raise ProviderCancelledError("provider stream was cancelled")
+            on_text_delta(delta)
+        if cancelled():
+            raise ProviderCancelledError("provider stream was cancelled")
+        return self.complete(context, tools)

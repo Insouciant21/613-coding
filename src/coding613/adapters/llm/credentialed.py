@@ -52,6 +52,19 @@ class CredentialedOpenAICompatibleLLM:
             self._delegate = delegate
         return delegate.complete(context, tools)
 
+    def complete_stream(
+        self,
+        context: ModelContext,
+        tools: Sequence[ToolDefinition],
+        on_text_delta: Callable[[str], None],
+        cancelled: Callable[[], bool],
+    ) -> LLMResponse:
+        delegate = self._delegate
+        if delegate is None:
+            delegate = self._build_delegate()
+            self._delegate = delegate
+        return delegate.complete_stream(context, tools, on_text_delta, cancelled)
+
     def close(self) -> None:
         """Release the ephemeral HTTP client without returning its key material."""
 

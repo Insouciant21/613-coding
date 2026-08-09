@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Any, Literal, Protocol
+from collections.abc import Callable, Sequence
+from typing import Any, Literal, Protocol, runtime_checkable
 from uuid import UUID
 
 from pydantic import Field
@@ -39,7 +39,19 @@ class LLMResponse(DomainModel):
     provider_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+@runtime_checkable
 class LLMProvider(Protocol):
     def complete(
         self, context: ModelContext, tools: Sequence[ToolDefinition]
+    ) -> LLMResponse: ...
+
+
+@runtime_checkable
+class StreamingLLMProvider(LLMProvider, Protocol):
+    def complete_stream(
+        self,
+        context: ModelContext,
+        tools: Sequence[ToolDefinition],
+        on_text_delta: Callable[[str], None],
+        cancelled: Callable[[], bool],
     ) -> LLMResponse: ...

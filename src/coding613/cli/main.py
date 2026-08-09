@@ -15,20 +15,4 @@ app.add_typer(run_app, name="run")
 app.add_typer(runs_app, name="runs")
 app.command("demo")(demo_command)
 
-
-@app.command("web")
-def web(
-    host: str = "127.0.0.1",
-    port: int = 8000,
-    repo: str = ".",
-) -> None:
-    """Start the local operations console."""
-
-    import uvicorn
-
-    from coding613.api.app import create_app
-    from coding613.application.composition import build_services
-
-    uvicorn.run(create_app(build_services(repo)), host=host, port=port)
-
 __all__ = ["app"]

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol
@@ -21,6 +21,11 @@ from coding613.application.approvals import (
 from coding613.application.budgets import BudgetLimits, BudgetTracker
 from coding613.application.feedback import FeedbackClassifier
 from coding613.application.policy import PolicyEngine, RepositoryPolicyConfig
+from coding613.application.progress import (
+    CancellationToken,
+    ProviderCancelledError,
+    complete_with_progress,
+)
 from coding613.application.tool_registry import ToolRegistry, ToolRegistryError
 from coding613.application.validation import ValidationResult, ValidationTracker
 from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
@@ -39,8 +44,10 @@ from coding613.domain.models import (
     SchemaValidationEvidence,
     StopReason,
 )
+from coding613.domain.redaction import redact_text
 from coding613.ports.llm import LLMProvider, LLMResponse, ModelContext, ToolDefinition
 from coding613.ports.policy import PolicyDecision, PolicyEffect
+from coding613.ports.progress import NullProgressSink, ProgressKind, ProgressSink, RunProgress
 from coding613.ports.storage import EventStore, LoopSessionStore
 from coding613.ports.tools import ToolContext, ToolResult
 
@@ -54,6 +61,13 @@ _FINISH_TOOL = ToolDefinition(
         "additionalProperties": False,
     },
 )
+
+
+def _progress_text(value: str, limit: int = 8_000) -> str:
+    safe = redact_text(value)
+    if len(safe) <= limit:
+        return safe
+    return f"{safe[:limit]}\n... output truncated ({len(safe) - limit} characters omitted)"
 
 
 class ContextBuilder(Protocol):
@@ -88,6 +102,8 @@ class LoopDependencies:
     revision: Callable[[], str]
     changed_files: Callable[[], Sequence[str]]
     clock: Callable[[], datetime]
+    progress: ProgressSink = field(default_factory=NullProgressSink)
+    cancellation: CancellationToken = field(default_factory=CancellationToken)
 
 
 @dataclass(slots=True)
@@ -237,7 +253,31 @@ class AgentLoop:
 
             started = time.monotonic()
             try:
-                raw_response = dependencies.provider.complete(context, definitions)
+                raw_response = complete_with_progress(
+                    dependencies.provider,
+                    context,
+                    definitions,
+                    lambda delta: self._publish(
+                        run_id,
+                        ProgressKind.TEXT_DELTA,
+                        dependencies,
+                        text=delta,
+                    ),
+                    dependencies.cancellation.is_cancelled,
+                )
+            except ProviderCancelledError:
+                elapsed = time.monotonic() - started
+                session.budget.consume(turns=0, calls=0, seconds=elapsed, cost=0)
+                self._transition(run_id, session, dependencies, RunState.PAUSED)
+                session.stop_reason = None
+                self._record(
+                    run_id,
+                    session,
+                    dependencies,
+                    state_before=RunState.WAITING_MODEL,
+                    context=context,
+                )
+                return self._summary(run_id, session)
             except Exception as error:
                 elapsed = time.monotonic() - started
                 session.budget.consume(turns=0, calls=0, seconds=elapsed, cost=0)
@@ -614,6 +654,27 @@ class AgentLoop:
         )
         return self._summary(run_id, session)
 
+    def pause(
+        self,
+        run_id: UUID,
+        task: str,
+        dependencies: LoopDependencies,
+    ) -> RunSummary:
+        session = self._load(run_id, dependencies)
+        if session.state.is_terminal:
+            return self._summary(run_id, session)
+        state_before = session.state
+        self._transition(run_id, session, dependencies, RunState.PAUSED)
+        session.stop_reason = None
+        self._record(
+            run_id,
+            session,
+            dependencies,
+            state_before=state_before,
+            context=ModelContext(run_id=run_id, task=task),
+        )
+        return self._summary(run_id, session)
+
     def get_summary(
         self, run_id: UUID, dependencies: LoopDependencies
     ) -> RunSummary:
@@ -959,6 +1020,15 @@ class AgentLoop:
             repository_root=dependencies.policy_config.repository_root,
             permission_mode=dependencies.permission_mode,
         )
+        self._publish(
+            run_id,
+            ProgressKind.TOOL_STARTED,
+            dependencies,
+            payload={
+                "tool": call.name,
+                "arguments": redact_payload(call.arguments),
+            },
+        )
         try:
             tool_result = ToolResult.model_validate(
                 dependencies.tools.dispatch(call, context)
@@ -1006,6 +1076,19 @@ class AgentLoop:
             )
             return True
 
+        self._publish(
+            run_id,
+            ProgressKind.TOOL_FINISHED,
+            dependencies,
+            payload={
+                "tool": call.name,
+                "success": tool_result.success,
+                "output": _progress_text(tool_result.output),
+                "error": _progress_text(tool_result.error or "") if tool_result.error else "",
+                "changed_files": tool_result.changed_files,
+            },
+        )
+
         for path in tool_result.changed_files:
             if path not in session.changed_files:
                 session.changed_files.append(path)
@@ -1052,11 +1135,18 @@ class AgentLoop:
             )
             return False
 
+        self._publish(run_id, ProgressKind.VALIDATION_STARTED, dependencies)
         try:
             validation = ValidationResult.model_validate(
                 dependencies.validator.validate()
             )
         except Exception as error:
+            self._publish(
+                run_id,
+                ProgressKind.VALIDATION_FINISHED,
+                dependencies,
+                payload={"success": False},
+            )
             self._dependency_failure(
                 run_id,
                 session,
@@ -1073,6 +1163,15 @@ class AgentLoop:
                 approval_update=approval_update,
             )
             return True
+        self._publish(
+            run_id,
+            ProgressKind.VALIDATION_FINISHED,
+            dependencies,
+            payload={
+                "success": validation.passed,
+                "result": redact_payload(validation.model_dump(mode="json")),
+            },
+        )
         try:
             revision = dependencies.revision()
         except Exception as error:
@@ -1451,7 +1550,34 @@ class AgentLoop:
             "state.transition",
             {"from": previous.value, "to": state.value},
         )
+        self._publish(
+            run_id,
+            ProgressKind.STATE,
+            dependencies,
+            text=state.value,
+            payload={"from": previous.value, "to": state.value},
+        )
 
+    @staticmethod
+    def _publish(
+        run_id: UUID,
+        kind: ProgressKind,
+        dependencies: LoopDependencies,
+        *,
+        text: str = "",
+        payload: Mapping[str, Any] | None = None,
+    ) -> None:
+        try:
+            dependencies.progress.publish(
+                RunProgress(
+                    run_id=run_id,
+                    kind=kind,
+                    text=text,
+                    payload=dict(payload or {}),
+                )
+            )
+        except Exception:
+            return
     def _terminal(
         self,
         run_id: UUID,

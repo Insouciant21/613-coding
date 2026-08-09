@@ -3,8 +3,8 @@ stages:
   - lint
   - typecheck
   - demo
-  - build
   - container
+  - artifact-smoke
 
 default:
   image: python:3.12.8-slim-bookworm
@@ -30,20 +30,12 @@ typecheck:
 demo:
   stage: demo
   script:
-    - uv run python -m coding_harness.demo.core_feedback --help || true
     - uv run pytest tests/demo -q
-
-build:
-  stage: build
-  script:
-    - uv build
-  artifacts:
-    paths:
-      - dist/
 
 docker-build:
   stage: container
   image: docker:27.5.1-cli
+  before_script: []
   services:
     - name: docker:27.5.1-dind
       command: ["--tls=false"]
@@ -51,5 +43,16 @@ docker-build:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   script:
-    - docker build --pull -t 613-coding:"$CI_COMMIT_SHA" .
-    - scripts/smoke_container.sh "613-coding:$CI_COMMIT_SHA"
+    - docker build --pull --target artifacts --output type=local,dest=dist .
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week
+
+artifact-smoke:
+  stage: artifact-smoke
+  needs:
+    - job: docker-build
+      artifacts: true
+  script:
+    - scripts/smoke_artifacts.sh dist

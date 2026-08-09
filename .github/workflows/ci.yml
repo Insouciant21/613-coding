@@ -36,7 +36,7 @@ jobs:
       - run: uv sync --frozen
       - run: uv run pytest tests/demo -q
 
-  package-and-container:
+  package-and-artifacts:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +44,10 @@ jobs:
         with:
           version: "0.8.14"
       - run: uv sync --frozen
-      - run: uv build
-      - run: docker build --pull -t 613-coding:${{ github.sha }} .
-      - run: scripts/smoke_container.sh 613-coding:${{ github.sha }}
+      - run: docker build --pull --target artifacts --output type=local,dest=dist .
+      - run: scripts/smoke_artifacts.sh dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 613-coding-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error

@@ -40,7 +40,7 @@ LanceDB, `keyring`, Docker Engine API/BuildKit, HTTPX streaming for OpenAI-compa
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | complete through Docker smoke repair `774c07a`; real provider remains injectable |
 | `docs/superpowers/plans/2026-08-09-613-coding-package-rename.md` | Strict distribution/import/runtime/documentation rename | completed Tasks 1-3 | complete through reviewed CI and SSH deployment at `eefee2d` |
 | `docs/superpowers/plans/2026-08-09-safe-repository-mutations.md` | Schema-validated apply_patch and descriptor-relative delete | existing provider/context repair branch | committed in `9ee205d`; pending execution approval |
-| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | committed in `9ee205d`; pending execution approval |
+| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | TUI-01 through TUI-08 complete locally; TUI-09 documentation/Cube handoff remains |
 | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | committed in `9ee205d`; pending execution approval |
 | `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
 
@@ -202,7 +202,135 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
   behavior. Controller takeover and all deviations are recorded in
   AGENT_LOG.md and the SDD ledger.
 
+## TUI-01 Task Evidence
+
+- Status: complete after an independent scoped re-review confirmed both Important findings are
+  addressed with no new Critical or Important breakage; Task 2 may start.
+- Commits: `66c11d8` (`feat: persist interactive coding sessions`) and `b45bb71`
+  (`fix: make session migration atomic`).
+- TDD evidence: the original domain/storage collection RED failed because `InteractiveSession`
+  was absent. Fix-round RED failed 3 targeted tests: late SQLite index denial left v1 schema
+  objects behind, a later UTC Run did not advance an offset-bearing session, and existing offset
+  session rows sorted lexically rather than chronologically.
+- Fix: schema statements, v1 table/index additions, and `PRAGMA user_version = 1` now run in one
+  explicit SQLite transaction. Run and interactive-session timestamps persist in UTC; existing
+  relevant rows normalize transactionally on opening, preserving chronological ordering and
+  microsecond precision.
+- Verification: focused domain/storage suite passed 19 tests; full harness suite passed 322 tests
+  with one existing Starlette/httpx deprecation warning. Ruff, mypy for 15 relevant source files,
+  `uv lock --check`, and `git diff --check` passed.
+- Boundaries: migration remains additive and retains legacy Run/Event data. No WebUI, Cube,
+  credentials, deployment, `.claude/`, or course-requirement file changed.
+- Review: scoped review of `66c11d8..c23f217` found the atomic migration and chronological
+  timestamp findings ADDRESSED, with no new breakage or out-of-scope observations.
+
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
+
+## TUI-02 Task Evidence
+
+- Status: complete through `330d4a5` (`feat: stream provider progress through application ports`);
+  evidence record follows in the scoped documentation commit.
+- Inherited recovery: a prior external implementer left the Task 2 code and tests uncommitted after
+  recording valid initial RED/GREEN evidence, but authentication failed before it could record a
+  report or commit. Controller baseline verification before recovery was `334 passed` under
+  `uv run pytest -vv --ignore=tmp`.
+- Fresh RED: the added focused regression command failed as expected with 10 failures: nested
+  `RunProgress.payload` mutation was allowed; three non-object normal messages leaked
+  `AttributeError`; five malformed SSE tool-call containers/fragments were accepted or leaked
+  `AttributeError`; and one credential assertion initially expected empty provider metadata.
+- Fix: progress payloads now recursively freeze built-in containers while retaining the specified
+  dict-compatible field; normal and streamed provider messages validate container/fragment types
+  before parsing; streaming remains optional through a runtime-checkable port; and credentialed
+  delegates are lazily built and reused.
+- GREEN: the final focused Task 2 suite passed 30 tests. Scoped Ruff passed, mypy passed for 14
+  source files, the full offline suite passed 342 tests with one existing Starlette/httpx warning,
+  `uv lock --check` and `git diff --check` passed.
+- Boundaries: no `tmp/cube`, `.claude/`, course requirement, credential, deployment, Web removal,
+  TUI view, or later-task file changed. `RunProgress` remains ephemeral; no progress is persisted.
+- Review fix round 1: independent review found streamed tool calls fabricated `call-{index}` when
+  the provider omitted an ID. TDD RED failed the new missing-ID regression; the parser now rejects
+  incomplete streamed tool calls and uses only provider-supplied IDs. Focused suite passed 31,
+  full offline suite passed 343 with the same existing warning, Ruff/mypy/lock/diff checks passed.
+- Review status: fix finding addressed by the focused regression and scoped diff verification;
+  independent re-review dispatch was unavailable in this turn and remains a process follow-up for
+  the broad branch review.
+
+## TUI-03 Task Evidence
+
+- Status: implementation locally verified; independent task review pending.
+- TDD RED: the two new progress/cancellation tests failed because `LoopDependencies` had no
+  `progress` or `cancellation` fields.
+- GREEN: focused loop/composition suite passed 50; loop/composition/CLI regression suite passed 55;
+  Ruff and mypy for application code passed.
+- Behavior: progress is ephemeral and sink failures are isolated; provider cancellation persists
+  `PAUSED` with no stop reason; `RunService.pause()` supports active and idle nonterminal runs.
+- Regression repair: non-streaming progress fallback now ignores raw malformed provider values
+  until Loop schema validation, preserving the pre-existing invalid-response repair path.
+
+## TUI-04 Task Evidence
+
+- Status: implementation locally complete; independent task review unavailable because the external
+  Codex refresh token is invalidated.
+- TDD RED: five workflow tests failed on absent `LocalServices.interactive`.
+- GREEN: interactive/context/composition suite passed 20; full offline suite passed 352 with the
+  existing Web test deprecation warning; Ruff, mypy, lock, and diff checks passed.
+- Behavior: sessions and linked Runs restore from SQLite, transcripts use persisted final response
+  content only, newest nonterminal Run is active, and history injection is capped at 12 entries and
+  12,000 characters with repeat redaction.
+
+## TUI-05 Task Evidence
+
+- Status: root dispatch and Textual shell locally complete; independent review deferred with the
+  recorded external authentication blocker.
+- RED: CLI/TUI test collection failed on missing `coding613.cli.tui` and `coding613.tui` modules.
+- GREEN: focused entrypoint/Pilot suite passed 13; full offline suite passed 365; Ruff, mypy, lock,
+  and diff checks passed.
+- Behavior: root invocation opens TUI, task words prefill the composer, five management commands
+  retain Typer dispatch, and 80x24/60x20 layouts keep stable full-width regions.
+- Source record: `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-2-report.md`.
+
+## TUI-06 Task Evidence
+
+- Status: complete; commit `048bdbc`; source record `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-6-report.md`.
+- TDD/Pilot: controller, command, renderer, approval, long-diff, pause, provider-error, and
+  narrow-terminal tests passed; the full Task 6 regression command passed 95 tests.
+- Behavior: UI-thread progress draining, one streamed assistant Markdown per Run, persisted
+  transcript reconciliation, public approval lookup/fingerprint details, explicit approval keys,
+  slash commands, provider metadata, redacted bounded details, and idempotent Esc pause.
+- Static/reproducibility gates: scoped Ruff and mypy passed; `uv lock --check` and `git diff --check`
+  passed. No remote review claim is made because the external Codex token remains invalidated.
+
+## TUI-07 Task Evidence
+
+- Status: complete; commit `4877a7f`; the main FastAPI/WebUI/Render/runtime-container surface and
+  positive tests were removed while worker Docker and multi-agent application code remained.
+- TDD: absence contracts initially failed on dependencies, root `web`, removed paths, and current
+  guidance; after deletion, removal/CLI/application tests passed 143 and the full offline suite
+  passed 380 tests.
+- Static gates: Ruff, mypy, `uv lock --check`, and `git diff --check` passed. Current README and
+  operations guidance describe only local TUI/CLI, keyring, SQLite/LanceDB, worker sandbox, and
+  artifact operation; historical records are left outside the current-guidance scan.
+
+## TUI-08 Task Evidence
+
+- Status: locally complete; implementation remains uncommitted in the TUI/distribution worktree.
+- Root-cause fixes: the standalone wheel explicitly declares its direct `click` runtime dependency;
+  the pinned Debian slim builder installs `binutils` required by PyInstaller's Linux analysis.
+- Verification: focused distribution/CI tests passed 11; local build and smoke passed for binary,
+  wheel, sdist, and `SHA256SUMS`; Docker BuildKit `--target artifacts` export succeeded and its
+  output passed smoke; Debian Bookworm slim executed the exported binary with `--help`.
+- Artifact evidence: Docker output binary is 152M, `file` reports ELF 64-bit LSB x86-64, and
+  `sha256sum -c SHA256SUMS` passed. GitHub/GitLab workflows now upload or retain the four artifacts
+  and no longer reference the removed runtime container smoke script.
+- CI portability follow-up: GitHub installs pinned uv before artifact smoke; GitLab separates the
+  Docker export job from a dependent Python/uv `artifact-smoke` job. The updated contract test,
+  full 388-test offline suite, Ruff, mypy, lock, and diff checks passed.
+- Review fix: GitLab's Docker CLI producer explicitly disables inherited Python setup and contains
+  no smoke invocation; the dependent Python/uv job is the sole artifact smoke consumer.
+- Final review fixes: session resume reconstructs persisted summaries, continues the same paused
+  Run, and restores pending approval actions after restart. Fresh deliverables each passed config
+  inspection and the offline core demo; focused 111 and full 392-test suites plus all static gates
+  passed.
 
 ## SSH Deployment Follow-up
 

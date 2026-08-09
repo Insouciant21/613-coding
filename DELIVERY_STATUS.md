@@ -1,15 +1,15 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 01:56:00 (Asia/Shanghai)
-Responsible actor: `/root`; safe repository mutations Tasks 1-4 are reviewed, locally verified, and integrated into `main` at `69caa09`; the approved local TUI/distribution implementation remains pending; published deployment remains unchanged.
+Last updated: 2026-08-10 05:19:25 (Asia/Shanghai)
+Responsible actor: `/root` for locally verified TUI-08; safe repository mutations Tasks 1-4 are reviewed and integrated into `main` at `69caa09`; TUI-01 through TUI-08 are locally verified in the TUI/distribution worktree; published deployment remains unchanged.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
-| Claude Code-like TUI | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | complete safe mutations, then begin TUI-01 |
-| Binary/wheel/sdist artifact builder | design approved; implementation pending | TUI/distribution design; Docker and CI contract | build and execute artifacts after TDD implementation |
+| Claude Code-like TUI | TUI-01 through TUI-08 implementation/fix verified locally; final recovery review fixes verified | design `e7f7ece`; plan `9ee205d`; commits `048bdbc`, `4877a7f`; paused/approval recovery evidence in `AGENT_LOG.md` | merge verified branch to main and rerun acceptance gates |
+| Binary/wheel/sdist artifact builder | locally built and Docker-exported; CI workflows updated | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08 evidence below | commit after broad review and retain CI artifact upload gate |
 | Main Web/HTTP removal | design approved; implementation pending | revised `SPEC.md` and `AGENTS.md` | prove code, dependency, test, manifest, and documentation removal |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
 | Approved design | complete | `docs/superpowers/specs/2026-08-07-613-coding-design.md`; commits `6ad0eec`, `c4fd219`, `ba03b70` | none |
@@ -23,9 +23,9 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Mock-LLM mechanism tests | persisted core demo complete and reviewed | scripted adapter tests plus offline feedback/repair/persistence demo in `tests/demo`; commits `2dd32f9` through `f9394d7` | retain as regression gate |
 | Container sandbox | complete | SANDBOX-01 `9df471d`; SANDBOX-02 `aa3600a`; SANDBOX-03 `3ec6ac1`; SANDBOX-04 `439540f`; SANDBOX-05 `fb1c222`; reports under `.superpowers/sdd/2026-08-08-613-coding-sandbox/` | retain regression gate |
 | Multi-agent orchestration | complete | MULTI-01 `9744339`; MULTI-02 `5910d7b`; MULTI-03 `43f51fc`; MULTI-04 `11eaef8`; MULTI-05 `376fd41`; reports under `.superpowers/sdd/2026-08-08-613-coding-multi-agent/` | retain regression gate |
-| README and distribution | existing Web distribution is historical and must be replaced | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata, `scripts/smoke_container.sh`; prior commit `774c07a` | document and verify local TUI/binary distribution |
+| README and distribution | local TUI and artifact-only operation documented | `README.md`, `docs/deployment.md`, `Dockerfile`, package metadata, `scripts/smoke_artifacts.sh`; TUI-07/TUI-08 evidence below | retain artifact verification and CI upload gate |
 | Strict package rename documentation and artifacts | deployed and verified | `eefee2d`; Task 3 artifacts and Task 4 CI/deployment evidence below | retain as regression gate |
-| GitLab CI `unit-test` job | configured; local equivalent verified | `.gitlab-ci.yml`; current local `pytest`, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
+| GitLab CI `unit-test` job | configured; local equivalent and artifact handoff verified | `.gitlab-ci.yml`; Docker export feeds dependent Python/uv `artifact-smoke`; current local pytest, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
 | Real-provider worker reliability | unblocked and integrated on `main` | descriptor-relative delete and patch mutation Tasks 1-4; merge `69caa09`; fresh main evidence below | retain regression gate |
@@ -342,6 +342,98 @@ Every completed plan task must link a commit and fresh verification output here.
 - Source records: `PLAN.md`, `AGENT_LOG.md`, and `.superpowers/sdd/2026-08-09-safe-repository-mutations/progress.md`.
 
 - Main integration evidence: merge commit `69caa09`; `uv run pytest -q --ignore=tmp` passed 313 tests, Ruff, mypy, lock, and diff checks passed. Unfiltered pytest collection remains blocked by the user-owned `tmp/cube` package import path and is not claimed.
+
+## TUI-01 Evidence
+
+- Status: persisted interactive-session domain/storage implementation and its first review-fix
+  round are locally verified and independently re-reviewed with no open Critical/Important issue.
+- Commits: `66c11d8` and `b45bb71`.
+- Fix evidence: a real SQLite authorizer denial after v1 mutations now rolls the schema and
+  `user_version` back together. Offset-bearing session/Run timestamps persist in UTC, legacy
+  offset rows normalize on reopen, and chronological activity ordering is covered.
+- Latest verification: focused domain/storage suite 19 passed; full harness suite 322 passed with
+  one existing Starlette/httpx deprecation warning; relevant Ruff/mypy, `uv lock --check`, and
+  `git diff --check` passed.
+- Source records: `PLAN.md`, `AGENT_LOG.md`, and
+  `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-1-report.md`.
+- Review: `66c11d8..c23f217` scoped re-review verdict was both findings ADDRESSED, with no new
+  breakage or out-of-scope observation.
+
+## TUI-02 Evidence
+
+- Verification timestamp: `2026-08-10 03:21:46 Asia/Shanghai`.
+- Status: complete locally at `330d4a5` after recovery from the prior external implementer's
+  authentication failure; no deployment, credential, or remote CI state changed.
+- TDD: inherited contract/SSE RED/GREEN evidence was reported but not persisted by the failed
+  implementer. Controller pre-takeover baseline passed 334 tests. Fresh regression RED produced
+  10 expected failures covering deep payload mutation, malformed normal messages, invalid SSE
+  tool-call containers/fragments, and a corrected credentialed public-call metadata expectation.
+- GREEN: focused Task 2 suite passed 30 tests; scoped Ruff and mypy passed; full offline suite
+  passed 342 tests with one existing Starlette/httpx warning; `uv lock --check` and
+  `git diff --check` passed.
+- Boundary: streaming provider support is optional, progress is ephemeral and recursively frozen,
+  malformed provider shapes return `ProviderResponseError`, and one lazy credentialed delegate is
+  reused across public stream calls. Source detail is in
+  `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-2-report.md`.
+- CI/CD: no Task 2 remote pipeline was triggered. The latest recorded GitHub Actions result remains
+  `31299431092` passed; the next pipeline must cover the TUI branch changes before remote delivery.
+- Review fix round 1: missing streamed tool-call IDs now raise `ProviderResponseError` instead of
+  receiving a fabricated audit ID. Focused suite passed 31; full offline suite passed 343 with the
+  existing Starlette/httpx warning; Ruff, mypy, lock, and diff checks passed. Scoped re-review is
+  The focused regression and scoped diff verification address the finding; an independent scoped
+  re-review was unavailable in this turn and is explicitly carried into the broad branch review.
+
+## TUI-03 Evidence
+
+- Verification timestamp: `2026-08-10 04:00:00 Asia/Shanghai`.
+- Status: implementation locally verified; independent task review pending.
+- Focused evidence: loop/composition suite `50 passed`; loop/composition/CLI regression suite
+  `55 passed`; Ruff and mypy application checks passed.
+- Boundary: progress remains ephemeral, cancellation is cooperative, and idle pause persists a
+  nonterminal `PAUSED` Run without a stop reason. No `tmp/cube`, Web removal, packaging, or remote
+  deployment files changed.
+
+## TUI-04 Evidence
+
+- Verification timestamp: `2026-08-10 04:20:00 Asia/Shanghai`.
+- Status: interactive session application service locally complete; independent review is deferred
+  because external Codex authentication returns `refresh_token_invalidated`.
+- Evidence: focused suite 20 passed; full offline suite 352 passed with the existing Web warning;
+  Ruff, mypy for 87 source files, lock, and diff checks passed.
+- Boundary: SQLite remains authoritative; transcript deltas are not persisted; session context is
+  bounded and redacted; no Web, packaging, `tmp/cube`, deployment, or credential path changed.
+
+## TUI-05 Evidence
+
+- Verification timestamp: `2026-08-10 04:45:00 Asia/Shanghai`.
+- Root `613-coding` now opens the local Textual shell; `--repo`, `--resume`, initial task, help,
+  unknown-option, missing-repository, and management dispatch contracts are tested.
+- Focused suite passed 13; full offline suite passed 365 with the existing Web warning; Ruff,
+  mypy for 91 source files, uv lock, and diff checks passed.
+
+## TUI-06 Evidence
+
+- Verification timestamp: `2026-08-10 04:29:21 Asia/Shanghai`.
+- Commit: `048bdbc` (`feat: add streamed coding conversation tui`).
+- TDD/Pilot: `uv run pytest tests/tui tests/cli tests/application/test_interactive.py tests/application/test_loop.py -q` passed 95 tests.
+- Static gates: scoped Ruff and mypy passed; `uv lock --check` and `git diff --check` passed.
+- Behavior: streamed assistant reconciliation, background service execution, idempotent pause,
+  approval fingerprint/reason/path/diff details, explicit approve/reject keys, slash commands,
+  provider metadata, bounded redacted tool/validation/error output, and 80x24/60x20 long-diff
+  scrollability.
+- Review boundary: external Codex review remains unavailable due HTTP 401 `refresh_token_invalidated`;
+  no independent review success is claimed. No `tmp/cube`, deployment, Web removal, or release
+  artifact state changed.
+
+## TUI-07 Evidence
+
+- Verification timestamp: `2026-08-10 04:39:05 Asia/Shanghai`.
+- Commit: `4877a7f` (`refactor: replace web console with local tui`).
+- Removal/CLI/application suite passed 143 tests; full offline suite passed 380 tests.
+- FastAPI/Uvicorn, `coding613.api`, `coding613.web`, Render manifest, runtime entrypoint, and
+  container smoke script are absent from the main product. Current guidance no longer instructs a
+  server, public URL, SSH, or reverse proxy. Worker sandbox and orchestration sources were not
+  changed.
 
 ## CI and Deployment Manifest Evidence
 
