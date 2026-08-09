@@ -123,9 +123,9 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 
 ## Real-provider Worker Reliability Repair Evidence
 
-- Status: implementation and two review repair rounds complete through `80f6c85`, `da9cda5`, and `ee05b2a`; second scoped re-review pending.
-- Scope: stable goal-directed worker context, configured permission-mode inheritance, repository file deletion, policy/role/progress integration, and symlink-safe unlink semantics.
-- Verification: real-provider Cube foundation run `46ec4663-1c43-41e7-95d7-ce31f3b7d489` completed successfully; fresh harness verification passed 260 tests, Ruff, mypy across 82 source files, lock check, and diff check.
+- Status: review blocked. Context, configured-mode inheritance, and bounded file listings work through `0836308`, but pathname-based `delete_file` remains vulnerable to a parent-symlink TOCTOU race and must not merge.
+- Scope: stable goal-directed worker context, configured permission-mode inheritance, bounded repository listings, and a pending descriptor-relative `delete_file` redesign using no-follow directory descriptors.
+- Verification: real-provider Cube foundation run `46ec4663-1c43-41e7-95d7-ce31f3b7d489` completed successfully; the latest harness verification passed 266 tests, Ruff, mypy across 82 source files, lock check, and diff check. Independent review reproduced the unresolved delete race.
 - Evidence: `AGENT_LOG.md` entry `2026-08-09 22:20:00 Asia/Shanghai`; target operation details remain append-only in `tmp/cube/AGENT_LOG.md`.
 
 ## CI and Deployment Manifest Evidence
