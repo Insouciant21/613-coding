@@ -532,3 +532,17 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Remote GREEN: GitHub Actions run `31288180749` passed all jobs; package/container job `93180685167` passed the pinned Docker build and smoke script. Source: https://github.com/Insouciant21/613-coding/actions/runs/31288180749
 - Boundary: direct Docker Hub OAuth can reset on this host's IPv6 path; the local verification used a digest-matching approved mirror cache. Render deployment and public URL remain operator-controlled and unverified.
 - Lesson: a successful image build is insufficient distribution evidence; the image must start under its declared user, pass its health contract, and clean up in the CI environment.
+
+### 2026-08-09 09:31:53 CST (Asia/Shanghai) - REMOTE-CI-02
+
+- Evidence: REMOTE-CI-02 | 60ce34bf795f04f3c33d2d25fb24468d1c9cad82
+- Status: pass
+- Command: `gh run watch 31288395120 --repo Insouciant21/613-coding --exit-status`
+- Result: main 60ce34b passed: unit-test, quality, demo, package-and-container; Docker build and smoke passed
+
+### 2026-08-09 09:32:12 Asia/Shanghai - final main CI verification
+
+- Task: verify the exact published main commit after delivery-record updates.
+- Evidence: commit `60ce34b`; GitHub Actions run `31288395120` passed. Jobs `93181247911` (`unit-test`), `93181247963` (`quality`), `93181247927` (`demo`), and `93181247973` (`package-and-container`) all completed successfully.
+- Container evidence: job `93181247973` built the digest-pinned image and ran `scripts/smoke_container.sh`; no failed annotations were present beyond the upstream Node.js 20 deprecation notices.
+- Boundary: GitHub CI is verified for the published main branch; GitLab has configuration and local-equivalent evidence but no configured GitLab remote pipeline. Render remains an operator-controlled deployment, and no public URL is claimed.
