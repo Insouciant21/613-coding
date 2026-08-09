@@ -759,3 +759,29 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   `sqlite.py:33-114` and the offset regressions to `test_sqlite.py:237-372`. It did not rerun the
   implementer's test claims.
 - Task status: TUI-01 is complete; TUI-02 streaming provider/progress contracts may start.
+
+### 2026-08-10 03:21:46 Asia/Shanghai - TUI distribution Task 2 recovery and completion
+
+- Task and skills: completed TUI-02 from the approved task brief using `test-driven-development`;
+  inherited uncommitted provider/progress work after the prior external implementer's Codex
+  authentication failure. The controller had independently established a 334-test baseline before
+  takeover.
+- Inherited result: the prior implementer reported valid contract/SSE RED and GREEN evidence but
+  did not leave a report or commit. The recovered implementation was inspected rather than
+  discarded; its intended Task 2 files were the only code/test paths changed.
+- Fresh TDD RED: `uv run pytest tests/application/test_progress.py
+  tests/adapters/llm/test_openai_compatible.py tests/adapters/llm/test_credentialed.py -q` failed
+  10 times as expected. The failures proved mutable nested progress payloads, leaked
+  `AttributeError` for three non-dict messages and one malformed function fragment, silent
+  coercion/acceptance for four more SSE tool-call cases, and a corrected test expectation for the
+  adapter's intentional empty `tool_call_ids` metadata.
+- GREEN: the final Task 2 focused suite passed 30 tests; scoped Ruff and mypy passed; full
+  `uv run pytest -q --ignore=tmp` passed 342 tests with one pre-existing Starlette/httpx warning;
+  `uv lock --check` and `git diff --check` passed.
+- Decision and lesson: `frozen=True` alone is shallow for Pydantic dict fields, so `RunProgress`
+  recursively freezes built-in payload containers while preserving its required dict-compatible
+  public field. SSE fragments validate exact containers and scalar types before accumulation;
+  streams and normal responses therefore return typed provider errors instead of implementation
+  exceptions.
+- Commit: `330d4a5` (`feat: stream provider progress through application ports`). No human
+  implementation edit, deployment action, real credential read, or remote CI run occurred.

@@ -40,7 +40,7 @@ LanceDB, `keyring`, Docker Engine API/BuildKit, HTTPX streaming for OpenAI-compa
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | complete through Docker smoke repair `774c07a`; real provider remains injectable |
 | `docs/superpowers/plans/2026-08-09-613-coding-package-rename.md` | Strict distribution/import/runtime/documentation rename | completed Tasks 1-3 | complete through reviewed CI and SSH deployment at `eefee2d` |
 | `docs/superpowers/plans/2026-08-09-safe-repository-mutations.md` | Schema-validated apply_patch and descriptor-relative delete | existing provider/context repair branch | committed in `9ee205d`; pending execution approval |
-| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | TUI-01 complete through `66c11d8`, `b45bb71`; TUI-02 through TUI-09 pending |
+| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | TUI-01 complete through `66c11d8`, `b45bb71`; TUI-02 complete through `330d4a5`; TUI-03 through TUI-09 pending |
 | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | committed in `9ee205d`; pending execution approval |
 | `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
 
@@ -225,6 +225,29 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
   timestamp findings ADDRESSED, with no new breakage or out-of-scope observations.
 
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
+
+## TUI-02 Task Evidence
+
+- Status: complete through `330d4a5` (`feat: stream provider progress through application ports`);
+  evidence record follows in the scoped documentation commit.
+- Inherited recovery: a prior external implementer left the Task 2 code and tests uncommitted after
+  recording valid initial RED/GREEN evidence, but authentication failed before it could record a
+  report or commit. Controller baseline verification before recovery was `334 passed` under
+  `uv run pytest -vv --ignore=tmp`.
+- Fresh RED: the added focused regression command failed as expected with 10 failures: nested
+  `RunProgress.payload` mutation was allowed; three non-object normal messages leaked
+  `AttributeError`; five malformed SSE tool-call containers/fragments were accepted or leaked
+  `AttributeError`; and one credential assertion initially expected empty provider metadata.
+- Fix: progress payloads now recursively freeze built-in containers while retaining the specified
+  dict-compatible field; normal and streamed provider messages validate container/fragment types
+  before parsing; streaming remains optional through a runtime-checkable port; and credentialed
+  delegates are lazily built and reused.
+- GREEN: the final focused Task 2 suite passed 30 tests. Scoped Ruff passed, mypy passed for 14
+  source files, the full offline suite passed 342 tests with one existing Starlette/httpx warning,
+  `uv lock --check` and `git diff --check` passed.
+- Boundaries: no `tmp/cube`, `.claude/`, course requirement, credential, deployment, Web removal,
+  TUI view, or later-task file changed. `RunProgress` remains ephemeral; no progress is persisted.
+- Source record: `.superpowers/sdd/2026-08-09-613-coding-tui-distribution/task-2-report.md`.
 
 ## SSH Deployment Follow-up
 
