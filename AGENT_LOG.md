@@ -660,3 +660,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - GREEN: safe mutation and loop integration suite passed 132 tests; full suite passed 312 tests with one existing Starlette/httpx deprecation warning; Ruff, mypy for 83 source files, `uv lock --check`, and `git diff --check` passed.
 - Independent re-review: all Critical and Important findings are addressed; no new blocking issue remains.
 - Human intervention: controller implemented the verified minimal fixes; no `tmp/cube` product code, credentials, deployment, `.claude/`, or user-owned requirement files were modified.
+- Implementation commit: `c6ce018`; delivery-record linkage is finalized in the follow-up documentation commit.
+
+### 2026-08-10 01:56:00 Asia/Shanghai - Safe mutation final close-boundary repair
+
+- Task: close the remaining Important review finding for root descriptor cleanup; triggered `receiving-code-review`, `systematic-debugging`, `test-driven-development`, and `verification-before-completion`.
+- TDD RED: injected failure of the pinned root descriptor's `os.close()` after a successful replacement; the raw `OSError` escaped while the file had already changed.
+- Fix: commit-phase cleanup now converts root-close failures into `PatchCommitError` with the exact committed paths, while preserving the original commit error when both failures occur.
+- GREEN: focused safe mutation and loop integration suite passed 133 tests; full suite passed 313 tests with one existing Starlette/httpx deprecation warning; Ruff, mypy for 83 source files, `uv lock --check`, and `git diff --check` passed.
+- Review status: the remaining Important finding is addressed in `e80883b`; no Critical or Important findings remain.

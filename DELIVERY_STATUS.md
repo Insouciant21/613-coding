@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 01:47:40 (Asia/Shanghai)
+Last updated: 2026-08-10 01:56:00 (Asia/Shanghai)
 Responsible actor: `/root`; safe repository mutations Tasks 1-4 are reviewed and locally verified in `fix/provider-context-history`, pending non-destructive integration into `main`; published deployment remains unchanged.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -330,10 +330,10 @@ Every completed plan task must link a commit and fresh verification output here.
 ## Safe Repository Mutations Evidence
 
 - Status: Tasks 1-4 complete in the reviewed `fix/provider-context-history` worktree; no deployment or remote state was changed.
-- Commits: Task 1 `9255c08`, `62c4fe6`; Task 2 `338b363`, `ad2cd04`, `80366e5`; Task 3 `1e6fb22`, `890e576`; Task 4 implementation and evidence commit are pending final commit creation.
+- Commits: Task 1 `9255c08`, `62c4fe6`; Task 2 `338b363`, `ad2cd04`, `80366e5`; Task 3 `1e6fb22`, `890e576`; Task 4 implementation `c6ce018` plus final close-boundary fix `e80883b`; evidence-record commit follows after this hash is linked.
 - Task 4 evidence: `apply_patch` is registered as `coding613.tool.apply_patch.v1`; composition, permission-mode, schema rejection, partial-commit propagation, and credential-header denial regressions are covered.
 - Review: independent review's Critical credential-header bypass and Important missing-record findings were addressed; no Critical or Important findings remain.
-- Fresh verification: safe mutation and loop integration suite passed 132 tests; full suite passed 312 tests with one pre-existing Starlette/httpx deprecation warning; Ruff, mypy for 83 source files, `uv lock --check`, and `git diff --check` passed.
+- Fresh verification: safe mutation and loop integration suite passed 133 tests; full suite passed 313 tests with one pre-existing Starlette/httpx deprecation warning; Ruff, mypy for 83 source files, `uv lock --check`, and `git diff --check` passed.
 - Source records: `PLAN.md`, `AGENT_LOG.md`, and `.superpowers/sdd/2026-08-09-safe-repository-mutations/progress.md`.
 
 ## CI and Deployment Manifest Evidence

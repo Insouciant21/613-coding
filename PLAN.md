@@ -158,11 +158,14 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
   apply_patch headers are now hard-denied before execution. A second scoped
   review found and fixed root-path replacement during multi-file commits,
   non-OSError partial-error reporting, and strict-parser trailing/target
-  length gaps. No Critical or Important findings remain.
+  length gaps. Final re-review found and fixed root descriptor close-error
+  reporting. No Critical or Important findings remain.
 - Fresh verification at 2026-08-10 01:52:00 CST: safe mutation and loop
-  integration suite passed 132 tests; full suite passed 312 tests with one
+  integration suite passed 133 tests; full suite passed 313 tests with one
   pre-existing Starlette/httpx deprecation warning; Ruff, mypy (83 source
   files), uv lock --check, and git diff --check passed.
+- Task 4 implementation commit: `c6ce018`; final close-boundary fix commit:
+  `e80883b`; evidence-record commit follows after this hash is linked.
 - Delegation deviation: 613 Coding run
   51a8e02a-3e46-4ed6-93b2-aae093be16b2 exhausted 20 model calls repeating
   git diff --check without writes; earlier Task 2 runs
