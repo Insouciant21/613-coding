@@ -147,6 +147,18 @@ class PolicyEngine:
                 path_rule = self._path_rule(value, root)
                 if path_rule is not None:
                     return path_rule
+        if call.name == "apply_patch":
+            patch = call.arguments.get("patch")
+            if isinstance(patch, str):
+                for line in patch.splitlines():
+                    if not line.startswith(("--- ", "+++ ")):
+                        continue
+                    value = line[4:].split("\t", 1)[0].strip()
+                    if value == "/dev/null":
+                        continue
+                    path_rule = self._path_rule(value, root)
+                    if path_rule is not None:
+                        return path_rule
         argv = call.arguments.get("argv")
         if isinstance(argv, list) and all(isinstance(item, str) for item in argv):
             lowered = tuple(item.lower() for item in argv)

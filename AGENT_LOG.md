@@ -641,3 +641,22 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Policy repair: run `ffe7ea54-9f4c-45fb-9285-fd843117dfda` produced repeated policy blocks because `token: string` matched the generic secret regex. TDD commit `a61a9d1` exempts common code type annotations while retaining actual secret assignments; focused tests passed 19 and the full suite passed 267. Ruff, mypy across 82 source files, lock check, and diff check passed.
 - Remaining blocker: 613 Coding registers only whole-file `edit_file` for repository mutation even though role policy mentions `apply_patch`. Independent bounded runs created Task 3 tests and partial files, but three consecutive `state.ts` repair attempts replaced incompatible whole files; the last one-line import repair deleted the fuller implementation and left 42 focused tests failing.
 - Decision: stop before a fourth repair attempt under `systematic-debugging`. Do not hand-edit Cube product code or claim Task 3 completion. Architecture choice is required between adding a schema-validated patch executor with conflict/preimage checks or explicitly relaxing the 613-only product-authoring constraint.
+
+### 2026-08-10 01:47:40 Asia/Shanghai - Safe repository mutations Task 4
+
+- Task: Task 4 tool-registry, policy, composition, and evidence completion; triggered `requesting-code-review`, `receiving-code-review`, `test-driven-development`, and `verification-before-completion`.
+- TDD RED: the focused policy regression for `.ssh/id_rsa`, `.aws/credentials`, and nested `.gnupg` patch headers failed 3 tests because policy only inspected named path arguments.
+- Implementation: `apply_patch` policy now inspects unified-diff `---`/`+++` headers and applies the existing hard path rules before executor dispatch. Added exact partial-commit propagation coverage for `PatchCommitError` and preserved the versioned `coding613.tool.apply_patch.v1` schema.
+- GREEN: policy suite passed 22 tests; registry/policy/composition suite passed 36 tests. Earlier fresh full verification passed 304 tests with one existing Starlette/httpx deprecation warning; Ruff, mypy for 83 source files, `uv lock --check`, and `git diff --check` passed.
+- Independent review: one Critical credential-path bypass and one Important evidence omission were addressed; the review also identified a Minor partial-commit test, which was added. No Critical or Important findings remain.
+- Human intervention: controller applied the minimal repair after verifying the reviewer finding; no `tmp/cube` product code, `.claude/`, requirement documents, credentials, or deployment state were touched.
+- Lesson: policy hard rules must inspect structured content carried inside mutation payloads, not only top-level path fields; task evidence files are part of the implementation boundary.
+
+### 2026-08-10 01:52:00 Asia/Shanghai - Safe mutation scoped re-review repairs
+
+- Task: address the second independent review's Critical root-path TOCTOU, Important partial-error reporting, and Important strict-parser findings; triggered `systematic-debugging`, `test-driven-development`, and `verification-before-completion`.
+- TDD RED: root replacement reproduced writes landing in the replacement directory; a late `PathOutsideRepositoryError` after the first file commit lost `changed_files`; trailing junk was silently accepted by the parser.
+- Implementation: `apply_patch` now opens one repository-root descriptor before preflight and passes duplicated descriptors through every read/delete/write; all commit-phase exceptions become `PatchCommitError` with exact committed paths; parser line accounting rejects trailing content and validates source/target hunk lengths.
+- GREEN: safe mutation and loop integration suite passed 132 tests; full suite passed 312 tests with one existing Starlette/httpx deprecation warning; Ruff, mypy for 83 source files, `uv lock --check`, and `git diff --check` passed.
+- Independent re-review: all Critical and Important findings are addressed; no new blocking issue remains.
+- Human intervention: controller implemented the verified minimal fixes; no `tmp/cube` product code, credentials, deployment, `.claude/`, or user-owned requirement files were modified.

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from coding613.adapters.tools.filesystem import FilesystemTools
 from coding613.adapters.tools.git import GitTools
+from coding613.adapters.tools.patch import PatchCommitError
 from coding613.adapters.tools.validation import ValidatorRunner
 from coding613.application.tool_registry import ToolRegistry
 from coding613.application.validation import (
@@ -113,6 +114,45 @@ class _DeleteFileExecutor:
         if path not in self._changed_files:
             self._changed_files.append(path)
         return _result(call, changed_files=(path,))
+
+
+class _ApplyPatchExecutor:
+    def __init__(self, tools: FilesystemTools, changed_files: list[str]) -> None:
+        self._tools = tools
+        self._changed_files = changed_files
+
+    def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
+        del context
+        try:
+            result = self._tools.apply_patch(str(call.arguments["patch"]))
+        except PatchCommitError as error:
+            self._merge_changed(error.changed_files)
+            return ToolResult(
+                call=call,
+                success=False,
+                error=type(error).__name__,
+                changed_files=error.changed_files,
+            )
+        except Exception as error:  # noqa: BLE001
+            return _failure(call, error)
+        self._merge_changed(result.changed_files)
+        return _result(
+            call,
+            output=_json(
+                {
+                    "added": result.added,
+                    "updated": result.updated,
+                    "deleted": result.deleted,
+                    "changed_files": list(result.changed_files),
+                }
+            ),
+            changed_files=result.changed_files,
+        )
+
+    def _merge_changed(self, paths: tuple[str, ...]) -> None:
+        for path in paths:
+            if path not in self._changed_files:
+                self._changed_files.append(path)
 
 
 class _GitDiffExecutor:
@@ -242,6 +282,26 @@ def build_repository_tools(
             },
         ),
         _DeleteFileExecutor(filesystem, changed_files),
+    )
+    registry.register(
+        ToolDefinition(
+            name="apply_patch",
+            description="Apply a strict unified diff to repository files",
+            input_schema={
+                "$id": "coding613.tool.apply_patch.v1",
+                "type": "object",
+                "properties": {
+                    "patch": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1_000_000,
+                    }
+                },
+                "required": ["patch"],
+                "additionalProperties": False,
+            },
+        ),
+        _ApplyPatchExecutor(filesystem, changed_files),
     )
     registry.register(
         ToolDefinition(

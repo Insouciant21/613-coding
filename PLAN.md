@@ -134,6 +134,44 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 - Verification: distribution-focused suite passed 7; Docker build attempt failed at external Docker Hub token retrieval, so no Docker or deployment success is claimed.
 - Boundary: remote CI final status and public URL require a configured forge/deployment account.
 
+## Safe Repository Mutations Evidence
+
+- Status: Tasks 1-4 complete in the reviewed fix/provider-context-history
+  worktree; integration into main remains pending the final branch check.
+- Task 1 commits: 9255c08, 62c4fe6; descriptor-relative delete holds parent
+  directory descriptors, rejects parent symlinks and protected roots, permits
+  final symlink deletion without following it, and passed its independent
+  review plus one fix round.
+- Task 2 commits: 338b363, ad2cd04, 80366e5; strict unidiff parser, immutable
+  prepared changes, path/header/hunk preflight, UTF-8 and aggregate limits,
+  and stable exceptions. Parser suite reached 23 passing tests after two
+  scoped review fix rounds.
+- Task 3 commits: 1e6fb22, 890e576; descriptor-relative patch staging, fsync,
+  atomic replace, delete reuse, sorted PatchResult, and exact partial
+  changed-file reporting. Patch/filesystem suite reached 48 passing tests
+  after one scoped review fix round.
+- Task 4 local implementation wires the versioned schema
+  coding613.tool.apply_patch.v1, executor result/error propagation,
+  composition integration, permission-mode tests, credential-path hard
+  denial coverage, and exact partial-commit changed-file propagation.
+- Task 4 review found and fixed a Critical policy bypass: credential paths in
+  apply_patch headers are now hard-denied before execution. A second scoped
+  review found and fixed root-path replacement during multi-file commits,
+  non-OSError partial-error reporting, and strict-parser trailing/target
+  length gaps. No Critical or Important findings remain.
+- Fresh verification at 2026-08-10 01:52:00 CST: safe mutation and loop
+  integration suite passed 132 tests; full suite passed 312 tests with one
+  pre-existing Starlette/httpx deprecation warning; Ruff, mypy (83 source
+  files), uv lock --check, and git diff --check passed.
+- Delegation deviation: 613 Coding run
+  51a8e02a-3e46-4ed6-93b2-aae093be16b2 exhausted 20 model calls repeating
+  git diff --check without writes; earlier Task 2 runs
+  9b284a12-6d32-4c34-8c39-db4b1be7877b,
+  63b5fe3e-9790-4f5a-95a0-66789d363b74, and
+  1d87af44-3373-409d-86de-44c8a1bbe61d showed provider/no-progress
+  behavior. Controller takeover and all deviations are recorded in
+  AGENT_LOG.md and the SDD ledger.
+
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 
 ## SSH Deployment Follow-up

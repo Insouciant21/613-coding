@@ -202,3 +202,50 @@ total_model_calls = 2
     assert summary.status is RunState.COMPLETED
     assert summary.stop_reason is StopReason.SUCCESS
     assert summary.validation_evidence
+
+
+def test_local_composition_runs_apply_patch_and_persists_changed_file(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "answer.txt"
+    target.write_text("before\n", encoding="utf-8")
+    (tmp_path / "harness.toml").write_text(
+        """
+[validation]
+commands = [["python", "-c", "print('ok')"]]
+
+[budgets]
+total_model_calls = 2
+""",
+        encoding="utf-8",
+    )
+    provider = ScriptedLLM(
+        (
+            LLMResponse(
+                actions=(
+                    ActionEnvelope(
+                        action=ToolCall(
+                            name="apply_patch",
+                            arguments={
+                                "patch": """--- a/answer.txt
++++ b/answer.txt
+@@ -1 +1 @@
+-before
++after
+"""
+                            },
+                        )
+                    ),
+                )
+            ),
+            LLMResponse(actions=(ActionEnvelope(action=FinishAction(summary="patched")),)),
+        )
+    )
+    services = build_services(tmp_path, provider=provider)
+    run = services.run_service.create_run(RunRequest(task="patch answer"))
+
+    summary = services.run_service.resume(run.id)
+
+    assert summary.status is RunState.COMPLETED
+    assert summary.changed_files == ("answer.txt",)
+    assert target.read_text(encoding="utf-8") == "after\n"

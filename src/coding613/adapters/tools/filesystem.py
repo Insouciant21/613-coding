@@ -113,8 +113,14 @@ class FilesystemTools:
     def delete_file(self, path: str | Path) -> None:
         self._delete_file(Path(path), lambda: None)
 
-    def _delete_file(self, relative: Path, on_commit: Callable[[], None]) -> None:
-        parent_fd, name = self._parent_descriptor(relative)
+    def _delete_file(
+        self,
+        relative: Path,
+        on_commit: Callable[[], None],
+        *,
+        root_fd: int | None = None,
+    ) -> None:
+        parent_fd, name = self._parent_descriptor(relative, root_fd=root_fd)
         try:
             metadata = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
             if stat.S_ISDIR(metadata.st_mode):
@@ -125,17 +131,22 @@ class FilesystemTools:
             os.close(parent_fd)
 
     def apply_patch(self, patch: str) -> PatchResult:
-        prepared = prepare_patch(
-            patch,
-            self._read_patch_source,
-            max_patch_bytes=self.max_file_bytes,
-        )
+        root_fd = self._open_root_descriptor()
         changed_files: list[str] = []
+        try:
+            prepared = prepare_patch(
+                patch,
+                lambda path: self._read_patch_source(path, root_fd=root_fd),
+                max_patch_bytes=self.max_file_bytes,
+            )
+        except Exception:
+            os.close(root_fd)
+            raise
         try:
             for change in prepared.changes:
                 record_commit = lambda path=change.path: changed_files.append(path)
                 if change.operation is PatchOperation.DELETE:
-                    self._delete_file(Path(change.path), record_commit)
+                    self._delete_file(Path(change.path), record_commit, root_fd=root_fd)
                 else:
                     if change.after is None:
                         raise RuntimeError("prepared write change has no content")
@@ -143,10 +154,13 @@ class FilesystemTools:
                         Path(change.path),
                         change.after,
                         record_commit,
+                        root_fd=root_fd,
                     )
-        except OSError as error:
+        except Exception as error:
             committed = tuple(sorted(changed_files))
             raise PatchCommitError(str(error), committed) from error
+        finally:
+            os.close(root_fd)
 
         return PatchResult(
             added=sum(
@@ -161,8 +175,8 @@ class FilesystemTools:
             changed_files=tuple(sorted(changed_files)),
         )
 
-    def _read_patch_source(self, path: str) -> str:
-        parent_fd, name = self._parent_descriptor(Path(path))
+    def _read_patch_source(self, path: str, *, root_fd: int | None = None) -> str:
+        parent_fd, name = self._parent_descriptor(Path(path), root_fd=root_fd)
         descriptor: int | None = None
         try:
             flags = (
@@ -200,11 +214,13 @@ class FilesystemTools:
         path: Path,
         content: str,
         on_commit: Callable[[], None],
+        *,
+        root_fd: int | None = None,
     ) -> None:
         data = content.encode("utf-8")
         if len(data) > self.max_file_bytes:
             raise FileTooLargeError(f"content exceeds {self.max_file_bytes} bytes")
-        parent_fd, name = self._parent_descriptor(path, create=True)
+        parent_fd, name = self._parent_descriptor(path, create=True, root_fd=root_fd)
         temporary_name = f".{name}.613-tmp-{secrets.token_hex(8)}"
         descriptor: int | None = None
         staged = False
@@ -249,7 +265,22 @@ class FilesystemTools:
                     pass
             os.close(parent_fd)
 
-    def _parent_descriptor(self, path: Path, *, create: bool = False) -> tuple[int, str]:
+    def _open_root_descriptor(self) -> int:
+        directory_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        return os.open(self.root, directory_flags)
+
+    def _parent_descriptor(
+        self,
+        path: Path,
+        *,
+        create: bool = False,
+        root_fd: int | None = None,
+    ) -> tuple[int, str]:
         if "\x00" in str(path) or path.is_absolute() or ".." in path.parts or not path.parts:
             raise PathOutsideRepositoryError("path must be repository-relative")
         if path.parts[0] in self._PROTECTED_MUTATION_ROOTS:
@@ -261,7 +292,7 @@ class FilesystemTools:
             | getattr(os, "O_CLOEXEC", 0)
             | getattr(os, "O_NOFOLLOW", 0)
         )
-        current_fd = os.open(self.root, directory_flags)
+        current_fd = os.dup(root_fd) if root_fd is not None else os.open(self.root, directory_flags)
         try:
             for component in path.parent.parts:
                 try:

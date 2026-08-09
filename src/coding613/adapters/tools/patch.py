@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -112,6 +113,7 @@ def prepare_patch(
     if not patch.startswith("--- "):
         raise InvalidPatchError("patch must start with a unified file header")
     _preflight_header_pairs(patch)
+    _validate_patch_lines(patch)
 
     try:
         files = PatchSet(patch)
@@ -198,6 +200,36 @@ def _preflight_header_pairs(patch: str) -> None:
         raise InvalidPatchError("patch contains no file headers")
 
 
+def _validate_patch_lines(patch: str) -> None:
+    source_remaining = target_remaining = 0
+    hunk_pattern = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+    for line in patch.splitlines():
+        if source_remaining or target_remaining:
+            if line.startswith("\\ No newline at end of file"):
+                continue
+            if line.startswith(" "):
+                source_remaining -= 1
+                target_remaining -= 1
+            elif line.startswith("-"):
+                source_remaining -= 1
+            elif line.startswith("+"):
+                target_remaining -= 1
+            else:
+                raise InvalidPatchError("hunk line count mismatch")
+            if source_remaining < 0 or target_remaining < 0:
+                raise InvalidPatchError("hunk line count mismatch")
+            continue
+        if line.startswith(("--- ", "+++ ")):
+            continue
+        match = hunk_pattern.match(line)
+        if match is None:
+            raise InvalidPatchError("patch contains unsupported trailing content")
+        source_remaining = int(match.group(2) or "1") if match.group(1) else 0
+        target_remaining = int(match.group(4) or "1") if match.group(3) else 0
+    if source_remaining or target_remaining:
+        raise InvalidPatchError("hunk line count mismatch")
+
+
 def _operation_path(source: str, target: str) -> tuple[PatchOperation, str]:
     source_dev_null = source == "/dev/null"
     target_dev_null = target == "/dev/null"
@@ -254,6 +286,7 @@ def _apply_hunks(patched_file: object, source: str | None, operation: PatchOpera
             raise PatchConflictError(f"hunk offset is out of range: {path}")
         output.extend(original[cursor:start])
         consumed = 0
+        produced = 0
         for line in hunk:
             line_type = getattr(line, "line_type", "")
             value = str(getattr(line, "value", ""))
@@ -262,15 +295,20 @@ def _apply_hunks(patched_file: object, source: str | None, operation: PatchOpera
                     raise PatchConflictError(f"hunk context does not match: {path}")
                 if line_type == " ":
                     output.append(value)
+                    produced += 1
                 cursor += 1
                 consumed += 1
             elif line_type == "+":
                 output.append(value)
+                produced += 1
             else:
                 raise InvalidPatchError(f"unsupported hunk line: {path}")
         declared = int(getattr(hunk, "source_length", consumed))
         if declared != consumed:
             raise InvalidPatchError(f"hunk source length mismatch: {path}")
+        declared_target = int(getattr(hunk, "target_length", produced))
+        if declared_target != produced:
+            raise InvalidPatchError(f"hunk target length mismatch: {path}")
     output.extend(original[cursor:])
     if operation is PatchOperation.DELETE and cursor != len(original):
         raise PatchConflictError(f"delete patch does not consume source: {path}")

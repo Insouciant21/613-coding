@@ -370,3 +370,101 @@ def test_apply_patch_reports_delete_committed_before_parent_close_failure(
 
     assert raised.value.changed_files == ("gone.txt",)
     assert not target.exists()
+
+
+def test_apply_patch_pins_repository_root_descriptor(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "a.txt").write_text("old-a\n", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("old-b\n", encoding="utf-8")
+    replacement = tmp_path.parent / "replacement-root"
+    replacement.mkdir()
+    (replacement / "b.txt").write_text("outside\n", encoding="utf-8")
+    patch = """--- a/a.txt
++++ b/a.txt
+@@ -1 +1 @@
+-old-a
++new-a
+--- a/b.txt
++++ b/b.txt
+@@ -1 +1 @@
+-old-b
++new-b
+"""
+    real_write = FilesystemTools._write_patch_text
+    calls = 0
+
+    def swap_root(self: FilesystemTools, path: Path, content: str, on_commit: object, **kwargs: object) -> None:
+        nonlocal calls
+        real_write(self, path, content, on_commit, **kwargs)  # type: ignore[arg-type]
+        calls += 1
+        if calls == 1:
+            parked = tmp_path.parent / "parked-original"
+            tmp_path.rename(parked)
+            replacement.rename(tmp_path)
+
+    monkeypatch.setattr(FilesystemTools, "_write_patch_text", swap_root)
+    result = FilesystemTools(tmp_path).apply_patch(patch)
+
+    assert result.changed_files == ("a.txt", "b.txt")
+    assert (tmp_path / "b.txt").read_text(encoding="utf-8") == "outside\n"
+    assert (tmp_path.parent / "parked-original" / "b.txt").read_text(encoding="utf-8") == "new-b\n"
+
+
+def test_apply_patch_reports_filesystem_errors_after_partial_commit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "a.txt").write_text("old-a\n", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("old-b\n", encoding="utf-8")
+    patch = """--- a/a.txt
++++ b/a.txt
+@@ -1 +1 @@
+-old-a
++new-a
+--- a/b.txt
++++ b/b.txt
+@@ -1 +1 @@
+-old-b
++new-b
+"""
+    real_write = FilesystemTools._write_patch_text
+    calls = 0
+
+    def fail_second(self: FilesystemTools, path: Path, content: str, on_commit: object, **kwargs: object) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise PathOutsideRepositoryError("simulated late path failure")
+        real_write(self, path, content, on_commit, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(FilesystemTools, "_write_patch_text", fail_second)
+    with pytest.raises(PatchCommitError) as raised:
+        FilesystemTools(tmp_path).apply_patch(patch)
+
+    assert raised.value.changed_files == ("a.txt",)
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "new-a\n"
+
+
+def test_prepare_patch_rejects_trailing_non_diff_content() -> None:
+    patch = """--- a/value.txt
++++ b/value.txt
+@@ -1 +1 @@
+-old
++new
+trailing-junk
+"""
+
+    with pytest.raises(InvalidPatchError):
+        prepare_patch(patch, lambda path: "old\n")
+
+
+def test_prepare_patch_rejects_target_hunk_length_mismatch() -> None:
+    patch = """--- a/value.txt
++++ b/value.txt
+@@ -1 +1 +2 @@
+-old
++new
+"""
+
+    with pytest.raises(InvalidPatchError):
+        prepare_patch(patch, lambda path: "old\n")
