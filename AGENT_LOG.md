@@ -659,3 +659,4 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   for existing state databases.
 - Implementation boundary: no source code, dependency, CI, WebUI, Dockerfile, or Cube product file
   changed during planning.
+- Plan commit: `9ee205d` (`docs: plan tui artifact and cube recovery work`).

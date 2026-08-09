@@ -8,8 +8,8 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
-| Safe repository mutations | design and implementation plan written; execution pending | design commit `e7f7ece`; `docs/superpowers/plans/2026-08-09-safe-repository-mutations.md` | select execution workflow and begin MUTATION-01 |
-| Claude Code-like TUI | design and implementation plan written; execution pending | design commit `e7f7ece`; `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | complete safe mutations, then begin TUI-01 |
+| Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
+| Claude Code-like TUI | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | complete safe mutations, then begin TUI-01 |
 | Binary/wheel/sdist artifact builder | design approved; implementation pending | TUI/distribution design; Docker and CI contract | build and execute artifacts after TDD implementation |
 | Main Web/HTTP removal | design approved; implementation pending | revised `SPEC.md` and `AGENTS.md` | prove code, dependency, test, manifest, and documentation removal |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |

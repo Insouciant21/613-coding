@@ -39,9 +39,9 @@ LanceDB, `keyring`, Docker Engine API/BuildKit, HTTPX streaming for OpenAI-compa
 | `docs/superpowers/plans/2026-08-08-613-coding-multi-agent.md` | Task graph, workers, Supervisor, artifact integration | Core loop, sandbox | complete through `376fd41` |
 | `docs/superpowers/plans/2026-08-08-613-coding-delivery.md` | CLI, FastAPI/WebUI, CI, package, Docker demo, records | Core services; sandbox for demo | complete through Docker smoke repair `774c07a`; real provider remains injectable |
 | `docs/superpowers/plans/2026-08-09-613-coding-package-rename.md` | Strict distribution/import/runtime/documentation rename | completed Tasks 1-3 | complete through reviewed CI and SSH deployment at `eefee2d` |
-| `docs/superpowers/plans/2026-08-09-safe-repository-mutations.md` | Schema-validated apply_patch and descriptor-relative delete | existing provider/context repair branch | written; pending execution approval |
-| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | written; pending execution approval |
-| `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | written; pending execution approval |
+| `docs/superpowers/plans/2026-08-09-safe-repository-mutations.md` | Schema-validated apply_patch and descriptor-relative delete | existing provider/context repair branch | committed in `9ee205d`; pending execution approval |
+| `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | committed in `9ee205d`; pending execution approval |
+| `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | committed in `9ee205d`; pending execution approval |
 | `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
 
 The completed historical critical path was `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. The current
