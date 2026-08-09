@@ -748,3 +748,14 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   `uv lock --check`, and `git diff --check` passed.
 - Boundary: no `tmp/cube`, credential, deployment, `.claude/`, or course requirement path changed.
 - Next: independent scoped re-review is required before starting TUI-02.
+
+### 2026-08-10 02:58:51 Asia/Shanghai - TUI distribution Task 1 scoped re-review
+
+- Review scope: `66c11d8..c23f217`, using the Task 1 brief, implementer report, and generated
+  review package; reviewer checkout was read-only.
+- Verdict: atomic v1 migration ADDRESSED; offset timestamp chronology ADDRESSED; no new Critical
+  or Important breakage and no out-of-scope observations.
+- Evidence: the reviewer linked transaction ownership and rollback coverage to
+  `sqlite.py:33-114` and the offset regressions to `test_sqlite.py:237-372`. It did not rerun the
+  implementer's test claims.
+- Task status: TUI-01 is complete; TUI-02 streaming provider/progress contracts may start.

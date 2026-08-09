@@ -204,8 +204,8 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
 
 ## TUI-01 Task Evidence
 
-- Status: implementation and review fix round complete in the TUI/distribution worktree; an
-  independent scoped re-review remains required before Task 2 starts.
+- Status: complete after an independent scoped re-review confirmed both Important findings are
+  addressed with no new Critical or Important breakage; Task 2 may start.
 - Commits: `66c11d8` (`feat: persist interactive coding sessions`) and `b45bb71`
   (`fix: make session migration atomic`).
 - TDD evidence: the original domain/storage collection RED failed because `InteractiveSession`
@@ -221,6 +221,8 @@ Detailed task steps, file paths, interfaces, failing tests, and commit commands 
   `uv lock --check`, and `git diff --check` passed.
 - Boundaries: migration remains additive and retains legacy Run/Event data. No WebUI, Cube,
   credentials, deployment, `.claude/`, or course-requirement file changed.
+- Review: scoped review of `66c11d8..c23f217` found the atomic migration and chronological
+  timestamp findings ADDRESSED, with no new breakage or out-of-scope observations.
 
 Every task must end with a focused test result and commit hash. `DELIVERY_STATUS.md` must link the evidence before a task is marked complete.
 
