@@ -110,30 +110,7 @@ def prepare_patch(
     for patched_file in files:
         source = _header_path(str(patched_file.source_file))
         target = _header_path(str(patched_file.target_file))
-        source_dev_null = source == "/dev/null"
-        target_dev_null = target == "/dev/null"
-        if source_dev_null == target_dev_null:
-            if source_dev_null:
-                raise InvalidPatchError("both patch paths cannot be /dev/null")
-            source_path = _normalize_path(source)
-            target_path = _normalize_path(target)
-            if source_path != target_path:
-                raise InvalidPatchError("source and target paths differ")
-            operation = PatchOperation.UPDATE
-            path = target_path
-        elif source_dev_null:
-            operation = PatchOperation.ADD
-            path = _normalize_path(target)
-        elif target_dev_null:
-            operation = PatchOperation.DELETE
-            path = _normalize_path(source)
-        else:
-            source_path = _normalize_path(source)
-            target_path = _normalize_path(target)
-            if source_path != target_path:
-                raise InvalidPatchError("source and target paths differ")
-            operation = PatchOperation.UPDATE
-            path = target_path
+        operation, path = _operation_path(source, target)
         if path in targets:
             raise InvalidPatchError(f"duplicate patch target: {path}")
         targets.add(path)
@@ -153,6 +130,7 @@ def prepare_patch(
                 raise PatchConflictError(f"missing patch source: {path}") from error
             if not isinstance(before, str):
                 raise InvalidPatchError("reader must return text")
+            _utf8_size(before, "patch source")
         after: str | None = _apply_hunks(patched_file, before, operation, path)
         if operation is PatchOperation.DELETE:
             after = None
@@ -160,12 +138,9 @@ def prepare_patch(
             before = None
         aggregate_bytes += len(path.encode("utf-8"))
         if before is not None:
-            aggregate_bytes += len(before.encode("utf-8"))
+            aggregate_bytes += _utf8_size(before, "patch source")
         if after is not None:
-            try:
-                aggregate_bytes += len(after.encode("utf-8"))
-            except UnicodeEncodeError as error:
-                raise PatchLimitError("change text must be valid UTF-8") from error
+            aggregate_bytes += _utf8_size(after, "change text")
         if aggregate_bytes > max_patch_bytes:
             raise PatchLimitError("aggregate patch data exceeds configured byte limit")
         changes.append(PreparedChange(path, operation, before, after))
@@ -191,19 +166,40 @@ def _preflight_header_pairs(patch: str) -> None:
             continue
         if index + 1 >= len(lines) or not lines[index + 1].startswith("+++ "):
             raise InvalidPatchError("unified file header is incomplete")
-        source = _header_path(line[4:])
-        target = _header_path(lines[index + 1][4:])
-        candidate = target if target != "/dev/null" else source
-        if candidate == "/dev/null":
-            raise InvalidPatchError("both patch paths cannot be /dev/null")
-        normalized = _normalize_path(candidate)
-        if normalized in targets:
-            raise InvalidPatchError(f"duplicate patch target: {normalized}")
-        targets.add(normalized)
+        _, path = _operation_path(
+            _header_path(line[4:]),
+            _header_path(lines[index + 1][4:]),
+        )
+        if path in targets:
+            raise InvalidPatchError(f"duplicate patch target: {path}")
+        targets.add(path)
         found += 1
         index += 2
     if found == 0:
         raise InvalidPatchError("patch contains no file headers")
+
+
+def _operation_path(source: str, target: str) -> tuple[PatchOperation, str]:
+    source_dev_null = source == "/dev/null"
+    target_dev_null = target == "/dev/null"
+    if source_dev_null and target_dev_null:
+        raise InvalidPatchError("both patch paths cannot be /dev/null")
+    if source_dev_null:
+        return PatchOperation.ADD, _normalize_path(target)
+    if target_dev_null:
+        return PatchOperation.DELETE, _normalize_path(source)
+    source_path = _normalize_path(source)
+    target_path = _normalize_path(target)
+    if source_path != target_path:
+        raise InvalidPatchError("source and target paths differ")
+    return PatchOperation.UPDATE, target_path
+
+
+def _utf8_size(value: str, label: str) -> int:
+    try:
+        return len(value.encode("utf-8"))
+    except UnicodeEncodeError as error:
+        raise PatchLimitError(f"{label} must be valid UTF-8") from error
 
 
 def _normalize_path(value: str) -> str:

@@ -98,6 +98,22 @@ def test_prepare_patch_rejects_source_target_mismatch() -> None:
         prepare_patch(patch, lambda path: "VALUE = 1\n")
 
 
+def test_prepare_patch_validates_all_headers_before_calling_reader() -> None:
+    mismatch = UPDATE.replace("src/value.py", "src/other.py").replace(
+        "+++ b/src/other.py", "+++ b/src/mismatch.py"
+    )
+    calls: list[str] = []
+
+    def read(path: str) -> str:
+        calls.append(path)
+        return "VALUE = 1\n"
+
+    with pytest.raises(InvalidPatchError):
+        prepare_patch(UPDATE + mismatch, read)
+
+    assert calls == []
+
+
 def test_prepare_patch_rejects_duplicate_targets() -> None:
     with pytest.raises(InvalidPatchError):
         prepare_patch(UPDATE + UPDATE, lambda path: "VALUE = 1\n")
@@ -146,3 +162,8 @@ def test_prepare_patch_counts_utf8_bytes_and_aggregate_size() -> None:
 def test_prepare_patch_rejects_surrogate_encoding() -> None:
     with pytest.raises(PatchLimitError):
         prepare_patch(chr(0xDFFF), lambda path: "")
+
+
+def test_prepare_patch_wraps_invalid_utf8_from_reader() -> None:
+    with pytest.raises(PatchLimitError):
+        prepare_patch(UPDATE, lambda path: chr(0xDFFF))
