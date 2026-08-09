@@ -586,3 +586,10 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Compatibility: the user selected a strict rename; no `coding-harness` command, `coding_harness` import, legacy Keyring lookup, compatibility shim, or deprecation period will remain.
 - Scope: rename source/import paths, packaging metadata, lock data, Docker entrypoint, current documentation, tests, CI assumptions, and the deployed image without changing stored domain formats or application behavior.
 - Design: `docs/superpowers/specs/2026-08-09-613-coding-package-rename-design.md`; implementation is gated on written-spec review and an approved plan.
+
+### 2026-08-09 13:37:47 Asia/Shanghai - package rename implementation plan
+
+- Trigger: the user reviewed the written design and directed implementation to start; invoked `writing-plans` before touching source code.
+- Plan: `docs/superpowers/plans/2026-08-09-613-coding-package-rename.md` separates the core import/distribution rename, runtime surfaces, documentation/artifact verification, and reviewed CI/deployment rollout.
+- TDD gate: naming contract tests must fail against the legacy package before the mechanical directory/import migration begins.
+- Deployment gate: no remote replacement occurs until clean wheel/Docker smoke, independent review, branch CI, and exact-main CI pass.
