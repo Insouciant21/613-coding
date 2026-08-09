@@ -167,3 +167,8 @@ def test_prepare_patch_rejects_surrogate_encoding() -> None:
 def test_prepare_patch_wraps_invalid_utf8_from_reader() -> None:
     with pytest.raises(PatchLimitError):
         prepare_patch(UPDATE, lambda path: chr(0xDFFF))
+
+
+def test_prepare_patch_wraps_invalid_utf8_for_existing_add_target() -> None:
+    with pytest.raises(PatchLimitError):
+        prepare_patch(ADD, lambda path: chr(0xDFFF))

@@ -118,10 +118,13 @@ def prepare_patch(
         before: str | None = None
         if operation is PatchOperation.ADD:
             try:
-                reader(path)
+                existing = reader(path)
             except FileNotFoundError:
                 before = None
             else:
+                if not isinstance(existing, str):
+                    raise InvalidPatchError("reader must return text")
+                _utf8_size(existing, "existing add target")
                 raise PatchConflictError(f"add target already exists: {path}")
         else:
             try:
