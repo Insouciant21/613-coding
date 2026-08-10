@@ -10,13 +10,21 @@ from coding613.application.approvals import action_fingerprint
 from coding613.application.budgets import BudgetLimits
 from coding613.application.validation import ValidationKind, ValidationResult
 from coding613.domain.actions import ToolCall
-from coding613.domain.models import ApprovalRequest, ResourceUsage
+from coding613.domain.models import (
+    ApprovalRequest,
+    FeedbackKind,
+    ResourceUsage,
+    RunState,
+    RunSummary,
+    StopReason,
+)
 from coding613.ports.tools import ToolResult
 from coding613.tui.renderers import (
     render_approval,
     render_assistant,
     render_budget,
     render_error,
+    render_run_summary,
     render_tool_call,
     render_tool_result,
     render_unified_diff,
@@ -123,3 +131,24 @@ def test_error_is_redacted_and_budget_shows_used_over_limit() -> None:
     assert "[REDACTED]" in error_text
     assert "calls 3/8" in budget_text
     assert "cost $0.2500/$1.0000" in budget_text
+
+
+def test_run_summary_renderer_exposes_feedback_validation_and_budget() -> None:
+    summary = RunSummary(
+        run_id=uuid4(),
+        status=RunState.FAILED,
+        stop_reason=StopReason.VALIDATION_FAILED,
+        changed_files=("src/app.py",),
+        validation_evidence=({"stdout": "1 failed"},),
+        approvals=(uuid4(),),
+        completion_blockers=(FeedbackKind.TEST_FAILURE,),
+        resource_usage=ResourceUsage(model_calls=2, wall_time_seconds=1.25),
+    )
+
+    widget = render_run_summary(summary)
+
+    assert "validation_failed" in widget.display_text
+    assert "test_failure" in widget.display_text
+    assert "validation=1" in widget.display_text
+    assert "approvals=1" in widget.display_text
+    assert "model_calls=2" in widget.display_text

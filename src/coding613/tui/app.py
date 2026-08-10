@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
@@ -28,6 +29,7 @@ from .renderers import (
     render_approval,
     render_assistant,
     render_error,
+    render_run_summary,
     render_tool_call,
     render_tool_result,
     render_validation,
@@ -89,10 +91,13 @@ class CodingApp(App[None]):
         self._tool_widgets: dict[str, DetailMessage] = {}
         self._tool_calls: dict[str, ToolCall] = {}
         self._tool_keys_by_name: dict[str, list[str]] = {}
+        self._summary_widgets: dict[UUID, DetailMessage] = {}
         self._validation_widget: Static | None = None
         self._approval_id: UUID | None = None
+        self._current_session_id: UUID | None = None
         self._pending_user: UserMessage | None = None
         self._executing = False
+        self._operation_started_at: float | None = None
         self._drain_timer: object | None = None
 
     def compose(self) -> ComposeResult:
@@ -103,6 +108,7 @@ class CodingApp(App[None]):
 
     def on_mount(self) -> None:
         self.query_one(TaskComposer).focus()
+        self._update_footer()
         self._drain_timer = self.set_interval(0.05, self._drain_progress)
         if self.controller is not None:
             if self.resume is not None or self.continue_latest:
@@ -132,6 +138,9 @@ class CodingApp(App[None]):
             self.query_one(ActiveOperation).update("Idle")
 
     def action_confirm_exit(self) -> None:
+        if self.controller is not None and self.controller.active_run_id is not None:
+            self.run_worker(self._pause_run(), group="pause")
+            return
         self.query_one(StatusFooter).update("Press Ctrl+Q to exit; Esc resumes editing")
 
     async def action_quit(self) -> None:
@@ -176,6 +185,7 @@ class CodingApp(App[None]):
                     self.options = RunOptions(model=command.arguments[0])
                 else:
                     self.options = self.options.model_copy(update={"model": command.arguments[0]})
+                self._update_footer()
                 await log.mount(Static(f"Model selected: {command.arguments[0]}"))
             elif metadata is None:
                 await log.mount(Static("Model: not configured"))
@@ -192,9 +202,7 @@ class CodingApp(App[None]):
                 "autonomous",
             }:
                 self.permission_mode = PermissionMode(command.arguments[0])
-                self.query_one(StatusFooter).update(
-                    f"613 Coding  |  {self.permission_mode.value}  |  ready"
-                )
+                self._update_footer()
             else:
                 service = getattr(self.services, "permission_rules", None)
                 if service is None:
@@ -235,7 +243,21 @@ class CodingApp(App[None]):
         elif command.name == "status":
             summary = self.controller.last_summary
             status = summary.status.value if summary is not None else "idle"
-            await log.mount(Static(f"Status: {status}; active_run={self.controller.active_run_id or 'none'}"))
+            approval = "pending" if summary is not None and summary.approvals else "none"
+            validation = len(summary.validation_evidence) if summary is not None else 0
+            blockers = (
+                ",".join(item.value for item in summary.completion_blockers)
+                if summary is not None and summary.completion_blockers
+                else "none"
+            )
+            usage = summary.resource_usage.model_dump(mode="json") if summary is not None else {}
+            await log.mount(
+                Static(
+                    f"Status: {status}; active_run={self.controller.active_run_id or 'none'}; "
+                    f"approval={approval}; validation={validation}; feedback={blockers}; "
+                    f"budget={usage}"
+                )
+            )
         elif command.name == "cost":
             summary = self.controller.last_summary
             if summary is None:
@@ -272,13 +294,14 @@ class CodingApp(App[None]):
         if self.controller is None:
             return
         self._executing = True
+        self._operation_started_at = time.monotonic()
         composer = self.query_one(TaskComposer)
         composer.disabled = True
         composer.load_text("")
         pending = UserMessage(message)
         self._pending_user = pending
         await self.query_one(ConversationLog).mount(pending)
-        self.query_one(ActiveOperation).update("Starting run")
+        self._set_active_operation("Starting run")
         try:
             snapshot = await self.controller.submit(
                 message,
@@ -287,23 +310,28 @@ class CodingApp(App[None]):
             )
             await self._render_snapshot(snapshot)
             self.controller.drain_progress()
+            if self.controller.last_summary is not None:
+                await self._render_summary(self.controller.last_summary)
         except Exception as error:
             await self.query_one(ConversationLog).mount(render_error(error))
         finally:
             self._executing = False
             self._pending_user = None
             self._update_input_state()
-            self.query_one(ActiveOperation).update("Idle")
+            self._set_active_operation("Idle", reset=True)
 
     async def _restore_session(self, *, submit_after: str | None = None) -> None:
         if self.controller is None:
             return
         self._executing = True
+        self._operation_started_at = time.monotonic()
         self._update_input_state()
-        self.query_one(ActiveOperation).update("Restoring session")
+        self._set_active_operation("Restoring session")
         try:
             snapshot = await self.controller.resume(self.resume or "latest")
             await self._render_snapshot(snapshot, clear=True)
+            if self.controller.last_summary is not None:
+                await self._render_summary(self.controller.last_summary)
             if submit_after and self._approval_id is None:
                 await self._submit_message(submit_after)
         except Exception as error:
@@ -312,12 +340,12 @@ class CodingApp(App[None]):
             self._executing = False
             self._update_input_state()
             if self._approval_id is None:
-                self.query_one(ActiveOperation).update("Idle")
+                self._set_active_operation("Idle", reset=True)
 
     async def _pause_run(self) -> None:
         if self.controller is None:
             return
-        self.query_one(ActiveOperation).update("Pause requested")
+        self._set_active_operation("Pause requested")
         try:
             await self.controller.pause()
         except Exception as error:
@@ -335,6 +363,8 @@ class CodingApp(App[None]):
             )
             if snapshot is not None:
                 await self._render_snapshot(snapshot)
+                if self.controller.last_summary is not None:
+                    await self._render_summary(self.controller.last_summary)
         except Exception as error:
             await self.query_one(ConversationLog).mount(render_error(error))
         finally:
@@ -361,10 +391,10 @@ class CodingApp(App[None]):
                     await log.mount(assistant_widget)
                 else:
                     assistant_widget.replace(draft)
-                self.query_one(ActiveOperation).update("Receiving response")
+                self._set_active_operation("Receiving response")
             elif update.kind is ProgressKind.STATE:
                 state = update.payload.get("to", update.text) or "working"
-                self.query_one(ActiveOperation).update(str(state))
+                self._set_active_operation(str(state))
             elif update.kind is ProgressKind.TOOL_STARTED:
                 name = str(update.payload.get("tool", "tool"))
                 key = str(update.payload.get("tool_call_id") or f"{name}:{len(self._tool_widgets)}")
@@ -377,7 +407,7 @@ class CodingApp(App[None]):
                 )
                 self._tool_keys_by_name.setdefault(name, []).append(key)
                 await log.mount(tool_widget)
-                self.query_one(ActiveOperation).update(f"Running {name}")
+                self._set_active_operation(f"Running {name}")
             elif update.kind is ProgressKind.TOOL_FINISHED:
                 name = str(update.payload.get("tool", "tool"))
                 key = str(update.payload.get("tool_call_id", ""))
@@ -411,7 +441,13 @@ class CodingApp(App[None]):
             elif update.kind is ProgressKind.VALIDATION_FINISHED:
                 result_data = update.payload.get("result")
                 if isinstance(result_data, dict) and self._validation_widget is not None:
-                    result = render_validation(ValidationResult.model_validate(result_data))
+                    # Progress payloads are JSON-safe and therefore carry enum
+                    # values as strings; opt out of the strict domain parser at
+                    # this display boundary and keep validation authoritative in
+                    # the application loop.
+                    result = render_validation(
+                        ValidationResult.model_validate(result_data, strict=False)
+                    )
                     self._validation_widget.update(result.renderable)
                 else:
                     status = "passed" if update.payload.get("success") else "failed"
@@ -424,6 +460,7 @@ class CodingApp(App[None]):
 
     async def _render_snapshot(self, snapshot: Any, *, clear: bool = False) -> None:
         log = self.query_one(ConversationLog)
+        self._current_session_id = snapshot.session.id
         if clear:
             await log.remove_children()
             self._entries.clear()
@@ -432,6 +469,7 @@ class CodingApp(App[None]):
             self._tool_widgets.clear()
             self._tool_calls.clear()
             self._tool_keys_by_name.clear()
+            self._summary_widgets.clear()
         for entry in snapshot.transcript:
             key = (entry.role, entry.run_id)
             if key in self._entries:
@@ -471,6 +509,43 @@ class CodingApp(App[None]):
                 self.query_one(ActiveOperation).update("Awaiting approval")
         log.scroll_end(animate=False)
         self._update_input_state()
+        self._update_footer()
+
+    def _update_footer(self) -> None:
+        try:
+            footer = self.query_one(StatusFooter)
+        except Exception:
+            return
+        project = getattr(self.services, "run_service", None)
+        project = getattr(project, "project", None)
+        root = getattr(project, "canonical_root", None)
+        repository = getattr(root, "name", None) or (str(root) if root else "unknown")
+        metadata = getattr(self.services, "llm_metadata", None)
+        model = self.options.model if self.options is not None else None
+        model = model or getattr(metadata, "model", None) or "default"
+        provider = getattr(metadata, "provider", None) or "unconfigured"
+        session = str(self._current_session_id)[:8] if self._current_session_id else "new"
+        footer.update(
+            "613 Coding"
+            f" | repo={repository}"
+            f" | session={session}"
+            f" | model={model}"
+            f" | mode={self.permission_mode.value}"
+            f" | provider={provider}"
+        )
+
+    async def _render_summary(self, summary: Any) -> None:
+        if not hasattr(summary, "run_id"):
+            return
+        widget = render_run_summary(summary)
+        existing = self._summary_widgets.get(summary.run_id)
+        if existing is None:
+            self._summary_widgets[summary.run_id] = widget
+            await self.query_one(ConversationLog).mount(widget)
+        else:
+            existing.display_text = widget.display_text
+            existing.update(widget.renderable)
+        self.query_one(ConversationLog).scroll_end(animate=False)
 
     def _update_input_state(self) -> None:
         composer = self.query_one(TaskComposer)
@@ -478,6 +553,18 @@ class CodingApp(App[None]):
         composer.disabled = self._executing or awaiting
         if not composer.disabled:
             composer.focus()
+
+    def _set_active_operation(self, label: str, *, reset: bool = False) -> None:
+        if reset:
+            self._operation_started_at = None
+            self.query_one(ActiveOperation).update(label)
+            return
+        elapsed = (
+            time.monotonic() - self._operation_started_at
+            if self._operation_started_at is not None
+            else 0.0
+        )
+        self.query_one(ActiveOperation).update(f"{label} | elapsed={elapsed:.1f}s")
 
     @property
     def _permission_mode(self) -> PermissionMode:

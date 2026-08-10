@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from threading import Event
 from types import SimpleNamespace
 from uuid import UUID, uuid4
@@ -316,6 +317,57 @@ async def test_tui_submits_in_background_and_replaces_streamed_draft_once() -> N
 
 
 @pytest.mark.asyncio
+async def test_tui_renders_terminal_summary_with_feedback_and_resource_usage() -> None:
+    fake = FakeUiServices()
+    app = CodingApp(controller=_controller(fake))
+    async with app.run_test(size=(80, 24)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("repair")
+        await pilot.press("enter")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if any("Run: completed" in item.display_text for item in app.query(DetailMessage)):
+                break
+
+        summaries = [item.display_text for item in app.query(DetailMessage)]
+        assert any("Run: completed" in item for item in summaries)
+        assert any("resource_usage=" in item for item in summaries)
+
+
+@pytest.mark.asyncio
+async def test_tui_status_footer_shows_repository_session_model_and_provider() -> None:
+    fake = FakeUiServices()
+    services = SimpleNamespace(
+        run_service=SimpleNamespace(
+            project=SimpleNamespace(canonical_root=Path("/workspace/demo")),
+        ),
+        llm_metadata=SimpleNamespace(
+            model="gpt-test", provider="openai", base_url="https://example.invalid"
+        ),
+    )
+    app = CodingApp(
+        controller=_controller(fake),
+        services=services,
+        permission_mode=PermissionMode.STRICT,
+    )
+    async with app.run_test(size=(80, 24)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("repair")
+        await pilot.press("enter")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if fake.runs and fake.runs[-1].state is RunState.COMPLETED:
+                break
+
+        footer = str(app.query_one(StatusFooter).renderable)
+        assert "repo=demo" in footer
+        assert "session=" in footer
+        assert "model=gpt-test" in footer
+        assert "provider=openai" in footer
+        assert "strict" in footer
+
+
+@pytest.mark.asyncio
 async def test_tui_tracks_repeated_tool_names_by_call_id() -> None:
     app = CodingApp()
     async with app.run_test(size=(80, 24)):
@@ -369,6 +421,25 @@ async def test_tui_tracks_repeated_tool_names_by_call_id() -> None:
 
 
 @pytest.mark.asyncio
+async def test_tui_active_operation_includes_elapsed_time() -> None:
+    app = CodingApp()
+    async with app.run_test(size=(80, 24)):
+        app._operation_started_at = time.monotonic() - 1.0
+        await app._render_progress(
+            (
+                RunProgress(
+                    run_id=uuid4(),
+                    kind=ProgressKind.STATE,
+                    text="waiting_model",
+                    payload={"to": "waiting_model"},
+                ),
+            )
+        )
+
+        assert "elapsed=" in str(app.query_one(ActiveOperation).renderable)
+
+
+@pytest.mark.asyncio
 async def test_tui_pause_is_idempotent_and_reports_redacted_error() -> None:
     fake = FakeUiServices()
     app = CodingApp(controller=_controller(fake))
@@ -394,6 +465,28 @@ async def test_tui_pause_is_idempotent_and_reports_redacted_error() -> None:
         errors = [item.display_text for item in app.query(DetailMessage)]
         assert any("[REDACTED]" in item for item in errors)
         assert all("topsecret" not in item and "sk-secretvalue" not in item for item in errors)
+
+
+@pytest.mark.asyncio
+async def test_tui_ctrl_c_requests_pause_before_exit() -> None:
+    fake = FakeUiServices()
+    app = CodingApp(controller=_controller(fake))
+    async with app.run_test(size=(80, 24)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("pause")
+        await pilot.press("enter")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if fake.execution_started.is_set():
+                break
+
+        await pilot.press("ctrl+c")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if fake.pause_calls:
+                break
+
+        assert fake.pause_calls == [fake.runs[-1].id]
 
 
 @pytest.mark.asyncio
@@ -495,6 +588,30 @@ async def test_tui_approval_keyboard_action_resumes_same_run() -> None:
         assert fake.approve_calls == [approval_id]
         assert not app.query(ApprovalView)
         assert not composer.disabled
+
+
+@pytest.mark.asyncio
+async def test_tui_status_command_reports_approval_and_budget_state() -> None:
+    fake = FakeUiServices()
+    app = CodingApp(controller=_controller(fake))
+    async with app.run_test(size=(80, 24)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("approval")
+        await pilot.press("enter")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if app.query(ApprovalView):
+                break
+
+        await app._handle_command("/status")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if any("approval=" in str(item.renderable) for item in app.query(Static)):
+                break
+
+        texts = [str(item.renderable) for item in app.query(Static)]
+        assert any("approval=pending" in text for text in texts)
+        assert any("budget=" in text for text in texts)
 
 
 @pytest.mark.asyncio

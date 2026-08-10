@@ -131,6 +131,22 @@ class TextOutputSerializer:
         if verbose:
             if envelope.changed_files:
                 lines.append("changed_files=" + ",".join(envelope.changed_files))
+            if envelope.validation_evidence:
+                lines.append(
+                    "validation_evidence="
+                    + json.dumps(
+                        redact_payload(envelope.validation_evidence),
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                )
+            if envelope.completion_blockers:
+                lines.append(
+                    "completion_blockers="
+                    + ",".join(item.value for item in envelope.completion_blockers)
+                )
+            if envelope.approvals:
+                lines.append(f"approvals={len(envelope.approvals)}")
             if envelope.diagnostics is not None:
                 lines.append(
                     "diagnostics="

@@ -21,7 +21,7 @@ from coding613.application.budgets import BudgetLimits
 from coding613.application.validation import ValidationResult
 from coding613.domain.actions import ToolCall
 from coding613.domain.events import redact_payload
-from coding613.domain.models import ApprovalRequest, ResourceUsage
+from coding613.domain.models import ApprovalRequest, ResourceUsage, RunSummary
 from coding613.domain.redaction import redact_text
 from coding613.ports.tools import ToolResult
 
@@ -144,6 +144,35 @@ def render_validation(result: ValidationResult) -> DetailMessage:
         content,
         f"{header}\n{safe_output}",
         classes="conversation-entry validation-result",
+    )
+
+
+def render_run_summary(summary: RunSummary) -> DetailMessage:
+    """Render terminal feedback and resource usage without exposing raw payloads."""
+
+    stop_reason = summary.stop_reason.value if summary.stop_reason else "none"
+    lines = [
+        f"Run: {summary.status.value} | stop_reason={stop_reason}",
+        f"validation={len(summary.validation_evidence)} | approvals={len(summary.approvals)}",
+        (
+            "feedback="
+            + (",".join(item.value for item in summary.completion_blockers) or "none")
+        ),
+        (
+            "resource_usage="
+            + ", ".join(
+                f"{name}={value}"
+                for name, value in summary.resource_usage.model_dump(mode="json").items()
+            )
+        ),
+    ]
+    if summary.changed_files:
+        lines.append("changed_files=" + ", ".join(summary.changed_files))
+    display_text = _bounded("\n".join(lines))
+    return DetailMessage(
+        Text(display_text, style="green" if summary.status.value == "completed" else "yellow"),
+        display_text,
+        classes="conversation-entry run-summary",
     )
 
 
