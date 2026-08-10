@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 12:19:59 (Asia/Shanghai)
+Last updated: 2026-08-10 12:22:35 (Asia/Shanghai)
 Responsible actor: `/root` for the approved OpenAI SDK migration; implementation is locally verified on `feature/openai-sdk-llm` and no remote provider, deployment, or pipeline operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -45,7 +45,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - Implementation: `f7f2301` adds the bounded `openai` dependency, official SDK Chat Completions
   calls, injected offline fakes, lazy `OpenAI(..., max_retries=0)` construction, stream cleanup,
   and README guidance. The embedding HTTP adapter is intentionally out of scope.
-- Verification: initial adapter suite 33 passed; after review repair the adapter suite passed 37,
+- Final verification at `2026-08-10 12:22:35 Asia/Shanghai`: initial adapter suite 33 passed; after review repair the adapter suite passed 37,
   application/composition/CLI regressions passed 25, and full offline suite 405 passed with
   `uv run pytest -q --ignore=tmp`; Ruff, mypy, `uv lock --check`, `git diff --check`, and
   documentation tests (5) passed. No real provider request was made.

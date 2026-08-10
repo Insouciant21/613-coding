@@ -1045,3 +1045,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Follow-up review: both Important findings were marked addressed; no remaining Critical or
   Important issues were found. A Minor observation is retained: a still-live reader is suppressed
   behind an existing timeout/cancellation classification, with operational metrics deferred.
+
+### 2026-08-10 12:22:35 Asia/Shanghai - OpenAI SDK branch final verification
+
+- On clean branch tip `581402b`, `uv run pytest -q --ignore=tmp` passed 405 tests, Ruff passed,
+  mypy passed for 87 source files, documentation tests passed 5, and `uv lock --check` plus
+  `git diff --check` passed. The SDK branch has no uncommitted changes.
+- No real provider request, API-key lookup, remote pipeline, deployment, or main-worktree merge
+  was performed. Main remains dirty with unrelated user edits; integration awaits the user's
+  finishing-workflow choice.
