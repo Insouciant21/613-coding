@@ -548,3 +548,18 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - TDD/verification: RED contract failures were observed for missing documentation markers, follow-up-after-resume, lifecycle/diagnostic stream events, escaped slash prompts, invalid resume selectors, active-run duplication, shared-service delegation, and persisted prompt redaction. GREEN focused suites passed; final `uv run pytest -q --ignore=tmp` passed `460`; Ruff, mypy (102 files), lock, and diff checks passed.
 - Boundary: `LocalServices.interactive` now delegates the TUI compatibility shape to the same `ConversationService` consumed by print mode; stream JSON is one versioned redacted event per line with session/user/diagnostic lifecycle records and monotonic sequence numbers. Active sessions cannot receive a second Run concurrently, and stored run tasks are redacted.
 - Smoke/review: `613-coding --help` returned 0; provider-unconfigured print/verbose-stream smokes returned documented code 4 with safe output. Independent review agents repeatedly disconnected before producing a report; local spec/security/type review found no unresolved Critical issue, and no independent pass is claimed. Main-worktree user changes remained untouched.
+
+### Claude-Code-Parity completion audit evidence
+
+- Verification timestamp: 2026-08-10 15:04:34 Asia/Shanghai.
+- RED: the audit tests first exposed absent verbose validation/feedback/approval output, missing
+  TUI terminal summary/footer/elapsed/pause behavior, and strict parsing of a JSON-safe validation
+  progress payload. The failures were observed before the corresponding implementation changes.
+- GREEN: commit `45decdd` (`feat: expose tui and cli run feedback`) adds the bounded/redacted run
+  summary, repository/session/model/provider footer, elapsed active-operation state, Ctrl-C pause
+  request, verbose CLI evidence, and a real Textual Pilot prompt-to-harness integration test.
+- Verification: TUI suite 51 passed; CLI suite 33 passed; full offline suite 468 passed. Ruff,
+  mypy across 102 source files, `uv lock --check`, and `git diff --check` passed. The root CLI help
+  smoke returned 0 and the provider-unconfigured print smoke returned 4 with a safe terminal state.
+- Boundary: no provider request, keyring access, network, Docker, remote CI, merge, or main-worktree
+  mutation was performed; unrelated dirty main files remain outside this branch.

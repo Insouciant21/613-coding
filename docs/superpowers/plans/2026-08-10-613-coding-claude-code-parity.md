@@ -749,6 +749,23 @@ git commit -m "docs: document Claude Code parity contracts"
   implementation and offline contract tests; `f27dba6` records the delivery evidence and plan
   status.
 
+#### Task 7 post-implementation parity audit
+
+- RED: the completion audit exposed missing verbose CLI validation/feedback/approval fields,
+  missing terminal feedback/resource summaries and repository/session/model/provider footer data
+  in the TUI, missing elapsed-time display and effective Ctrl-C pause behavior, and a strict enum
+  parsing failure when rendering JSON-safe validation progress payloads.
+- GREEN: `45decdd` (`feat: expose tui and cli run feedback`) adds bounded/redacted terminal
+  summaries, footer and operation state updates, CLI verbose evidence, the JSON enum display
+  boundary, and an offline Textual Pilot integration test that drives a real `build_services`
+  harness from a prompt through edit, validation, and finish.
+- Verification: `uv run pytest tests/tui -q` passed 51; `uv run pytest tests/cli -q` passed 33;
+  `uv run pytest -q --ignore=tmp` passed 468; `uv run ruff check src tests/tui tests/cli`,
+  `uv run mypy src` (102 source files), `uv lock --check`, and `git diff --check` passed.
+- Smoke: `uv run 613-coding --help` returned 0; provider-unconfigured print returned 4 with
+  `status=failed stop_reason=provider_error`. No real provider, keyring, network, Docker, or
+  remote CI operation was used.
+
 ## Self-review checklist
 
 - Spec coverage: shared service and session state are Task 1; event and output contracts are Task 2;

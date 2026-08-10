@@ -1175,3 +1175,30 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   was performed; integration remains a user choice under `finishing-a-development-branch`.
 - Lesson: final evidence must be rerun from the exact committed tree and must report the untouched
   main-worktree boundary explicitly.
+
+### 2026-08-10 15:04:34 Asia/Shanghai - Claude-Code parity completion audit
+
+- Task: close the approved TUI/CLI parity slice with a user-visible completion audit; work stayed
+  in isolated worktree `feature/claude-code-parity`.
+- Skills: `test-driven-development`, `verification-before-completion`, and the existing
+  `requesting-code-review`/handoff workflow were applied; no external provider or deployment was
+  authorized.
+- RED: focused audit tests exposed missing verbose CLI validation/feedback/approval details, TUI
+  terminal summary/footer/elapsed/pause state, and a `ValidationResult` strict-enum failure when
+  rendering JSON-safe validation progress. The real prompt integration test reproduced the latter
+  before implementation.
+- GREEN: commit `45decdd` (`feat: expose tui and cli run feedback`) adds bounded/redacted run
+  summaries, repository/session/model/provider footer, elapsed operation state, Ctrl-C pause
+  request, verbose text evidence, the display-boundary enum coercion, and
+  `tests/tui/test_end_to_end.py`. That test drives `build_services` from a TUI prompt through an
+  actual repository edit, validation, and successful finish using `ScriptedLLM`.
+- Verification: `uv run pytest tests/tui -q` passed 51; `uv run pytest tests/cli -q` passed 33;
+  `uv run pytest -q --ignore=tmp` passed 468; Ruff passed for changed source/tests; mypy passed for
+  102 source files; `uv lock --check` and `git diff --check` passed. `613-coding --help` returned
+  0; provider-unconfigured print returned 4 with `status=failed stop_reason=provider_error`.
+- Human intervention: the user approved the parity work; no provider request, keyring access,
+  network, Docker, remote CI, merge, or deployment operation was performed. Main-worktree modified
+  context/loop/domain/test files and untracked `.claude/`, course documents, and `tmp/` remain
+  outside the branch.
+- Lesson: the TUI must render persisted terminal evidence as well as live progress, and JSON-safe
+  progress payloads need an explicit coercion boundary before entering strict domain models.

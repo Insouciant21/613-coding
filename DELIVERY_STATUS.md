@@ -517,6 +517,22 @@ Every completed plan task must link a commit and fresh verification output here.
 - Smoke/review: `uv run 613-coding --help` returned 0. Provider-unconfigured print and verbose stream smokes returned documented exit code 4 with versioned redacted output. Independent review agents disconnected before returning reports; local spec/security/type review found no unresolved Critical issue, and no independent pass is claimed.
 - Boundary: the TUI compatibility adapter and print CLI share `ConversationService`; SQLite remains authoritative, active runs are not duplicated, and MCP remains an injectable future boundary. Main-worktree user changes and untracked files were not staged.
 
+## Claude-Code-Parity completion audit evidence
+
+- Verification timestamp: 2026-08-10 15:04:34 Asia/Shanghai.
+- Commit: `45decdd` (`feat: expose tui and cli run feedback`).
+- TDD: the audit RED cycle covered missing CLI verbose validation/feedback/approval fields,
+  missing TUI terminal summary/footer/elapsed/pause behavior, and strict enum parsing at the
+  JSON-safe validation-progress display boundary. GREEN added the fixes and a real Textual Pilot
+  prompt-to-harness integration test.
+- Verification: `uv run pytest tests/tui -q` passed 51; `uv run pytest tests/cli -q` passed 33;
+  `uv run pytest -q --ignore=tmp` passed 468; Ruff, mypy across 102 source files, `uv lock --check`,
+  and `git diff --check` passed. `613-coding --help` returned 0; provider-unconfigured print
+  returned 4 with `status=failed stop_reason=provider_error`.
+- Boundary: no real provider, credential/keyring, network, Docker, remote CI, merge, or deployment
+  operation was used. The main worktree's pre-existing user changes and untracked files remain
+  untouched and unstaged.
+
 ## Package Rename Task 3 Evidence
 
 - Verification timestamp: `2026-08-09 14:26:25 Asia/Shanghai`.
