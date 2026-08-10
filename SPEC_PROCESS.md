@@ -162,3 +162,22 @@ The strongest brainstorming outcome was forcing explicit boundaries around objec
   SSE records; after, production chat calls and streams go through an injected official SDK client
   and are converted back into project-owned domain values.
 - Approved design: `docs/superpowers/specs/2026-08-10-openai-sdk-llm-design.md`.
+
+### Iteration 12: Claude-Code-like TUI and CLI parity
+
+- Question: how should the request for Claude Code-like TUI and CLI behavior be made testable
+  without coupling the product to Anthropic's private implementation?
+- Decision: define parity as equivalent local coding-agent workflow and stable user-facing
+  contracts: one shared conversation service, multiple follow-up prompts, session continuation and
+  resume, approvals and permission modes, context diagnostics/compaction, TUI progress, and CLI
+  text/JSON/stream-JSON input/output.
+- Scope decision: keep the existing owned `AgentLoop`, deterministic feedback classifiers,
+  governance, SQLite authority, sandbox, and tool registry. Do not add an unsafe permission bypass,
+  WebUI, account/telemetry behavior, or MCP transport in this implementation slice; retain an
+  injectable tool boundary for a later MCP adapter.
+- Meaningful before/after: before, the root command primarily launches a basic TUI and management
+  commands expose lower-level run operations; after the approved design, root prompt/print modes,
+  session controls, event serializers, TUI commands, diagnostics, and permission filters share one
+  application contract.
+- Human decision: user approved the proposed scope on 2026-08-10.
+- Approved design: `docs/superpowers/specs/2026-08-10-613-coding-claude-code-parity-design.md`.

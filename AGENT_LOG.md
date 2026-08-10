@@ -1075,3 +1075,24 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   pytest-asyncio deprecation warnings; `uv run ruff check .`, `uv run mypy src`, documentation
   tests (5), `uv lock --check`, and `git diff --check` passed. The five restored user paths and
   untracked `.claude/`, course documents, and `tmp/` remain outside the SDK commits.
+
+### 2026-08-10 13:23:35 Asia/Shanghai - Claude-Code-like TUI and CLI parity design
+
+- Task: extend the local TUI and CLI so the harness supports the same user-visible coding workflow
+  as Claude Code: prompt-driven repository work, follow-up turns, permissions, resume, and
+  scriptable print/stream output.
+- Skills: `using-superpowers`, `brainstorming`, `writing-plans` (read for the required planning
+  gate; implementation planning is still pending).
+- Context: audited `src/coding613/tui`, `src/coding613/cli`, shared interactive/run services,
+  progress contracts, existing tests, and the approved local TUI/distribution design. Browsed the
+  official Anthropic CLI reference for the public command/flag vocabulary; no vendor implementation
+  or external service was adopted.
+- Human decision: user approved the recommended boundary—one shared conversation service, full
+  local coding-agent workflow, TUI and print CLI parity, versioned text/JSON/stream-JSON contracts,
+  and a later MCP adapter rather than MCP transport in this slice.
+- Design: `docs/superpowers/specs/2026-08-10-613-coding-claude-code-parity-design.md`; it keeps
+  the owned AgentLoop, hard safety rules, deterministic feedback, SQLite authority, sandbox, and
+  injectable tool registry.
+- Verification: design self-review found no TODO/TBD markers and `git diff --check` passed for the
+  new document. No implementation or passing-code claim is made; the next gate is a detailed
+  implementation plan followed by user execution approval.
