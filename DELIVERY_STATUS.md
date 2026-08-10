@@ -1,14 +1,14 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 14:25:00 (Asia/Shanghai)
-Responsible actor: `/root` for the approved Claude-Code-like TUI/CLI parity plan; Inline Execution is active in the isolated parity worktree. No provider, deployment, or pipeline operation was performed.
+Last updated: 2026-08-10 14:50:00 (Asia/Shanghai)
+Responsible actor: `/root` for the approved Claude-Code-like TUI/CLI parity plan; implementation is verified in isolated worktree branch `feature/claude-code-parity`. No provider, deployment, or pipeline operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
 | Official OpenAI SDK chat adapter | implemented, review-repaired, offline verified, and integrated into `main` | design `b4b5a94`; plan `d3e34f6`; implementation `f7f2301`; repair `0fcd2af`; integrated tip `8e708e2`; `PLAN.md` OPENAI-SDK-LLM evidence | retain the offline regression gate; run a real provider smoke only with user-controlled credentials |
-| Claude-Code-like TUI/CLI parity | Tasks 1-6 implemented and offline verified; Task 7 pending | design `3a07f09`; plan; commits through `67206b7`; evidence in `PLAN.md` and `AGENT_LOG.md` | documentation/compatibility suite, then spec and code review gates |
+| Claude-Code-like TUI/CLI parity | Tasks 1-7 implemented and offline verified in `feature/claude-code-parity`; handoff pending user integration choice | design `3a07f09`; plan; implementation `fd8871e`; evidence below and in `PLAN.md`/`AGENT_LOG.md` | merge or retain the isolated branch; configure a provider for a real coding run |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
 | Binary/wheel/sdist artifact builder | Docker-exported and runtime-smoked on main; CI/release configuration present | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08/TUI-09 evidence | push/tag when an operator wants remote CI artifacts or a GitHub release |
@@ -508,6 +508,14 @@ Every completed plan task must link a commit and fresh verification output here.
 - Commit: `67206b7` (`feat: add context diagnostics and model overrides`).
 - TDD/verification: Task 6 focused context/compaction/diagnostics/SDK/TUI suite passed 43 tests; the full offline suite passed 443 tests; Ruff, mypy across 102 source files, and `git diff --check` passed.
 - Boundary: summaries are redacted and additive in SQLite, deterministic compaction is injected and failure-safe, diagnostics isolate failed checks, and model/system-prompt overrides are request-scoped without changing configured provider defaults or persisting secrets.
+
+## Claude-Code-Parity Task 7 Evidence
+
+- Verification timestamp: 2026-08-10 14:50:00 Asia/Shanghai.
+- Commit: `fd8871e` (`feat: align tui and cli conversation workflow`); documentation and evidence updates are part of the final handoff commit.
+- TDD/verification: focused RED/GREEN contracts cover documentation, shared TUI/CLI request delegation, follow-up after resume, escaped slash prompts, lifecycle/diagnostic stream events, invalid selectors, active-run prevention, and prompt redaction. `uv run pytest -q --ignore=tmp` passed `460`; Ruff, mypy across 102 source files, `uv lock --check`, and `git diff --check` passed.
+- Smoke/review: `uv run 613-coding --help` returned 0. Provider-unconfigured print and verbose stream smokes returned documented exit code 4 with versioned redacted output. Independent review agents disconnected before returning reports; local spec/security/type review found no unresolved Critical issue, and no independent pass is claimed.
+- Boundary: the TUI compatibility adapter and print CLI share `ConversationService`; SQLite remains authoritative, active runs are not duplicated, and MCP remains an injectable future boundary. Main-worktree user changes and untracked files were not staged.
 
 ## Package Rename Task 3 Evidence
 

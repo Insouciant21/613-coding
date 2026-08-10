@@ -1131,3 +1131,33 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commit: `67206b7` (`feat: add context diagnostics and model overrides`). SQLite stores only redacted context summaries; transcript rows are untouched by compaction; diagnostics are injected and failure-isolated; provider model selection remains configured by default with a one-request override.
 - Human intervention: no main-worktree user files were staged or changed; no real provider, credential, network, deployment, or CI operation was performed.
 - Lesson: context controls need an additive source-of-truth record and a failure-safe compactor; embedding prompt controls into the existing SessionContextBuilder keeps CLI and TUI requests on the same boundary.
+
+### 2026-08-10 14:50:00 Asia/Shanghai - Claude-Code parity Task 7 and final local gate
+
+- Task: complete the approved parity slice and handoff evidence in isolated worktree
+  `feature/claude-code-parity`; triggered `executing-plans`, `test-driven-development`,
+  `requesting-code-review`, and `verification-before-completion`.
+- RED/GREEN: documentation/parity tests first exposed missing README command markers; follow-up
+  work then reproduced and fixed absent resume-after-prompt behavior, lifecycle/diagnostic stream
+  events, `//` prompt escaping, invalid resume validation, active-run duplication, shared-service
+  delegation, prompt-override validation, and SQLite prompt redaction. The final focused and full
+  suite passed `460` tests.
+- Implementation: commit `fd8871e` (`feat: align tui and cli conversation workflow`) makes the TUI
+  compatibility adapter delegate to `ConversationService`, adds session continuation and active-run
+  guards, versioned stream lifecycle records, safe diagnostics envelopes, and storage redaction;
+  README/development docs and cross-adapter contract tests were included.
+- Verification: `uv run pytest -q --ignore=tmp` passed `460`; `uv run ruff check .`, `uv run mypy src`
+  passed for 102 source files, `uv lock --check`, and `git diff --check` passed. `uv run 613-coding
+  --help` returned 0. Provider-unconfigured print and verbose stream smoke commands returned the
+  documented exit code 4 and emitted no credential material; Textual Pilot coverage passed in the
+  full suite.
+- Review: three independent review-agent attempts failed with a stream disconnect before a report
+  was returned. A local spec/security/type and main-worktree protection review found no unresolved
+  Critical issue; no independent review pass is claimed.
+- Human intervention: the user approved the design and detailed plan before execution. The dirty main
+  worktree's context/loop/domain files and untracked `.claude/`, course documents, and `tmp/` stayed
+  outside the branch commits; no provider, keyring, network, Docker worker, deployment, or CI write
+  was performed.
+- Lesson: root CLI/TUI parity requires a single conversation boundary plus a compatibility adapter;
+  stream diagnostics must be events rather than an unversioned preamble, and active-session guards
+  prevent a resume prompt from silently creating overlapping runs.

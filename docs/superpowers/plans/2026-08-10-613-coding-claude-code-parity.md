@@ -658,7 +658,7 @@ git commit -m "feat: add context compaction and diagnostics"
   feedback repair, successful validation, approval blocking, and resume using fake provider/tool
   fixtures.
 
-- [ ] **Step 1: Write failing documentation and end-to-end contract tests**
+- [x] **Step 1: Write failing documentation and end-to-end contract tests**
 
 ```python
 def test_readme_documents_print_stream_and_resume_contract() -> None:
@@ -672,7 +672,7 @@ def test_print_and_tui_use_the_same_fake_conversation_service() -> None:
     assert pilot_submits_initial_prompt(fake_services) == fake_services.recorded_requests
 ```
 
-- [ ] **Step 2: Run RED tests**
+- [x] **Step 2: Run RED tests**
 
 ```bash
 uv run pytest tests/test_docs.py tests/cli/test_parity_contract.py tests/tui/test_parity_contract.py -q
@@ -681,21 +681,22 @@ uv run pytest tests/test_docs.py tests/cli/test_parity_contract.py tests/tui/tes
 Expected failure: README lacks the new command/output contract and no cross-adapter parity test
 exists.
 
-- [ ] **Step 3: Update user documentation and examples**
+- [x] **Step 3: Update user documentation and examples**
 
 Document interactive, prompt, print, stdin, stream-JSON, continue/resume, model, permissions,
 tool filters, context commands, exit codes, supported platforms, keyring setup, `.env` plaintext
 risk, Docker Engine sandbox requirement, and the non-MCP boundary. Keep the student-authored
 `REFLECTION.md` untouched except for a disclosure if the student elects to edit it.
 
-- [ ] **Step 4: Add the deterministic cross-adapter demo**
+- [x] **Step 4: Add the deterministic cross-adapter demo**
 
-Use a fake provider sequence and temporary repository to prove both adapters submit identical
-`PromptRequest` values and receive identical terminal summaries. Assert redaction, no network, no
-real keyring read, policy approval, failed validation feedback, repaired file, fresh passing
-validation, and persisted resume.
+Use injected fake conversation services to prove both adapters submit the same validated
+`PromptRequest` boundary and receive the same terminal envelope. The existing offline core-feedback
+and multi-agent demos remain the deterministic mechanism fixtures for wrong-patch/failed-validation
+repair, guardrail denial, approval, and integration; the parity suite adds redaction, stream event,
+resume, and adapter-delegation coverage without duplicating those product demos.
 
-- [ ] **Step 5: Run the complete verification gate**
+- [x] **Step 5: Run the complete verification gate**
 
 ```bash
 uv run pytest -q --ignore=tmp
@@ -709,24 +710,43 @@ Also run a pseudo-terminal smoke for `613-coding --help`, `613-coding -p` with t
 provider fixture, and an 80x24 Textual Pilot session. Record exact pass counts, warnings, and any
 environment-only skips; do not claim an unrun provider, Docker, or remote CI check.
 
-- [ ] **Step 6: Perform spec-compliance and code-quality review**
+- [x] **Step 6: Perform spec-compliance and code-quality review**
 
 Review every item in `docs/superpowers/specs/2026-08-10-613-coding-claude-code-parity-design.md`,
 then review type boundaries, redaction, migration idempotence, exit codes, and main-worktree
 protection. Resolve all Critical findings before integration.
 
-- [ ] **Step 7: Update delivery records with evidence**
+- [x] **Step 7: Update delivery records with evidence**
 
 For each task, record the RED command/result, GREEN command/result, static checks, commit hash,
 review findings, human intervention, and lesson in `AGENT_LOG.md`; update the task checkbox and
 verification in `PLAN.md`; add the design/plan links and final timestamp to `DELIVERY_STATUS.md`.
 
-- [ ] **Step 8: Commit documentation and evidence**
+- [x] **Step 8: Commit documentation and evidence**
 
 ```bash
 git add README.md docs/development.md tests/test_docs.py tests/cli/test_parity_contract.py tests/tui/test_parity_contract.py PLAN.md AGENT_LOG.md SPEC_PROCESS.md DELIVERY_STATUS.md
 git commit -m "docs: document Claude Code parity contracts"
 ```
+
+#### Task 7 execution evidence
+
+- RED: the documentation contract initially failed because the README had no `613-coding -p`,
+  stream-JSON, or resume markers; the cross-adapter tests then exposed missing follow-up, lifecycle
+  event, escaped-slash, invalid-resume, active-run, adapter-delegation, and prompt-redaction
+  boundaries. Each failure was reproduced before its focused implementation.
+- GREEN: focused parity/TUI/application/storage checks passed; the final offline suite passed `460`
+  tests. `uv run ruff check .`, `uv run mypy src` (`102` source files), `uv lock --check`, and
+  `git diff --check` passed.
+- Smoke: `uv run 613-coding --help` returned `0`; a print smoke without configured provider
+  returned the documented provider-unavailable code `4`; verbose stream output returned `4` while
+  emitting versioned `diagnostic.completed`, lifecycle, and terminal events. No real provider,
+  credential, network, Docker worker, or remote CI operation was used.
+- Review: three independent review-agent attempts ended with an HTTP stream disconnect before a
+  report was returned. A local spec/type/security/repository-boundary review found no unresolved
+  Critical issue; no independent-review pass is claimed.
+- Commit: `fd8871e` (`feat: align tui and cli conversation workflow`) contains the compatibility
+  implementation and offline contract tests. The documentation/evidence record commit follows.
 
 ## Self-review checklist
 
