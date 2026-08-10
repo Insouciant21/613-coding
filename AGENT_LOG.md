@@ -1121,3 +1121,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commit: `b7111cd` (`feat: enforce invocation permission filters`). New `ToolFilter`, `PermissionRule`, SQLite table, application service, loop enforcement, composition wiring, and TUI command actions are covered by offline tests.
 - Human intervention: no source edits were made in the dirty main worktree; user-owned files remain unstaged. No real LLM, credential, network, deployment, or CI operation was performed.
 - Lesson: permission changes must remain an application-service operation so TUI command parsing cannot mutate SQLite directly; loading rules per dependency factory makes them effective for subsequent runs while hard denials remain immutable.
+
+### 2026-08-10 14:21:31 Asia/Shanghai - Claude-Code parity Task 6
+
+- Task: add context accounting, explicit compaction, diagnostics, and request-scoped model/system-prompt overrides.
+- Skills/workflow: `executing-plans` and `test-driven-development`; work remained in the isolated parity worktree.
+- TDD RED: focused collection failed on missing `ContextService`/`DiagnosticService`; the model override behavior also failed until the adapter read validated context metadata.
+- GREEN: Task 6 focused suite passed 43 tests; `uv run pytest -q --ignore=tmp` passed 443 tests; Ruff and mypy passed; `git diff --check` passed.
+- Commit: `67206b7` (`feat: add context diagnostics and model overrides`). SQLite stores only redacted context summaries; transcript rows are untouched by compaction; diagnostics are injected and failure-isolated; provider model selection remains configured by default with a one-request override.
+- Human intervention: no main-worktree user files were staged or changed; no real provider, credential, network, deployment, or CI operation was performed.
+- Lesson: context controls need an additive source-of-truth record and a failure-safe compactor; embedding prompt controls into the existing SessionContextBuilder keeps CLI and TUI requests on the same boundary.

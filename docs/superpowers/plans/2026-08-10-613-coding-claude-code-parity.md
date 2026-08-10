@@ -559,7 +559,7 @@ git commit -m "feat: enforce invocation permission filters"
 - Adds `context_summary(session_id, revision, text, created_at)` persistence; original transcript rows remain unchanged.
 - Allows `ModelContext.metadata["model"]`, `metadata["system_prompt"]`, and `metadata["append_system_prompt"]` to alter one provider request without logging secret values.
 
-- [ ] **Step 1: Write RED accounting, compaction, diagnostics, and model override tests**
+- [x] **Step 1: Write RED accounting, compaction, diagnostics, and model override tests**
 
 ```python
 def test_context_report_counts_omitted_entries_without_deleting_transcript(fake_store) -> None:
@@ -584,7 +584,7 @@ def test_openai_adapter_uses_context_model_override(fake_client) -> None:
     assert fake_client.chat.completions.calls[0]["model"] == "gpt-test"
 ```
 
-- [ ] **Step 2: Run RED tests**
+- [x] **Step 2: Run RED tests**
 
 ```bash
 uv run pytest tests/application/test_context.py tests/application/test_compaction.py tests/application/test_diagnostics.py tests/adapters/llm/test_openai_compatible.py tests/tui/test_controller.py -q
@@ -593,28 +593,28 @@ uv run pytest tests/application/test_context.py tests/application/test_compactio
 Expected failure: no summary store, context service, diagnostics service, or per-request model /
 system-prompt override exists.
 
-- [ ] **Step 3: Add authoritative summary storage and deterministic accounting**
+- [x] **Step 3: Add authoritative summary storage and deterministic accounting**
 
 Create the summary table and migration. Extend `SessionContextBuilder` to expose included and
 omitted transcript entries, memory IDs, and a character-based token estimate. `ContextService`
 persists a redacted summary revision; a failed compactor leaves the table and transcript unchanged.
 Use a deterministic fake compactor in tests and make the real compactor an injected provider seam.
 
-- [ ] **Step 4: Add system-prompt and model metadata safely**
+- [x] **Step 4: Add system-prompt and model metadata safely**
 
 Merge `RunOptions.system_prompt`/`append_system_prompt` into model messages at context assembly.
 Use `metadata["model"]` only as a provider request override, preserving the configured model when
 absent. Whitelist these metadata keys, redact values in events, and test that no credentials or
 full environment data enter the context.
 
-- [ ] **Step 5: Implement injected diagnostics**
+- [x] **Step 5: Implement injected diagnostics**
 
 Create checks for repository readability, harness configuration, provider metadata/credential
 availability without reading key material, writable state directory, and optional Docker Engine
 availability. Each check returns pass/warn/fail with redacted detail; a failed optional check does
 not mutate run state. `/doctor` and CLI verbose diagnostics call this service.
 
-- [ ] **Step 6: Run focused GREEN and static checks**
+- [x] **Step 6: Run focused GREEN and static checks**
 
 ```bash
 uv run pytest tests/application/test_context.py tests/application/test_compaction.py tests/application/test_diagnostics.py tests/adapters/llm/test_openai_compatible.py tests/tui/test_controller.py -q
@@ -622,7 +622,7 @@ uv run ruff check src/coding613/ports/context.py src/coding613/application/conte
 uv run mypy src/coding613/ports/context.py src/coding613/application/context.py src/coding613/application/diagnostics.py src/coding613/application/composition.py src/coding613/adapters/llm/openai_compatible.py
 ```
 
-- [ ] **Step 7: Commit context and diagnostics**
+- [x] **Step 7: Commit context and diagnostics**
 
 ```bash
 git add src/coding613/ports/context.py src/coding613/application/context.py src/coding613/application/diagnostics.py src/coding613/application/composition.py src/coding613/adapters/storage/schema.sql src/coding613/adapters/storage/sqlite.py src/coding613/ports/llm.py src/coding613/adapters/llm/openai_compatible.py src/coding613/tui/controller.py tests/application/test_context.py tests/application/test_compaction.py tests/application/test_diagnostics.py tests/adapters/llm/test_openai_compatible.py tests/tui/test_controller.py
@@ -630,6 +630,12 @@ git commit -m "feat: add context compaction and diagnostics"
 ```
 
 ---
+
+#### Task 6 execution evidence
+
+- RED: the context/diagnostics collection initially failed because `ContextService` and `DiagnosticService` were absent; the model override test then asserted the configured model was used instead of the request metadata.
+- GREEN: `uv run pytest tests/application/test_context.py tests/application/test_compaction.py tests/application/test_diagnostics.py tests/adapters/llm/test_openai_compatible.py tests/tui/test_controller.py -q` passed 43 tests; full offline regression passed 443 tests; Ruff, mypy, and `git diff --check` passed.
+- Commit: `67206b7` (`feat: add context diagnostics and model overrides`). Context summaries are additive and redacted; failed compaction does not persist state or delete transcript rows.
 
 ### Task 7: Documentation, compatibility suite, and final delivery evidence
 
