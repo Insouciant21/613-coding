@@ -965,3 +965,22 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Cleanup after user-selected local merge removed the clean `feature/tui-distribution` worktree and
   merged branch. Existing user-owned untracked `.claude/`, course requirements, and `tmp/cube/`
   remain intact; unrelated historical/reviewer worktrees were left alone.
+
+### 2026-08-10 11:40:09 Asia/Shanghai - OpenAI SDK migration brainstorming
+
+- Task: replace the hand-written chat-completions HTTP/SSE implementation with the official OpenAI
+  Python SDK; triggered `using-superpowers`, `brainstorming`, and `openai-docs`.
+- Context inspection: production chat currently uses `httpx`; embedding remains a separate direct
+  HTTP adapter. Eight pre-existing tracked files contain user-owned reliability changes and were
+  not modified during design work.
+- Approaches: official SDK Chat Completions, SDK Responses API, and SDK transport with retained
+  custom parsing. Recommended Chat Completions to preserve custom `base_url`, current tool schemas,
+  and OpenAI-compatible endpoints.
+- User decision: approved the Chat Completions design.
+- Design boundary: retain owned ports, loop, governance, feedback, Keyring laziness, cancellation,
+  absolute deadline, typed provider errors, and offline injection; migrate only chat/tool calls,
+  disable SDK retries, and leave embeddings unchanged.
+- Documentation lookup: official web search returned no usable page and the direct official page
+  was protected by a browser challenge; no unverified documentation claim was substituted.
+- Evidence: `docs/superpowers/specs/2026-08-10-openai-sdk-llm-design.md` and the corresponding
+  `SPEC_PROCESS.md` entry. No implementation or verification claim is made at this stage.

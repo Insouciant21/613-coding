@@ -1,12 +1,13 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 05:46:09 (Asia/Shanghai)
-Responsible actor: `/root` for final local integration record at `043077a`; executable code and artifact builder were exact-main verified at merge `4528bda`, with only CI/docs/tests records added afterward; no remote deployment or pipeline execution was performed.
+Last updated: 2026-08-10 11:40:09 (Asia/Shanghai)
+Responsible actor: `/root` for the approved OpenAI SDK migration design; implementation has not started and no remote provider, deployment, or pipeline operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
+| Official OpenAI SDK chat adapter | design approved; implementation plan pending | `docs/superpowers/specs/2026-08-10-openai-sdk-llm-design.md`; `SPEC_PROCESS.md` Iteration 11 | user reviews committed design, then write implementation plan |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
 | Binary/wheel/sdist artifact builder | Docker-exported and runtime-smoked on main; CI/release configuration present | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08/TUI-09 evidence | push/tag when an operator wants remote CI artifacts or a GitHub release |

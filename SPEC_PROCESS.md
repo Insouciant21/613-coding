@@ -144,3 +144,21 @@ force.
 ## Reflection Notes
 
 The strongest brainstorming outcome was forcing explicit boundaries around objective feedback, dangerous actions, memory authority, and the distinction between the development host and the delivered Harness. The main unresolved execution risk is scope: three substantial runtime areas must be delivered with the feedback loop still visibly deeper than the supporting systems.
+
+### Iteration 11: Official OpenAI SDK migration
+
+- Question: should the LLM adapter continue maintaining direct HTTP/SSE protocol code or use the
+  official OpenAI Python SDK?
+- User decision: migrate chat and tool calls to the official SDK using Chat Completions.
+- Selected boundary: retain the project-owned `LLMProvider`, AgentLoop, schemas, governance,
+  deterministic feedback, cancellation, absolute deadline, Keyring lifecycle, and offline fakes;
+  replace only provider request/response transport and parsing with SDK calls and typed values.
+- Compatibility decision: keep custom `base_url` and the `openai-compatible` configuration value;
+  do not migrate the independent embedding adapter in this change.
+- Uncertainty exposed: Responses API would widen the migration and reduce compatible-endpoint
+  coverage, while using only the SDK transport would preserve the custom parsing burden. Both were
+  rejected in favor of `chat.completions.create`.
+- Meaningful before/after: before, production code posts directly to `/chat/completions` and parses
+  SSE records; after, production chat calls and streams go through an injected official SDK client
+  and are converted back into project-owned domain values.
+- Approved design: `docs/superpowers/specs/2026-08-10-openai-sdk-llm-design.md`.
