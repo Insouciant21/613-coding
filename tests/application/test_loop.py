@@ -38,6 +38,7 @@ from coding613.domain.models import (
     RunSummary,
     StopReason,
 )
+from coding613.domain.permissions import ToolFilter
 from coding613.ports.llm import (
     LLMResponse,
     ModelContext,
@@ -342,6 +343,29 @@ def test_bare_run_service_defaults_unspecified_mode_to_balanced(tmp_path: Path) 
     created = service.create_run(RunRequest(task="use library default"))
 
     assert created.permission_mode is PermissionMode.BALANCED
+
+
+def test_invocation_filter_blocks_tool_before_execution(tmp_path: Path) -> None:
+    provider = Provider(
+        (response(ToolCall(name="edit_file", arguments={"path": "a.py", "content": "x"})),)
+    )
+    deps, records, executor, _ = dependencies(
+        tmp_path, provider, Validator(()), budget=BudgetLimits(total_model_calls=2)
+    )
+    deps = replace(
+        deps,
+        tool_filter=ToolFilter(disallowed=frozenset({"edit_file"})),
+    )
+
+    summary = AgentLoop().run(uuid4(), "edit", deps)
+
+    assert summary.status is RunState.FAILED
+    assert not executor.calls
+    assert any(
+        iteration.policy_decision is not None
+        and iteration.policy_decision.rule_id == "invocation.tool_disallowed"
+        for iteration in records.iterations
+    )
 
 
 def test_failure_feedback_drives_repair_and_fresh_finish(tmp_path: Path) -> None:

@@ -44,6 +44,7 @@ from coding613.domain.models import (
     SchemaValidationEvidence,
     StopReason,
 )
+from coding613.domain.permissions import ToolFilter
 from coding613.domain.redaction import redact_text
 from coding613.ports.llm import LLMProvider, LLMResponse, ModelContext, ToolDefinition
 from coding613.ports.policy import PolicyDecision, PolicyEffect
@@ -104,6 +105,7 @@ class LoopDependencies:
     clock: Callable[[], datetime]
     progress: ProgressSink = field(default_factory=NullProgressSink)
     cancellation: CancellationToken = field(default_factory=CancellationToken)
+    tool_filter: ToolFilter = field(default_factory=ToolFilter)
 
 
 @dataclass(slots=True)
@@ -498,13 +500,7 @@ class AgentLoop:
                     valid=True, target="tool_call"
                 )
                 try:
-                    decision = PolicyDecision.model_validate(
-                        dependencies.policy.evaluate(
-                            action,
-                            dependencies.policy_config,
-                            dependencies.permission_mode,
-                        )
-                    )
+                    decision = self._policy_decision(action, dependencies)
                 except Exception as error:
                     return self._dependency_failure(
                         run_id,
@@ -777,13 +773,7 @@ class AgentLoop:
                 ),
             )
         try:
-            current_decision = PolicyDecision.model_validate(
-                dependencies.policy.evaluate(
-                    pending,
-                    dependencies.policy_config,
-                    dependencies.permission_mode,
-                )
-            )
+            current_decision = self._policy_decision(pending, dependencies)
         except Exception as error:
             return self._dependency_failure(
                 run_id,
@@ -1634,6 +1624,17 @@ class AgentLoop:
             rule_id=decision.rule_id,
             reason=decision.reason,
         )
+
+    @staticmethod
+    def _policy_decision(call: ToolCall, dependencies: LoopDependencies) -> PolicyDecision:
+        decision = PolicyDecision.model_validate(
+            dependencies.policy.evaluate(
+                call,
+                dependencies.policy_config,
+                dependencies.permission_mode,
+            )
+        )
+        return dependencies.tool_filter.apply(call, decision)
 
     @staticmethod
     def _summarize_context(context: ModelContext) -> str:

@@ -24,6 +24,7 @@ from coding613.domain.models import (
     RunState,
     StopReason,
 )
+from coding613.domain.permissions import PermissionRule
 
 
 class SqliteEventStore:
@@ -231,6 +232,56 @@ class SqliteEventStore:
             canonical_root=Path(row["canonical_root"]),
             created_at=self._parse_datetime(row["created_at"]),
         )
+
+    def save_permission_rule(self, project_id: UUID, rule: PermissionRule) -> None:
+        """Persist one validated project-scoped permission rule."""
+
+        with self._transaction() as connection:
+            connection.execute(
+                """
+                INSERT INTO permission_rules (
+                    project_id, scope, pattern, effect, created_at
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(project_id, scope, pattern) DO UPDATE SET
+                    effect = excluded.effect,
+                    created_at = excluded.created_at
+                """,
+                (
+                    str(project_id),
+                    rule.scope,
+                    rule.pattern,
+                    rule.effect,
+                    self._serialize_datetime(datetime.now(UTC)),
+                ),
+            )
+
+    def list_permission_rules(self, project_id: UUID) -> list[PermissionRule]:
+        with self._transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT scope, pattern, effect
+                FROM permission_rules
+                WHERE project_id = ?
+                ORDER BY scope, pattern
+                """,
+                (str(project_id),),
+            ).fetchall()
+        return [
+            PermissionRule(
+                scope=row["scope"], pattern=row["pattern"], effect=row["effect"]
+            )
+            for row in rows
+        ]
+
+    def delete_permission_rule(self, project_id: UUID, rule: PermissionRule) -> None:
+        with self._transaction() as connection:
+            connection.execute(
+                """
+                DELETE FROM permission_rules
+                WHERE project_id = ? AND scope = ? AND pattern = ?
+                """,
+                (str(project_id), rule.scope, rule.pattern),
+            )
 
     def get_run(self, run_id: UUID) -> Run | None:
         with self._transaction() as connection:

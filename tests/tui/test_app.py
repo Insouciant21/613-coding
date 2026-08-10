@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from datetime import UTC, datetime
 from threading import Event
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
@@ -21,6 +22,7 @@ from coding613.domain.models import (
     RunSummary,
     StopReason,
 )
+from coding613.domain.permissions import PermissionRule
 from coding613.ports.progress import ProgressKind, ProgressSink, RunProgress
 from coding613.tui.app import CodingApp
 from coding613.tui.controller import TuiController
@@ -197,6 +199,29 @@ class FakeUiServices:
             ),
             approvals=approvals,
         )
+
+
+class FakePermissionRules:
+    def __init__(self) -> None:
+        self.rules: list[PermissionRule] = []
+
+    def list_rules(self) -> list[PermissionRule]:
+        return list(self.rules)
+
+    def allow_tool(self, name: str) -> PermissionRule:
+        rule = PermissionRule(scope="tool", pattern=name, effect="allow")
+        self.rules = [item for item in self.rules if item.pattern != name]
+        self.rules.append(rule)
+        return rule
+
+    def deny_tool(self, name: str) -> PermissionRule:
+        rule = PermissionRule(scope="tool", pattern=name, effect="deny")
+        self.rules = [item for item in self.rules if item.pattern != name]
+        self.rules.append(rule)
+        return rule
+
+    def clear_tool(self, name: str) -> None:
+        self.rules = [item for item in self.rules if item.pattern != name]
 
 
 def _long_patch() -> str:
@@ -473,3 +498,35 @@ async def test_tui_permissions_slash_command_changes_next_run_mode() -> None:
                 break
         assert app.permission_mode is PermissionMode.STRICT
         assert "strict" in str(app.query_one(StatusFooter).renderable)
+
+
+@pytest.mark.asyncio
+async def test_tui_permissions_slash_commands_use_application_rule_service() -> None:
+    fake = FakeUiServices()
+    rules = FakePermissionRules()
+    services = SimpleNamespace(permission_rules=rules)
+    app = CodingApp(controller=_controller(fake), services=services)
+
+    async with app.run_test(size=(80, 24)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("/permissions allow read_file")
+        await pilot.press("enter")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if rules.rules:
+                break
+        assert rules.rules == [
+            PermissionRule(scope="tool", pattern="read_file", effect="allow")
+        ]
+        assert any(
+            "Allowed tool: read_file" in str(widget.renderable)
+            for widget in app.query_one(ConversationLog).query(Static)
+        )
+
+        composer.load_text("/permissions clear read_file")
+        await pilot.press("enter")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if not rules.rules:
+                break
+        assert rules.rules == []

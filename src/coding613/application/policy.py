@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, ClassVar
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from coding613.domain.actions import ToolCall
 from coding613.domain.events import redact_payload
 from coding613.domain.models import PermissionMode
 from coding613.domain.models_base import DomainModel
+from coding613.domain.permissions import PermissionRule
 from coding613.domain.sandbox import ResourceLimits
 from coding613.ports.policy import PolicyDecision, PolicyEffect
 
@@ -23,6 +25,7 @@ class RepositoryPolicyConfig(DomainModel):
     allow_git_writes: bool = False
     allow_writes: bool = True
     denied_tools: frozenset[str] = Field(default_factory=frozenset)
+    permission_rules: tuple[PermissionRule, ...] = ()
 
     @field_validator("repository_root")
     @classmethod
@@ -31,6 +34,13 @@ class RepositoryPolicyConfig(DomainModel):
         if not root.is_dir():
             raise ValueError("repository_root must be a directory")
         return root
+
+    @model_validator(mode="after")
+    def validate_permission_rules(self) -> RepositoryPolicyConfig:
+        keys = [(rule.scope, rule.pattern) for rule in self.permission_rules]
+        if len(keys) != len(set(keys)):
+            raise ValueError("permission rules must be unique by scope and pattern")
+        return self
 
 
 class SandboxPolicyConfig(DomainModel):
@@ -73,6 +83,32 @@ class PolicyEngine:
             return self._decision(
                 PolicyEffect.DENY, "config.denied_tool", "repository policy denied tool", call
             )
+        decision = self._repository_decision(call, config, mode)
+        if decision.effect is PolicyEffect.DENY:
+            return decision
+        rule = self._matching_permission_rule(call, config.permission_rules, config.repository_root)
+        if rule is not None and rule.effect == "deny":
+            return self._decision(
+                PolicyEffect.DENY,
+                "config.permission_rule_denied",
+                "project permission rule denied action",
+                call,
+            )
+        if rule is not None and rule.effect == "allow" and decision.effect is PolicyEffect.ASK:
+            return self._decision(
+                PolicyEffect.ALLOW,
+                "config.permission_rule_allowed",
+                "project permission rule allowed action",
+                call,
+            )
+        return decision
+
+    def _repository_decision(
+        self,
+        call: ToolCall,
+        config: RepositoryPolicyConfig,
+        mode: PermissionMode,
+    ) -> PolicyDecision:
         if call.name in self._READ_TOOLS:
             return self._decision(PolicyEffect.ALLOW, "mode.read", "safe read", call)
         if call.name in self._WRITE_TOOLS:
@@ -97,6 +133,50 @@ class PolicyEngine:
         return self._decision(
             PolicyEffect.DENY, "policy.unknown_tool", "unknown tool category", call
         )
+
+    @staticmethod
+    def _matching_permission_rule(
+        call: ToolCall,
+        rules: tuple[PermissionRule, ...],
+        root: Path,
+    ) -> PermissionRule | None:
+        for rule in rules:
+            if rule.scope == "tool" and rule.pattern == call.name:
+                return rule
+            if rule.scope != "path":
+                continue
+            for value in PolicyEngine._path_values(call):
+                normalized = PolicyEngine._normalize_rule_path(value, root)
+                if normalized is not None and fnmatchcase(normalized, rule.pattern):
+                    return rule
+        return None
+
+    @staticmethod
+    def _path_values(call: ToolCall) -> tuple[str, ...]:
+        values: list[str] = []
+        for key in ("path", "cwd", "root", "target"):
+            value = call.arguments.get(key)
+            if isinstance(value, str):
+                values.append(value)
+        if call.name == "apply_patch":
+            patch = call.arguments.get("patch")
+            if isinstance(patch, str):
+                for line in patch.splitlines():
+                    if line.startswith(("--- ", "+++ ")):
+                        path = line[4:].split("\t", 1)[0].strip()
+                        if path != "/dev/null":
+                            values.append(path[2:] if path[:2] in {"a/", "b/"} else path)
+        return tuple(values)
+
+    @staticmethod
+    def _normalize_rule_path(value: str, root: Path) -> str | None:
+        path = Path(value)
+        if path.is_absolute() or ".." in path.parts:
+            return None
+        resolved = (root / path).resolve(strict=False)
+        if not resolved.is_relative_to(root):
+            return None
+        return path.as_posix().removeprefix("./")
 
     def _command_decision(
         self,

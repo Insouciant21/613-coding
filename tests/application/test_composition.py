@@ -7,6 +7,7 @@ from coding613.adapters.llm.mock import ScriptedLLM
 from coding613.application.composition import build_services
 from coding613.application.run_service import RunRequest
 from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
+from coding613.domain.conversation import RunOptions
 from coding613.domain.models import PermissionMode, RunState, StopReason
 from coding613.ports.llm import LLMResponse
 
@@ -212,6 +213,39 @@ total_model_calls = 2
     assert summary.status is RunState.COMPLETED
     assert summary.stop_reason is StopReason.SUCCESS
     assert summary.validation_evidence
+
+
+def test_local_composition_applies_run_tool_filters_before_repository_execution(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "answer.txt"
+    target.write_text("answer\n", encoding="utf-8")
+    provider = ScriptedLLM(
+        (
+            LLMResponse(
+                actions=(
+                    ActionEnvelope(
+                        action=ToolCall(
+                            name="read_file", arguments={"path": "answer.txt"}
+                        )
+                    ),
+                )
+            ),
+        )
+    )
+    services = build_services(tmp_path, provider=provider)
+    run = services.run_service.create_run(
+        RunRequest(
+            task="read answer",
+            options=RunOptions(disallowed_tools=frozenset({"read_file"})),
+        )
+    )
+
+    summary = services.run_service.resume(run.id)
+
+    assert summary.status is RunState.FAILED
+    assert summary.unresolved_risks == ("invocation.tool_disallowed",)
+    assert target.read_text(encoding="utf-8") == "answer\n"
 
 
 def test_local_composition_runs_apply_patch_and_persists_changed_file(

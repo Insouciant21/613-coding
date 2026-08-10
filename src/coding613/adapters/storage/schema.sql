@@ -97,6 +97,18 @@ CREATE TABLE IF NOT EXISTS memory_entries (
 
 CREATE INDEX IF NOT EXISTS idx_memory_project_type ON memory_entries(project_id, memory_type);
 
+CREATE TABLE IF NOT EXISTS permission_rules (
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    scope TEXT NOT NULL,
+    pattern TEXT NOT NULL,
+    effect TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(project_id, scope, pattern)
+);
+
+CREATE INDEX IF NOT EXISTS idx_permission_rules_project_scope
+    ON permission_rules(project_id, scope, pattern);
+
 CREATE TABLE IF NOT EXISTS embedding_status (
     memory_id TEXT PRIMARY KEY REFERENCES memory_entries(id) ON DELETE CASCADE,
     status TEXT NOT NULL,

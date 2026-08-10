@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
@@ -178,9 +179,32 @@ class CodingApp(App[None]):
                     f"613 Coding  |  {self.permission_mode.value}  |  ready"
                 )
             else:
-                await log.mount(
-                    Static("Permission rules are application-managed; use /permissions list")
-                )
+                service = getattr(self.services, "permission_rules", None)
+                if service is None:
+                    await log.mount(Static("Permission rules are unavailable"))
+                elif not command.arguments or command.arguments[0] == "list":
+                    rules = await asyncio.to_thread(service.list_rules)
+                    lines = [
+                        f"{rule.effect} {rule.scope}:{rule.pattern}" for rule in rules
+                    ]
+                    await log.mount(
+                        Static(
+                            f"Mode: {self.permission_mode.value}\n"
+                            + ("\n".join(lines) or "No project permission rules")
+                        )
+                    )
+                else:
+                    action, tool_name = command.arguments
+                    if action == "allow":
+                        rule = await asyncio.to_thread(service.allow_tool, tool_name)
+                        message = f"Allowed tool: {rule.pattern}"
+                    elif action == "deny":
+                        rule = await asyncio.to_thread(service.deny_tool, tool_name)
+                        message = f"Denied tool: {rule.pattern}"
+                    else:
+                        await asyncio.to_thread(service.clear_tool, tool_name)
+                        message = f"Cleared tool rule: {tool_name}"
+                    await log.mount(Static(message))
         elif command.name == "runs":
             snapshot = await self.controller.snapshot()
             lines = [f"{run.id}  {run.state.value}  {run.task}" for run in snapshot.runs]

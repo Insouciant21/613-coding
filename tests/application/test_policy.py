@@ -8,6 +8,7 @@ import pytest
 from coding613.application.policy import PolicyEngine, RepositoryPolicyConfig
 from coding613.domain.actions import ToolCall
 from coding613.domain.models import PermissionMode
+from coding613.domain.permissions import PermissionRule
 from coding613.ports.policy import PolicyEffect
 
 
@@ -168,3 +169,73 @@ def test_sensitive_scoped_actions_ask_unless_autonomous_and_declared(
     assert engine.evaluate(call, config, PermissionMode.AUTONOMOUS).effect is PolicyEffect.ALLOW
     restricted = config.model_copy(update={config_field: False})
     assert engine.evaluate(call, restricted, PermissionMode.AUTONOMOUS).effect is PolicyEffect.ASK
+
+
+def test_project_deny_rule_is_applied_after_hard_checks(
+    config: RepositoryPolicyConfig,
+) -> None:
+    restricted = config.model_copy(
+        update={
+            "permission_rules": (
+                PermissionRule(scope="tool", pattern="read_file", effect="deny"),
+            )
+        }
+    )
+
+    decision = PolicyEngine().evaluate(
+        ToolCall(name="read_file", arguments={"path": "README.md"}),
+        restricted,
+        PermissionMode.AUTONOMOUS,
+    )
+
+    assert decision.effect is PolicyEffect.DENY
+    assert decision.rule_id == "config.permission_rule_denied"
+
+
+def test_project_allow_rule_can_resolve_an_approval_but_not_a_hard_denial(
+    config: RepositoryPolicyConfig,
+) -> None:
+    allowed = config.model_copy(
+        update={
+            "permission_rules": (
+                PermissionRule(scope="tool", pattern="edit_file", effect="allow"),
+            )
+        }
+    )
+    engine = PolicyEngine()
+    edit = ToolCall(name="edit_file", arguments={"path": "src/a.py", "content": "x"})
+
+    assert engine.evaluate(edit, allowed, PermissionMode.STRICT).effect is PolicyEffect.ALLOW
+
+    hard = ToolCall(name="read_file", arguments={"path": "../secret"})
+    hard_allowed = allowed.model_copy(
+        update={
+            "permission_rules": (
+                PermissionRule(scope="path", pattern="README.md", effect="allow"),
+            )
+        }
+    )
+    hard_decision = engine.evaluate(hard, hard_allowed, PermissionMode.AUTONOMOUS)
+    assert hard_decision.effect is PolicyEffect.DENY
+    assert hard_decision.rule_id.startswith("hard.")
+
+
+def test_project_path_rule_matches_normalized_repository_paths(
+    config: RepositoryPolicyConfig,
+) -> None:
+    restricted = config.model_copy(
+        update={
+            "permission_rules": (
+                PermissionRule(scope="path", pattern="src/private/**", effect="deny"),
+            )
+        }
+    )
+
+    decision = PolicyEngine().evaluate(
+        ToolCall(name="read_file", arguments={"path": "src/private/key.txt"}),
+        restricted,
+        PermissionMode.AUTONOMOUS,
+    )
+
+    assert decision.effect is PolicyEffect.DENY
+    assert decision.rule_id == "config.permission_rule_denied"

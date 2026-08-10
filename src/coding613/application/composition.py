@@ -31,12 +31,14 @@ from coding613.application.conversation import ConversationService
 from coding613.application.feedback import FeedbackClassifier
 from coding613.application.interactive import InteractiveSessionService
 from coding613.application.loop import AgentLoop, LoopDependencies
+from coding613.application.permissions import PermissionRuleService
 from coding613.application.policy import PolicyEngine
 from coding613.application.progress import CancellationToken
 from coding613.application.run_service import RunRequest, RunService
 from coding613.config import LLMConfig, load_config
 from coding613.domain.events import Event
 from coding613.domain.models import PermissionMode, Project, Run
+from coding613.domain.permissions import ToolFilter
 from coding613.ports.llm import LLMProvider, LLMResponse, ModelContext, ToolDefinition
 from coding613.ports.progress import NullProgressSink
 
@@ -96,6 +98,7 @@ class LocalServices:
         self.interactive = interactive
         self.llm_metadata = llm_metadata
         self.permission_mode = permission_mode
+        self.permission_rules = PermissionRuleService(self.run_service.project.id, self._events)
         self.conversation = ConversationService(
             self.run_service.project.id,
             self._events,
@@ -144,12 +147,15 @@ def build_services(
     )
 
     def dependencies(run: Run) -> LoopDependencies:
+        policy_config = config.policy.model_copy(
+            update={"permission_rules": tuple(store.list_permission_rules(project.id))}
+        )
         return LoopDependencies(
             context_builder=context,
             provider=provider,
             tools=tools,
             policy=policy,
-            policy_config=config.policy,
+            policy_config=policy_config,
             permission_mode=run.permission_mode,
             approvals=ApprovalService(run_id=run.id, store=store),
             events=store,
@@ -163,6 +169,10 @@ def build_services(
             clock=lambda: datetime.now(UTC),
             progress=NullProgressSink(),
             cancellation=CancellationToken(),
+            tool_filter=ToolFilter(
+                allowed=run.options.allowed_tools,
+                disallowed=run.options.disallowed_tools,
+            ),
         )
 
     service = ConfiguredRunService(
