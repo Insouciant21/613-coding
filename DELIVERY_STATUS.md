@@ -1,13 +1,13 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 11:47:00 (Asia/Shanghai)
-Responsible actor: `/root` for the approved OpenAI SDK migration plan; implementation has not started and no remote provider, deployment, or pipeline operation was performed.
+Last updated: 2026-08-10 12:19:59 (Asia/Shanghai)
+Responsible actor: `/root` for the approved OpenAI SDK migration; implementation is locally verified on `feature/openai-sdk-llm` and no remote provider, deployment, or pipeline operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
-| Official OpenAI SDK chat adapter | design and implementation plan committed; execution workflow pending | design `b4b5a94`; plan `d3e34f6`; `docs/superpowers/plans/2026-08-10-openai-sdk-llm.md` | select Subagent-Driven or Inline execution, then run Task 1 |
+| Official OpenAI SDK chat adapter | implemented, review-repaired, and offline verified on feature branch; integration pending | design `b4b5a94`; plan `d3e34f6`; implementation `f7f2301`; repair `0fcd2af`; `PLAN.md` OPENAI-SDK-LLM evidence | commit final records and integrate into main while preserving dirty user paths |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
 | Binary/wheel/sdist artifact builder | Docker-exported and runtime-smoked on main; CI/release configuration present | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08/TUI-09 evidence | push/tag when an operator wants remote CI artifacts or a GitHub release |
@@ -37,6 +37,21 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Public WebUI URL | removed from product scope | approved TUI/distribution design | no action |
 | Reflection | reserved for student | `REFLECTION.md` contains an explicit student-authored boundary and no AI-written narrative | student writes the final report |
 | Cold-start implementation trial | completed with revisions | report at `/tmp/613-cold-start.T1D2Hh/cold-start-report.md`; revision committed as `fc7bf53` | gate satisfied |
+
+## OPENAI-SDK-LLM Evidence
+
+- TDD RED: the focused SDK boundary initially failed 2 tests before implementation; the old
+  credential factory signature and direct HTTP chat boundary were the observed failures.
+- Implementation: `f7f2301` adds the bounded `openai` dependency, official SDK Chat Completions
+  calls, injected offline fakes, lazy `OpenAI(..., max_retries=0)` construction, stream cleanup,
+  and README guidance. The embedding HTTP adapter is intentionally out of scope.
+- Verification: initial adapter suite 33 passed; after review repair the adapter suite passed 37,
+  application/composition/CLI regressions passed 25, and full offline suite 405 passed with
+  `uv run pytest -q --ignore=tmp`; Ruff, mypy, `uv lock --check`, `git diff --check`, and
+  documentation tests (5) passed. No real provider request was made.
+- Review: independent review found two Important cleanup/secrecy risks; repair `0fcd2af` addressed
+  both, and follow-up review found no remaining Critical or Important issues. The main worktree's
+  unrelated user changes remain outside this branch and must be preserved at handoff.
 
 ## DELIVERY-01 Evidence
 

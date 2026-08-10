@@ -8,6 +8,11 @@
 
 **Tech Stack:** Python 3.12+, official `openai` Python package, Pydantic project models, pytest, `uv`, existing `LLMProvider` ports, and injected fake SDK clients for offline tests.
 
+**Execution note:** The four logical tasks were implemented together in migration commit `f7f2301`
+so the adapter seam, response mapping, stream lifecycle, and credential wiring could be reviewed as
+one boundary. The checklist below records the actual RED/GREEN and verification evidence; unrelated
+dirty main-worktree user changes were not staged.
+
 ## Global Constraints
 
 - Use `OpenAI.chat.completions.create(...)` for chat and tool calls; do not migrate this task to the Responses API.
@@ -101,7 +106,7 @@ def complete_stream(
 - Consumes: existing `LLMProvider`, `ModelContext`, `ToolDefinition`, Keyring reader, and project provider exceptions.
 - Produces: an SDK-shaped injected client and `SDKClientFactory(api_key, base_url, timeout)` used by Tasks 2–4.
 
-- [ ] **Step 1: Write failing injection and dependency-boundary tests**
+- [x] **Step 1: Write failing injection and dependency-boundary tests**
 
 Add tests that do not import `httpx` or call a network transport:
 
@@ -133,7 +138,7 @@ Add a source-boundary test that reads only `openai_compatible.py` and asserts it
 `httpx` or contain a direct `"/chat/completions"` post path. Add fake SDK response classes with
 attribute access matching the SDK's `choices[0].message` and iterable stream shapes.
 
-- [ ] **Step 2: Run focused tests and record the RED**
+- [x] **Step 2: Run focused tests and record the RED**
 
 Run:
 
@@ -146,14 +151,14 @@ Expected: FAIL because the current factories require an `httpx.Client`, the adap
 `AGENT_LOG.md` only after implementation work for this task is complete; do not edit product code
 to hide the RED.
 
-- [ ] **Step 3: Add the bounded dependency and minimal SDK client seam**
+- [x] **Step 3: Add the bounded dependency and minimal SDK client seam**
 
 Add a bounded `openai` entry to `[project].dependencies`, regenerate the lock file, and change
 the constructor/factory types to accept an injected SDK client. Keep the existing public class
 names and project error classes so application callers do not see SDK types. Import `OpenAI` only
 for the production default factory in `credentialed.py`.
 
-- [ ] **Step 4: Run the fixture and import checks**
+- [x] **Step 4: Run the fixture and import checks**
 
 Run:
 
@@ -165,7 +170,7 @@ uv run pytest tests/adapters/llm/test_credentialed.py tests/adapters/llm/test_op
 Expected: dependency lock succeeds; the new fixture/seam tests collect, while response-mapping
 tests may remain RED until Tasks 2–3 replace the old parser.
 
-- [ ] **Step 5: Commit the seam**
+- [x] **Step 5: Record the seam in combined migration commit `f7f2301`**
 
 Stage the dependency, adapter seam, and focused fixtures/tests. Because the adapter and credential
 files contain overlapping user-owned reliability changes, inspect their complete diff and confirm
@@ -190,7 +195,7 @@ git commit -m "refactor: inject official OpenAI SDK client"
 - Consumes: Task 1 SDK client seam and fake completion objects.
 - Produces: `complete(context, tools) -> LLMResponse` backed by `client.chat.completions.create`.
 
-- [ ] **Step 1: Replace HTTP fixtures with failing SDK-call expectations**
+- [x] **Step 1: Replace HTTP fixtures with failing SDK-call expectations**
 
 Rewrite the ordinary-call tests to capture keyword arguments from
 `fake.chat.completions.create` and return a fake completion:
@@ -221,7 +226,7 @@ def test_complete_calls_sdk_chat_completions_and_maps_tool_call() -> None:
 Retain tests for empty choices, non-object messages, malformed tool arguments, `finish`, and
 input-schema immutability, changing only the fixture transport.
 
-- [ ] **Step 2: Run the synchronous RED**
+- [x] **Step 2: Run the synchronous RED**
 
 Run:
 
@@ -231,7 +236,7 @@ uv run pytest tests/adapters/llm/test_openai_compatible.py -q -k 'complete or re
 
 Expected: FAIL because `complete` still calls the old HTTP client and parses JSON dictionaries.
 
-- [ ] **Step 3: Implement the SDK request and project response conversion**
+- [x] **Step 3: Implement the SDK request and project response conversion**
 
 Build a request dictionary from `_messages(context)` and `_tool_payload(tool)`, then call:
 
@@ -250,7 +255,7 @@ and JSON-object `arguments`, and content is `str | None`. Preserve `provider_met
 Catch SDK authentication, rate-limit, timeout, connection, status, and generic SDK errors in
 that order and raise the existing generic provider errors without including provider details.
 
-- [ ] **Step 4: Run the synchronous GREEN and regression checks**
+- [x] **Step 4: Run the synchronous GREEN and regression checks**
 
 Run:
 
@@ -262,7 +267,7 @@ uv run pytest tests/application/test_composition.py tests/application/test_conte
 Expected: all adapter tests and relevant composition/context regressions pass; no test starts a
 real network client.
 
-- [ ] **Step 5: Commit synchronous support**
+- [x] **Step 5: Record synchronous support in combined migration commit `f7f2301`**
 
 Inspect the complete adapter diff before staging so the pre-existing schema-filter and deadline
 behavior remains present alongside the SDK conversion. Stage only the adapter and its focused
@@ -286,7 +291,7 @@ git commit -m "feat: call chat completions through OpenAI SDK"
 - Produces: `complete_stream(...) -> LLMResponse` using SDK `stream=True` and preserving the
   existing progress/cancellation contract.
 
-- [ ] **Step 1: Write failing SDK stream tests**
+- [x] **Step 1: Write failing SDK stream tests**
 
 Use fake chunks with the SDK shape (`chunk.choices[0].delta.content` and
 `delta.tool_calls[*].function.arguments`) and assert:
@@ -316,7 +321,7 @@ Add tests for missing `[DONE]` equivalent/incomplete stream, missing provider ca
 chunk containers, cancellation after a text delta, deadline expiry using an injected clock, and
 cleanup when parsing or SDK iteration raises.
 
-- [ ] **Step 2: Run streaming RED**
+- [x] **Step 2: Run streaming RED**
 
 Run:
 
@@ -327,7 +332,7 @@ uv run pytest tests/adapters/llm/test_openai_compatible.py -q -k 'stream'
 Expected: FAIL because the adapter expects text lines and JSON SSE records rather than SDK chunk
 attributes.
 
-- [ ] **Step 3: Implement SDK stream aggregation**
+- [x] **Step 3: Implement SDK stream aggregation**
 
 Call `client.chat.completions.create(..., stream=True)`, record the monotonic start time, and
 iterate chunks in a `try/finally` that invokes the stream's `close()` method when available.
@@ -338,7 +343,7 @@ to have an ID and convert the synthesized message through the same project respo
 Task 2. Map SDK stream errors and cleanup failures without leaking secrets; preserve the primary
 provider/cancellation/timeout error if cleanup also fails.
 
-- [ ] **Step 4: Run streaming GREEN and full adapter regressions**
+- [x] **Step 4: Run streaming GREEN and full adapter regressions**
 
 Run:
 
@@ -350,7 +355,7 @@ uv run pytest tests/adapters/llm -q
 Expected: all SDK ordinary and streaming adapter tests pass, including cleanup and absolute
 deadline tests.
 
-- [ ] **Step 5: Commit streaming support**
+- [x] **Step 5: Record streaming support in combined migration commit `f7f2301`**
 
 Inspect the complete adapter diff before staging so the pre-existing schema-filter and deadline
 behavior remains present alongside SDK chunk aggregation. Stage only the adapter and its focused
@@ -380,7 +385,7 @@ git commit -m "feat: stream chat completions through OpenAI SDK"
 - Produces: configured local services that construct the official SDK lazily and evidence proving
   the migration is complete without altering user-owned changes.
 
-- [ ] **Step 1: Add failing credential/composition tests**
+- [x] **Step 1: Add failing credential/composition tests**
 
 Update the factory fixtures to receive `(api_key, base_url, timeout)` and return `FakeSDKClient`.
 Assert lazy lookup and one-time client creation:
@@ -406,7 +411,7 @@ Add an assertion that the default factory creates an `OpenAI` client with `api_k
 timeout, and `max_retries=0` by monkeypatching the adapter's imported `OpenAI` constructor; no
 network call is made.
 
-- [ ] **Step 2: Run credential/composition RED**
+- [x] **Step 2: Run credential/composition RED**
 
 Run:
 
@@ -417,7 +422,7 @@ uv run pytest tests/adapters/llm/test_credentialed.py tests/application/test_com
 Expected: FAIL because the current factory still receives HTTP headers and the composition test
 expects an `Authorization` header rather than SDK constructor arguments.
 
-- [ ] **Step 3: Implement lazy official SDK construction and composition wiring**
+- [x] **Step 3: Implement lazy official SDK construction and composition wiring**
 
 Define the default factory using the official `OpenAI` constructor with `max_retries=0`. Pass the
 secret as `api_key`, not as an application-visible header. Cache the resulting SDK-backed provider
@@ -425,13 +430,13 @@ after the first successful construction, close it through the existing provider 
 and preserve generic `ProviderCredentialError` wrapping for reader/factory failures. Update
 composition type imports and tests without changing its provider injection behavior.
 
-- [ ] **Step 4: Update user-facing provider documentation**
+- [x] **Step 4: Update user-facing provider documentation**
 
 Add a concise README sentence under Provider Configuration: chat/tool requests use the official
 OpenAI Python SDK, while `base_url` keeps OpenAI-compatible endpoints supported; keys still belong
 in the OS keyring and are never written to `harness.toml`.
 
-- [ ] **Step 5: Run all focused GREEN checks**
+- [x] **Step 5: Run all focused GREEN checks**
 
 Run:
 
@@ -447,7 +452,7 @@ Expected: all focused tests, lint, type checks, lock validation, and whitespace 
 the independently owned `tmp/cube` tree affects collection, use the repository-approved
 `uv run pytest -q --ignore=tmp` boundary and record that limitation rather than changing `tmp`.
 
-- [ ] **Step 6: Run the complete offline verification**
+- [x] **Step 6: Run the complete offline verification**
 
 Run:
 
@@ -462,7 +467,7 @@ git diff --check
 Expected: the full harness suite passes without network access or a real provider. Preserve the
 known non-blocking warning if it remains; do not describe a command as passing unless it ran.
 
-- [ ] **Step 7: Record evidence and commit the final task**
+- [x] **Step 7: Record evidence and commit the final task**
 
 Append the actual timestamp, RED/GREEN counts, focused/full commands, commits, reviewer findings,
 and any user-owned dirty paths to `AGENT_LOG.md`. Update the SDK row in `PLAN.md` and

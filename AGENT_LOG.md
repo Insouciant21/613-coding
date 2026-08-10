@@ -998,3 +998,50 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Self-review: placeholder scan, type/signature consistency, spec coverage, and `git diff --check`
   passed. No implementation or test-pass claim is made.
 - Plan commit: `d3e34f6` (`docs: plan OpenAI SDK provider migration`).
+
+### 2026-08-10 12:05:45 Asia/Shanghai - OpenAI SDK migration implementation
+
+- Task: execute the approved Chat Completions SDK plan in isolated worktree
+  `/home/int21/Workspace/ai4se_project/.worktrees/openai-sdk-llm`; triggered `executing-plans`,
+  `test-driven-development`, `verification-before-completion`, and `requesting-code-review`.
+- TDD RED: the focused SDK boundary first failed 2 tests: the credential factory still required
+  the old HTTP-client signature, and the production chat adapter still imported `httpx`/contained
+  the direct `/chat/completions` path. This RED was observed before implementation.
+- Implementation: commit `f7f2301` adds `openai>=1,<3` and lock entries; routes sync and streamed
+  chat/tool calls through injected `chat.completions.create`; maps SDK responses/errors into owned
+  provider models/errors; constructs the official client lazily with `base_url`, timeout, and
+  `max_retries=0`; preserves schema `$id` filtering, cancellation, absolute deadlines, cleanup,
+  secret-free credential failures, and project-owned LLM ports. The embedding adapter remains
+  intentionally direct HTTP per the approved design.
+- GREEN: `uv run pytest tests/adapters/llm -q` passed 33; application/composition/CLI regressions
+  passed 25; `uv run pytest -q --ignore=tmp` passed 401. `uv run pytest tests/test_docs.py -q`
+  passed 5. `uv run ruff check .`, `uv run mypy src`, `uv lock --check`, and `git diff --check`
+  passed. No real provider request, API-key lookup, remote pipeline, or deployment operation was
+  performed.
+- Workflow deviation: the plan's four logical tasks were implemented in one migration commit to
+  keep the intertwined adapter seam, response mapping, stream lifecycle, and credential wiring
+  reviewable together; unrelated main-worktree user edits remain outside the staging set.
+- Human intervention: after reviewing SDK stream behavior, added a daemon producer/queue boundary
+  so an absolute deadline is enforced even while the SDK hides SSE keepalive reads; added iteration
+  and cleanup-error fakes/tests. Independent code review is in progress before integration.
+
+### 2026-08-10 12:19:59 Asia/Shanghai - OpenAI SDK review repair
+
+- Review: an independent reviewer reported two Important boundary risks: the stream producer was
+  joined before closing the SDK stream, and credential construction chained reader/factory errors
+  that could expose secret-bearing causes. No Critical finding was reported.
+- TDD repair: added a close-aware blocked-stream test and client-close-on-delegate-failure test;
+  the adapter suite then passed 37 tests. The stream now closes before its bounded join, records a
+  reader that fails to stop, and preserves any primary timeout/cancellation/provider error. The
+  credential wrapper closes a returned client on delegate-construction failure and raises the
+  generic `ProviderCredentialError` with `from None`.
+- Additional compatibility repair: SDK `PermissionDeniedError` and 401/403/429 status responses
+  map to the existing authentication/rate-limit taxonomy; optional SDK stream function fragments
+  are accepted and tested.
+- Review-repair commit: `0fcd2af` (`fix: harden SDK stream and credential cleanup`). Fresh final
+  verification after that commit passed 37 adapter tests, 25 application/composition/CLI tests,
+  and 405 full offline tests; Ruff, mypy, docs tests (5), `uv lock --check`, and `git diff --check`
+  also passed.
+- Follow-up review: both Important findings were marked addressed; no remaining Critical or
+  Important issues were found. A Minor observation is retained: a still-live reader is suppressed
+  behind an existing timeout/cancellation classification, with operational metrics deferred.

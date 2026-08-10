@@ -13,8 +13,8 @@ filesystem adapters enforce mutation safety, Textual provides the local interact
 Docker remains a worker runtime boundary plus the reproducible release builder.
 
 **Tech Stack:** Python 3.12+, `uv`, Pydantic, pytest, Ruff, mypy, Textual, Typer, SQLite,
-LanceDB, `keyring`, Docker Engine API/BuildKit, HTTPX streaming for OpenAI-compatible providers,
-`unidiff`, and PyInstaller.
+LanceDB, `keyring`, Docker Engine API/BuildKit, the official OpenAI SDK for chat providers,
+HTTPX for the independent embedding adapter, `unidiff`, and PyInstaller.
 
 ## Global Constraints
 
@@ -43,7 +43,7 @@ LanceDB, `keyring`, Docker Engine API/BuildKit, HTTPX streaming for OpenAI-compa
 | `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | TUI-01 through TUI-09 integrated and recorded on `main` at `043077a`; remote CI publication remains operator-triggered |
 | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | committed in `9ee205d`; pending execution approval |
 | `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
-| `docs/superpowers/plans/2026-08-10-openai-sdk-llm.md` | Replace chat/tool HTTP and SSE with the official OpenAI SDK | approved SDK design `b4b5a94` | plan committed in `d3e34f6`; pending execution workflow |
+| `docs/superpowers/plans/2026-08-10-openai-sdk-llm.md` | Replace chat/tool HTTP and SSE with the official OpenAI SDK | approved SDK design `b4b5a94` | implementation `f7f2301`, repair `0fcd2af`; final evidence commit and main-worktree integration pending |
 
 The completed historical critical path was `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. The current
 critical path is `SAFE_MUTATION → TUI_DISTRIBUTION → CUBE_RECOVERY → CUBE Tasks 4-9`. Do not start
@@ -503,3 +503,26 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Runtime: the deployed container exposes `613-coding`, has no `coding-harness`, and returns 200 for `/healthz` and `/`. Existing runs `c0313a2c-7513-4a7b-a594-9afe0d31dc70` and `b9bc83a2-dac2-48c3-a15a-8bae7568118b` remained readable.
 - Restart persistence: new run `de1c5292-d40f-4924-8d0d-2d85df1b4731` returned 200 before and after `docker restart 613-coding`; the container returned to healthy.
 - Boundary: `127.0.0.1:8613:8000`, the `/app/.613-coding` data bind, read-only root, bounded no-exec tmpfs, dropped capabilities, `no-new-privileges`, 1 GiB/1 CPU/256 PIDs, group 1000, user `coding`, and `unless-stopped` were preserved. Reverse proxy configuration and ports 80/443 were untouched; no public URL is claimed.
+
+## OPENAI-SDK-LLM Task Evidence
+
+- Status: implementation and review repair complete in isolated branch at `f7f2301` plus
+  `0fcd2af`; final evidence commit and safe integration into the dirty main worktree remain pending.
+- TDD RED: the new SDK-boundary suite initially failed 2 tests because the old credential factory
+  still expected an HTTP client and the production chat adapter still imported `httpx`/contained
+  the direct chat endpoint. The failures were observed before the migration implementation.
+- GREEN: initial migration `uv run pytest tests/adapters/llm -q` passed 33 tests; after review
+  repair the adapter suite passed 37 tests, application/composition/CLI regressions passed 25,
+  and `uv run pytest -q --ignore=tmp` passed 405 tests.
+- Static verification: `uv run ruff check .`, `uv run mypy src`, `uv lock --check`, and
+  `git diff --check` passed on the implementation commit. `uv run pytest tests/test_docs.py -q`
+  passed 5 tests.
+- Boundary: sync and streamed chat/tool calls use injected official-SDK-shaped clients and
+  `chat.completions.create`; the production chat adapter has no direct `httpx` or
+  `/chat/completions` path. The embedding adapter remains intentionally unchanged. No real
+  provider request or credential operation was performed.
+- Review: the first independent review found two Important cleanup/secrecy risks; `0fcd2af`
+  closes the SDK stream before joining its reader, reports a reader that remains alive, suppresses
+  credential exception causes, and closes a returned client on delegate-construction failure.
+  Follow-up review found no remaining Critical or Important issues; one Minor observability note
+  is retained in `AGENT_LOG.md`.
