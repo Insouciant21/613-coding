@@ -27,6 +27,7 @@ from coding613.adapters.tools.repository import build_repository_tools
 from coding613.application.approvals import ApprovalService
 from coding613.application.budgets import BudgetLimits
 from coding613.application.context import ContextAssembler, SessionContextBuilder
+from coding613.application.conversation import ConversationService
 from coding613.application.feedback import FeedbackClassifier
 from coding613.application.interactive import InteractiveSessionService
 from coding613.application.loop import AgentLoop, LoopDependencies
@@ -95,6 +96,11 @@ class LocalServices:
         self.interactive = interactive
         self.llm_metadata = llm_metadata
         self.permission_mode = permission_mode
+        self.conversation = ConversationService(
+            self.run_service.project.id,
+            self._events,
+            self.run_service,
+        )
 
     def list_events(self, run_id: UUID) -> list[Event]:
         return self._events.list_for_run(run_id)

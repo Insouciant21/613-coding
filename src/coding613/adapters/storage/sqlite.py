@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
+from coding613.domain.conversation import RunOptions
 from coding613.domain.events import Event, redact_payload
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import (
@@ -81,6 +82,10 @@ class SqliteEventStore:
                 REFERENCES interactive_sessions(id) ON DELETE SET NULL
                 """
             )
+        if "options_json" not in run_columns:
+            connection.execute(
+                "ALTER TABLE runs ADD COLUMN options_json TEXT NOT NULL DEFAULT '{}'"
+            )
         connection.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_runs_session_created
@@ -118,14 +123,15 @@ class SqliteEventStore:
             connection.execute(
                 """
                 INSERT INTO runs (
-                    id, project_id, session_id, task, permission_mode, state, stop_reason,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    id, project_id, session_id, options_json, task, permission_mode, state,
+                    stop_reason, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(run.id),
                     str(run.project_id) if run.project_id else None,
                     str(run.session_id) if run.session_id else None,
+                    self._redacted_json(run.options.model_dump(mode="json")),
                     run.task,
                     run.permission_mode.value,
                     run.state.value,
@@ -241,6 +247,7 @@ class SqliteEventStore:
             id=UUID(row["id"]),
             project_id=UUID(row["project_id"]) if row["project_id"] else None,
             session_id=UUID(row["session_id"]) if row["session_id"] else None,
+            options=RunOptions.model_validate_json(row["options_json"] or "{}"),
             task=row["task"],
             permission_mode=PermissionMode(row["permission_mode"]),
             state=RunState(row["state"]),
@@ -267,7 +274,7 @@ class SqliteEventStore:
                 """
                 UPDATE runs
                 SET project_id = ?, session_id = ?, task = ?, permission_mode = ?, state = ?,
-                    stop_reason = ?, updated_at = ?
+                    stop_reason = ?, options_json = ?, updated_at = ?
                 WHERE id = ?
                     AND project_id IS ?
                     AND session_id IS ?
@@ -275,6 +282,7 @@ class SqliteEventStore:
                     AND permission_mode = ?
                     AND state = ?
                     AND stop_reason IS ?
+                    AND options_json = ?
                     AND created_at = ?
                     AND updated_at = ?
                 """,
@@ -285,6 +293,7 @@ class SqliteEventStore:
                     replacement.permission_mode.value,
                     replacement.state.value,
                     replacement.stop_reason.value if replacement.stop_reason else None,
+                    self._redacted_json(replacement.options.model_dump(mode="json")),
                     self._serialize_datetime(replacement.updated_at),
                     str(expected.id),
                     str(expected.project_id) if expected.project_id else None,
@@ -293,6 +302,7 @@ class SqliteEventStore:
                     expected.permission_mode.value,
                     expected.state.value,
                     expected.stop_reason.value if expected.stop_reason else None,
+                    self._redacted_json(expected.options.model_dump(mode="json")),
                     self._serialize_datetime(expected.created_at),
                     self._serialize_datetime(expected.updated_at),
                 ),

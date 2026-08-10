@@ -8,6 +8,8 @@ from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID
 
+from pydantic import Field
+
 from coding613.application.approvals import (
     ApprovalDecision,
     ApprovalResolution,
@@ -15,6 +17,7 @@ from coding613.application.approvals import (
 )
 from coding613.application.loop import AgentLoop, LoopDependencies
 from coding613.application.progress import CancellationToken
+from coding613.domain.conversation import RunOptions
 from coding613.domain.models import (
     ApprovalRequest,
     PermissionMode,
@@ -30,6 +33,7 @@ class RunRequest(DomainModel):
     project_id: UUID | None = None
     session_id: UUID | None = None
     permission_mode: PermissionMode | None = None
+    options: RunOptions = Field(default_factory=RunOptions)
 
 
 class RunStore(Protocol):
@@ -59,6 +63,7 @@ class RunService:
         run = Run(
             project_id=request.project_id,
             session_id=request.session_id,
+            options=request.options,
             task=request.task,
             permission_mode=request.permission_mode or PermissionMode.BALANCED,
         )

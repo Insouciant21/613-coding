@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY,
     project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
     session_id TEXT REFERENCES interactive_sessions(id) ON DELETE SET NULL,
+    options_json TEXT NOT NULL DEFAULT '{}',
     task TEXT NOT NULL,
     permission_mode TEXT NOT NULL,
     state TEXT NOT NULL,

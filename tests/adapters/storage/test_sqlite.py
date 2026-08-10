@@ -11,6 +11,7 @@ import pytest
 
 from coding613.adapters.storage.sqlite import SqliteEventStore
 from coding613.domain.actions import ActionEnvelope, ToolCall
+from coding613.domain.conversation import RunOptions
 from coding613.domain.events import Event
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import (
@@ -101,6 +102,19 @@ def test_session_round_trip_and_ordered_runs(tmp_path: Path) -> None:
     store.create_run(second)
 
     assert store.list_runs_for_session(session.id) == [first, second]
+
+
+def test_run_options_survive_storage_round_trip(tmp_path: Path) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+    options = RunOptions(
+        model="gpt-test",
+        allowed_tools=frozenset({"read_file"}),
+        append_system_prompt="Use the repository convention.",
+    )
+    run = Run(task="inspect", options=options)
+    store.create_run(run)
+
+    assert store.get_run(run.id) == run
 
 
 def test_sessions_are_ordered_by_latest_activity_and_runs_update_activity(

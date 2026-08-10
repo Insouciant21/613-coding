@@ -9,6 +9,7 @@ from pydantic import Field
 
 from coding613.application.progress import CancellationToken
 from coding613.application.run_service import RunRequest, RunService
+from coding613.domain.conversation import RunOptions
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import IterationRecord, PermissionMode, Run, RunSummary
 from coding613.domain.models_base import DomainModel
@@ -82,6 +83,7 @@ class InteractiveSessionService:
         session_id: UUID,
         message: str,
         permission_mode: PermissionMode | None = None,
+        options: RunOptions | None = None,
     ) -> Run:
         if not message.strip():
             raise ValueError("message must not be blank")
@@ -94,6 +96,7 @@ class InteractiveSessionService:
                 project_id=session.project_id,
                 session_id=session.id,
                 permission_mode=permission_mode,
+                options=options or RunOptions(),
             )
         )
 

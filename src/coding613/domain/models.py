@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 from pydantic import Field, field_validator, model_validator
 
 from .actions import ActionEnvelope, ToolCall
+from .conversation import RunOptions
 from .models_base import DomainModel
 
 
@@ -175,6 +176,7 @@ class Run(DomainModel):
     id: UUID = Field(default_factory=uuid4)
     project_id: UUID | None = None
     session_id: UUID | None = None
+    options: RunOptions = Field(default_factory=RunOptions)
     task: str = Field(min_length=1)
     permission_mode: PermissionMode = PermissionMode.BALANCED
     state: RunState = RunState.RUNNING
