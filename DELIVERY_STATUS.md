@@ -533,6 +533,23 @@ Every completed plan task must link a commit and fresh verification output here.
   operation was used. The main worktree's pre-existing user changes and untracked files remain
   untouched and unstaged.
 
+## Claude-Code-Parity local integration evidence
+
+- Verification timestamp: 2026-08-10 16:22:48 Asia/Shanghai.
+- Integration: the user selected local merge; `feature/claude-code-parity` fast-forwarded `main`
+  from `75c6877` to `0c37379`.
+- Preservation: the pre-existing main-worktree changes were saved in recoverable
+  `stash@{0}` (`pre-merge-user-changes-2026-08-10`) and restored. The only conflict was
+  `src/coding613/application/context.py`; its resolution retains both the user's no-progress
+  escalation and the parity context-store interface. `tmp/cube/` is a nested Git repository and
+  was left untouched.
+- Verification: merged main passed `uv run pytest -q --ignore=tmp` (`471 passed, 253 existing
+  pytest-asyncio deprecation warnings`), Ruff, mypy across 102 source files, `uv lock --check`, and
+  `git diff HEAD --check`.
+- Current status: parity code is integrated locally; user-modified tracked files and untracked
+  user files remain uncommitted and unstaged. No remote pull/push, provider, credential, Docker, or
+  deployment operation was performed.
+
 ## Package Rename Task 3 Evidence
 
 - Verification timestamp: `2026-08-09 14:26:25 Asia/Shanghai`.

@@ -1202,3 +1202,22 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   outside the branch.
 - Lesson: the TUI must render persisted terminal evidence as well as live progress, and JSON-safe
   progress payloads need an explicit coercion boundary before entering strict domain models.
+
+### 2026-08-10 16:22:48 Asia/Shanghai - Claude-Code parity local integration
+
+- Task: execute the user's selected local merge of `feature/claude-code-parity` into `main`.
+- Workflow: `finishing-a-development-branch`; base branch confirmed as `main` at `75c6877`.
+- Preservation: the main worktree had five user-modified tracked files plus `.claude/`, course
+  documents, and nested Git repository `tmp/cube/`. Tracked/untracked changes were saved in the
+  recoverable `stash@{0}` (`pre-merge-user-changes-2026-08-10`); the nested repository was not
+  stashed or modified. The parity branch fast-forwarded main to `0c37379`.
+- Conflict: stash restoration conflicted only in `src/coding613/application/context.py`; the
+  minimal resolution retained the user's no-progress escalation prompt and parity's
+  `ContextSummaryStore` boundary. The stash remains retained as a recovery copy.
+- Verification: merged main passed `uv run pytest -q --ignore=tmp` with `471 passed, 253 warnings`,
+  `uv run ruff check .`, `uv run mypy src` (102 files), `uv lock --check`, and
+  `git diff HEAD --check`. The warnings are existing pytest-asyncio deprecations.
+- Human intervention: local merge was explicitly selected by the user; no remote pull, push,
+  deployment, provider request, credential access, or unrelated user-file overwrite occurred.
+- Lesson: when a dirty main overlaps a feature branch, stash-and-restore plus an explicit semantic
+  conflict review preserves user work while still allowing a verified fast-forward integration.

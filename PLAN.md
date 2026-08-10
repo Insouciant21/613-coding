@@ -563,3 +563,14 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   smoke returned 0 and the provider-unconfigured print smoke returned 4 with a safe terminal state.
 - Boundary: no provider request, keyring access, network, Docker, remote CI, merge, or main-worktree
   mutation was performed; unrelated dirty main files remain outside this branch.
+
+### Claude-Code-Parity local integration evidence
+
+- Verification timestamp: 2026-08-10 16:22:48 Asia/Shanghai.
+- User selected option 1; `feature/claude-code-parity` fast-forwarded `main` from `75c6877` to
+  `0c37379`.
+- The dirty main worktree was preserved through recoverable `stash@{0}`; the one context conflict
+  was manually resolved by retaining both the no-progress escalation and `ContextSummaryStore`.
+- Merged-main verification passed 471 tests (253 existing pytest-asyncio deprecation warnings),
+  Ruff, mypy (102 files), `uv lock --check`, and `git diff HEAD --check`. User-owned tracked and
+  untracked files remain uncommitted and unstaged.
