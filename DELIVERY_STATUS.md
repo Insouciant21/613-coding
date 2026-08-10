@@ -512,7 +512,7 @@ Every completed plan task must link a commit and fresh verification output here.
 ## Claude-Code-Parity Task 7 Evidence
 
 - Verification timestamp: 2026-08-10 14:50:00 Asia/Shanghai.
-- Commit: `fd8871e` (`feat: align tui and cli conversation workflow`); documentation and evidence updates are part of the final handoff commit.
+- Commits: `fd8871e` (`feat: align tui and cli conversation workflow`) and `f27dba6` (documentation and evidence updates).
 - TDD/verification: focused RED/GREEN contracts cover documentation, shared TUI/CLI request delegation, follow-up after resume, escaped slash prompts, lifecycle/diagnostic stream events, invalid selectors, active-run prevention, and prompt redaction. `uv run pytest -q --ignore=tmp` passed `460`; Ruff, mypy across 102 source files, `uv lock --check`, and `git diff --check` passed.
 - Smoke/review: `uv run 613-coding --help` returned 0. Provider-unconfigured print and verbose stream smokes returned documented exit code 4 with versioned redacted output. Independent review agents disconnected before returning reports; local spec/security/type review found no unresolved Critical issue, and no independent pass is claimed.
 - Boundary: the TUI compatibility adapter and print CLI share `ConversationService`; SQLite remains authoritative, active runs are not duplicated, and MCP remains an injectable future boundary. Main-worktree user changes and untracked files were not staged.

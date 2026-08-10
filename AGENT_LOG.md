@@ -1145,7 +1145,8 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Implementation: commit `fd8871e` (`feat: align tui and cli conversation workflow`) makes the TUI
   compatibility adapter delegate to `ConversationService`, adds session continuation and active-run
   guards, versioned stream lifecycle records, safe diagnostics envelopes, and storage redaction;
-  README/development docs and cross-adapter contract tests were included.
+  README/development docs and cross-adapter contract tests were included. Commit `f27dba6` records
+  the delivery evidence and plan status.
 - Verification: `uv run pytest -q --ignore=tmp` passed `460`; `uv run ruff check .`, `uv run mypy src`
   passed for 102 source files, `uv lock --check`, and `git diff --check` passed. `uv run 613-coding
   --help` returned 0. Provider-unconfigured print and verbose stream smoke commands returned the

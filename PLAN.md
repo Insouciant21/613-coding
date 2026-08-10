@@ -44,7 +44,7 @@ HTTPX for the independent embedding adapter, `unidiff`, and PyInstaller.
 | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | committed in `9ee205d`; pending execution approval |
 | `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
 | `docs/superpowers/plans/2026-08-10-openai-sdk-llm.md` | Replace chat/tool HTTP and SSE with the official OpenAI SDK | approved SDK design `b4b5a94` | implemented and integrated into `main` at `8e708e2` (implementation `f7f2301`, repair `0fcd2af`, evidence `581402b`/`8e708e2`) |
-| `docs/superpowers/plans/2026-08-10-613-coding-claude-code-parity.md` | Shared Claude-Code-like TUI/CLI conversation, permissions, context, resume, and output contracts | approved parity design `3a07f09` | Tasks 1-7 complete through `fd8871e`; delivery records and final handoff committed next |
+| `docs/superpowers/plans/2026-08-10-613-coding-claude-code-parity.md` | Shared Claude-Code-like TUI/CLI conversation, permissions, context, resume, and output contracts | approved parity design `3a07f09` | Tasks 1-7 complete through `fd8871e`; delivery evidence recorded in `f27dba6` |
 
 The completed historical critical path was `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. The current
 critical path is `SAFE_MUTATION → TUI_DISTRIBUTION → CUBE_RECOVERY → CUBE Tasks 4-9`. Do not start
@@ -534,7 +534,7 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 ## CLAUDE-CODE-PARITY Task Evidence
 
-- Status: Tasks 1-7 complete in isolated worktree branch `feature/claude-code-parity`; final delivery record commit is pending this handoff.
+- Status: Tasks 1-7 complete in isolated worktree branch `feature/claude-code-parity`; delivery evidence is recorded in `f27dba6`.
 - Commits: `d8894d6` conversation boundary; `2f49041` event/output contracts; `e6a0542` root print CLI; `5fe88dc` TUI controls; `b7111cd` invocation permission filters and project rules; `67206b7` context/diagnostics; `fd8871e` shared TUI/CLI follow-up and output-boundary repairs.
 - Verification: the final offline gate passed 460 tests; Ruff, mypy across 102 source files, `uv lock --check`, and `git diff --check` passed. CLI help returned 0 and the provider-unconfigured print smoke returned documented code 4.
 - TDD evidence: each task recorded a missing-boundary RED before implementation; Task 5 covered missing storage methods, policy-rule application, loop filter injection, and application permission service.
@@ -544,7 +544,7 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 ## Claude-Code-Parity Task 7 Evidence
 
 - Verification timestamp: 2026-08-10 14:50:00 Asia/Shanghai.
-- Commit: `fd8871e` (`feat: align tui and cli conversation workflow`); documentation/evidence record commit is the next handoff commit.
+- Commits: `fd8871e` (`feat: align tui and cli conversation workflow`) and `f27dba6` (delivery evidence and plan status).
 - TDD/verification: RED contract failures were observed for missing documentation markers, follow-up-after-resume, lifecycle/diagnostic stream events, escaped slash prompts, invalid resume selectors, active-run duplication, shared-service delegation, and persisted prompt redaction. GREEN focused suites passed; final `uv run pytest -q --ignore=tmp` passed `460`; Ruff, mypy (102 files), lock, and diff checks passed.
 - Boundary: `LocalServices.interactive` now delegates the TUI compatibility shape to the same `ConversationService` consumed by print mode; stream JSON is one versioned redacted event per line with session/user/diagnostic lifecycle records and monotonic sequence numbers. Active sessions cannot receive a second Run concurrently, and stored run tasks are redacted.
 - Smoke/review: `613-coding --help` returned 0; provider-unconfigured print/verbose-stream smokes returned documented code 4 with safe output. Independent review agents repeatedly disconnected before producing a report; local spec/security/type review found no unresolved Critical issue, and no independent pass is claimed. Main-worktree user changes remained untouched.

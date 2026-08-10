@@ -745,8 +745,9 @@ git commit -m "docs: document Claude Code parity contracts"
 - Review: three independent review-agent attempts ended with an HTTP stream disconnect before a
   report was returned. A local spec/type/security/repository-boundary review found no unresolved
   Critical issue; no independent-review pass is claimed.
-- Commit: `fd8871e` (`feat: align tui and cli conversation workflow`) contains the compatibility
-  implementation and offline contract tests. The documentation/evidence record commit follows.
+- Commits: `fd8871e` (`feat: align tui and cli conversation workflow`) contains the compatibility
+  implementation and offline contract tests; `f27dba6` records the delivery evidence and plan
+  status.
 
 ## Self-review checklist
 
