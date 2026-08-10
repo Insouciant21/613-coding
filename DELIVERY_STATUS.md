@@ -1,13 +1,13 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 12:22:35 (Asia/Shanghai)
-Responsible actor: `/root` for the approved OpenAI SDK migration; implementation is locally verified on `feature/openai-sdk-llm` and no remote provider, deployment, or pipeline operation was performed.
+Last updated: 2026-08-10 12:24:15 (Asia/Shanghai)
+Responsible actor: `/root` for the approved OpenAI SDK migration; implementation is integrated into `main` and no remote provider, deployment, or pipeline operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
-| Official OpenAI SDK chat adapter | implemented, review-repaired, and offline verified on feature branch; integration pending | design `b4b5a94`; plan `d3e34f6`; implementation `f7f2301`; repair `0fcd2af`; `PLAN.md` OPENAI-SDK-LLM evidence | commit final records and integrate into main while preserving dirty user paths |
+| Official OpenAI SDK chat adapter | implemented, review-repaired, offline verified, and integrated into `main` | design `b4b5a94`; plan `d3e34f6`; implementation `f7f2301`; repair `0fcd2af`; integrated tip `8e708e2`; `PLAN.md` OPENAI-SDK-LLM evidence | retain the offline regression gate; run a real provider smoke only with user-controlled credentials |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
 | Binary/wheel/sdist artifact builder | Docker-exported and runtime-smoked on main; CI/release configuration present | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08/TUI-09 evidence | push/tag when an operator wants remote CI artifacts or a GitHub release |
@@ -46,12 +46,15 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
   calls, injected offline fakes, lazy `OpenAI(..., max_retries=0)` construction, stream cleanup,
   and README guidance. The embedding HTTP adapter is intentionally out of scope.
 - Final verification at `2026-08-10 12:22:35 Asia/Shanghai`: initial adapter suite 33 passed; after review repair the adapter suite passed 37,
-  application/composition/CLI regressions passed 25, and full offline suite 405 passed with
-  `uv run pytest -q --ignore=tmp`; Ruff, mypy, `uv lock --check`, `git diff --check`, and
-  documentation tests (5) passed. No real provider request was made.
+  application/composition/CLI regressions passed 25, and clean feature branch suite 405 passed.
+  After integration, merged main passed 408 tests with 127 existing pytest-asyncio deprecation
+  warnings; Ruff, mypy, `uv lock --check`, and `git diff --check` passed. No real provider request
+  was made.
 - Review: independent review found two Important cleanup/secrecy risks; repair `0fcd2af` addressed
-  both, and follow-up review found no remaining Critical or Important issues. The main worktree's
-  unrelated user changes remain outside this branch and must be preserved at handoff.
+  both, and follow-up review found no remaining Critical or Important issues.
+- Integration: main fast-forwarded to `8e708e2` after a recoverable stash of tracked user changes;
+  five unrelated user paths were restored, while overlapping adapter/test changes were carried
+  into the SDK implementation. The stash remains as a user-change backup.
 
 ## DELIVERY-01 Evidence
 

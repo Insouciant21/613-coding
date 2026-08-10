@@ -1054,3 +1054,14 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - No real provider request, API-key lookup, remote pipeline, deployment, or main-worktree merge
   was performed. Main remains dirty with unrelated user edits; integration awaits the user's
   finishing-workflow choice.
+
+### 2026-08-10 12:24:15 Asia/Shanghai - OpenAI SDK local integration
+
+- Integration: tracked main-worktree changes were saved in recoverable `stash@{0}` named
+  `pre-openai-sdk-main-user-changes`; `feature/openai-sdk-llm` was fast-forwarded into `main` at
+  `8e708e2`. The SDK-related adapter and test changes in the stash are semantically carried by the
+  migration; the five unrelated context/loop/domain/test paths were restored without staging.
+- Merged-main verification: `uv run pytest -q --ignore=tmp` passed 408 tests with 127 existing
+  pytest-asyncio deprecation warnings; Ruff, mypy, `uv lock --check`, and `git diff --check` passed.
+  Untracked `.claude/`, course documents, and `tmp/` were not touched. No remote provider,
+  credential, pipeline, or deployment operation was performed.

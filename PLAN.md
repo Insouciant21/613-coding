@@ -43,7 +43,7 @@ HTTPX for the independent embedding adapter, `unidiff`, and PyInstaller.
 | `docs/superpowers/plans/2026-08-09-613-coding-tui-distribution.md` | Streaming sessions, Textual TUI, Web removal, PyInstaller, Docker artifacts, CI/CD | safe repository mutations | TUI-01 through TUI-09 integrated and recorded on `main` at `043077a`; remote CI publication remains operator-triggered |
 | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | committed in `9ee205d`; pending execution approval |
 | `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
-| `docs/superpowers/plans/2026-08-10-openai-sdk-llm.md` | Replace chat/tool HTTP and SSE with the official OpenAI SDK | approved SDK design `b4b5a94` | implementation `f7f2301`, repair `0fcd2af`; final evidence commit and main-worktree integration pending |
+| `docs/superpowers/plans/2026-08-10-openai-sdk-llm.md` | Replace chat/tool HTTP and SSE with the official OpenAI SDK | approved SDK design `b4b5a94` | implemented and integrated into `main` at `8e708e2` (implementation `f7f2301`, repair `0fcd2af`, evidence `581402b`/`8e708e2`) |
 
 The completed historical critical path was `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. The current
 critical path is `SAFE_MUTATION → TUI_DISTRIBUTION → CUBE_RECOVERY → CUBE Tasks 4-9`. Do not start
@@ -506,14 +506,14 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 
 ## OPENAI-SDK-LLM Task Evidence
 
-- Status: implementation and review repair complete in isolated branch at `f7f2301` plus
-  `0fcd2af`; final evidence commit and safe integration into the dirty main worktree remain pending.
+- Status: implementation, review repair, evidence, and local integration complete at `8e708e2`;
+  unrelated user changes remain uncommitted and preserved.
 - TDD RED: the new SDK-boundary suite initially failed 2 tests because the old credential factory
   still expected an HTTP client and the production chat adapter still imported `httpx`/contained
   the direct chat endpoint. The failures were observed before the migration implementation.
 - GREEN: initial migration `uv run pytest tests/adapters/llm -q` passed 33 tests; after review
   repair the adapter suite passed 37 tests, application/composition/CLI regressions passed 25,
-  and `uv run pytest -q --ignore=tmp` passed 405 tests.
+  the clean feature branch passed 405 tests, and the merged main worktree passed 408 tests.
 - Static verification: `uv run ruff check .`, `uv run mypy src`, `uv lock --check`, and
   `git diff --check` passed on the implementation commit. `uv run pytest tests/test_docs.py -q`
   passed 5 tests.
@@ -526,3 +526,7 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   credential exception causes, and closes a returned client on delegate-construction failure.
   Follow-up review found no remaining Critical or Important issues; one Minor observability note
   is retained in `AGENT_LOG.md`.
+- Integration: main was fast-forwarded to `8e708e2` after stashing tracked user changes; the
+  unrelated context/loop/domain/test paths were restored and verified. The recovery stash
+  `stash@{0}` remains intentionally retained, and untracked `.claude/`, course documents, and
+  `tmp/` were not staged or modified.
