@@ -1,14 +1,14 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 13:31:00 (Asia/Shanghai)
-Responsible actor: `/root` for the approved Claude-Code-like TUI/CLI parity plan; execution workflow selection is pending and no provider, deployment, or pipeline operation was performed.
+Last updated: 2026-08-10 14:10:00 (Asia/Shanghai)
+Responsible actor: `/root` for the approved Claude-Code-like TUI/CLI parity plan; Inline Execution is active in the isolated parity worktree. No provider, deployment, or pipeline operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
 | Official OpenAI SDK chat adapter | implemented, review-repaired, offline verified, and integrated into `main` | design `b4b5a94`; plan `d3e34f6`; implementation `f7f2301`; repair `0fcd2af`; integrated tip `8e708e2`; `PLAN.md` OPENAI-SDK-LLM evidence | retain the offline regression gate; run a real provider smoke only with user-controlled credentials |
-| Claude-Code-like TUI/CLI parity | approved design and detailed plan; implementation pending | design `3a07f09`; plan `docs/superpowers/plans/2026-08-10-613-coding-claude-code-parity.md`; brainstorming/plan evidence in `SPEC_PROCESS.md` and `AGENT_LOG.md` | select Subagent-Driven or Inline execution, create the isolated worktree, then run TDD slices |
+| Claude-Code-like TUI/CLI parity | Tasks 1-5 implemented and offline verified; Tasks 6-7 pending | design `3a07f09`; plan; commits `d8894d6`, `2f49041`, `e6a0542`, `5fe88dc`, `b7111cd`; evidence in `PLAN.md` and `AGENT_LOG.md` | implement context/diagnostics, then docs and final review gate |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
 | Binary/wheel/sdist artifact builder | Docker-exported and runtime-smoked on main; CI/release configuration present | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08/TUI-09 evidence | push/tag when an operator wants remote CI artifacts or a GitHub release |
@@ -494,6 +494,13 @@ Every completed plan task must link a commit and fresh verification output here.
 - REMOTE-CI-03 | cf7f8a5ee387965003f76bd1f374a288bc0067c0 | pass | main cf7f8a5 passed: unit-test, quality, demo, package-and-container; Docker build and smoke passed
 
 - DEPLOY-01 | 35a383a9bed47d5fc50c691655e71eb18d630348 | blocked | Render API returned HTTP 401; no Render credential or deployed service URL is available
+
+## Claude-Code-Parity Task 5 Evidence
+
+- Verification timestamp: 2026-08-10 14:10:00 Asia/Shanghai.
+- Commit: `b7111cd` (`feat: enforce invocation permission filters`).
+- TDD/verification: focused permission/policy/loop/composition/storage/TUI/CLI suite passed 126 tests; the final changed-boundary gate passed 36 tests; `uv run ruff check .`, `uv run mypy src`, and `git diff --check` passed.
+- Boundary: `ToolFilter` is applied after hard policy evaluation and again during approval resume; project permission rules are validated, persisted in SQLite, loaded into new run dependencies, and exposed through the application service used by TUI slash commands. No API key or network operation was used.
 
 ## Package Rename Task 3 Evidence
 

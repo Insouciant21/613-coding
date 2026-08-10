@@ -1111,3 +1111,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   to define the `SessionEnvelope` shape for multiple stream-JSON input messages.
 - Human intervention: execution has not started; the main worktree's modified context/loop/domain
   files and untracked `.claude/`, course documents, and `tmp/` remain unstaged.
+
+### 2026-08-10 14:12:41 Asia/Shanghai - Claude-Code parity Task 5
+
+- Task: enforce invocation tool filters and project permission rules for the shared CLI/TUI loop.
+- Skills/workflow: `executing-plans` and `test-driven-development`; implementation stayed in the isolated `feature/claude-code-parity` worktree after the user's Inline Execution approval.
+- TDD RED: storage tests first failed with `AttributeError` for missing permission-rule methods; policy tests then showed project rules were ignored; loop tests rejected the missing `tool_filter` dependency; application-service tests failed to import the missing module.
+- GREEN: `uv run pytest tests/application/test_permission_filters.py tests/application/test_permissions.py tests/application/test_policy.py tests/application/test_loop.py tests/adapters/storage/test_sqlite.py tests/adapters/storage/test_permissions.py tests/tui/test_commands.py tests/tui/test_app.py tests/cli/test_prompt.py -q` passed 126 tests; final changed-boundary gate passed 36 tests. `uv run ruff check .`, `uv run mypy src`, and `git diff --check` passed.
+- Commit: `b7111cd` (`feat: enforce invocation permission filters`). New `ToolFilter`, `PermissionRule`, SQLite table, application service, loop enforcement, composition wiring, and TUI command actions are covered by offline tests.
+- Human intervention: no source edits were made in the dirty main worktree; user-owned files remain unstaged. No real LLM, credential, network, deployment, or CI operation was performed.
+- Lesson: permission changes must remain an application-service operation so TUI command parsing cannot mutate SQLite directly; loading rules per dependency factory makes them effective for subsequent runs while hard denials remain immutable.

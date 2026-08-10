@@ -44,7 +44,7 @@ HTTPX for the independent embedding adapter, `unidiff`, and PyInstaller.
 | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | committed in `9ee205d`; pending execution approval |
 | `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
 | `docs/superpowers/plans/2026-08-10-openai-sdk-llm.md` | Replace chat/tool HTTP and SSE with the official OpenAI SDK | approved SDK design `b4b5a94` | implemented and integrated into `main` at `8e708e2` (implementation `f7f2301`, repair `0fcd2af`, evidence `581402b`/`8e708e2`) |
-| `docs/superpowers/plans/2026-08-10-613-coding-claude-code-parity.md` | Shared Claude-Code-like TUI/CLI conversation, permissions, context, resume, and output contracts | approved parity design `3a07f09` | detailed plan written; execution workflow selection pending |
+| `docs/superpowers/plans/2026-08-10-613-coding-claude-code-parity.md` | Shared Claude-Code-like TUI/CLI conversation, permissions, context, resume, and output contracts | approved parity design `3a07f09` | Tasks 1-5 complete through `b7111cd`; Tasks 6-7 pending |
 
 The completed historical critical path was `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. The current
 critical path is `SAFE_MUTATION → TUI_DISTRIBUTION → CUBE_RECOVERY → CUBE Tasks 4-9`. Do not start
@@ -63,8 +63,8 @@ Cube recovery with the old whole-file editing boundary.
   follow-up `f9d7f47`.
 - [x] Root `SPEC.md`, `AGENTS.md`, `SPEC_PROCESS.md`, and delivery status updated for the local TUI
   and artifact-only deployment direction.
-- [ ] User reviews the three redesign implementation plans and selects Subagent-Driven or Inline
-  Execution.
+- [x] User approved the parity design and detailed plan and selected Inline Execution on
+  2026-08-10.
 - [ ] Each task receives spec-compliance review, code-quality review, fresh verification, a commit, and record updates.
 
 ## Task Index
@@ -531,3 +531,11 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   unrelated context/loop/domain/test paths were restored and verified. The recovery stash
   `stash@{0}` remains intentionally retained, and untracked `.claude/`, course documents, and
   `tmp/` were not staged or modified.
+
+## CLAUDE-CODE-PARITY Task Evidence
+
+- Status: Tasks 1-5 complete in isolated worktree branch `feature/claude-code-parity`; Tasks 6-7 remain pending.
+- Commits: `d8894d6` conversation boundary; `2f49041` event/output contracts; `e6a0542` root print CLI; `5fe88dc` TUI controls; `b7111cd` invocation permission filters and project rules.
+- Verification: Task 5 focused gate passed 126 tests; the final changed-boundary gate passed 36 tests, full Ruff, mypy across 100 source files, and `git diff --check`.
+- TDD evidence: each task recorded a missing-boundary RED before implementation; Task 5 covered missing storage methods, policy-rule application, loop filter injection, and application permission service.
+- Boundary: CLI and TUI use the shared conversation/run services; filters and project rules remain subject to hard policy, deterministic validation, and SQLite authority. Main-worktree user edits remain unstaged and untouched.

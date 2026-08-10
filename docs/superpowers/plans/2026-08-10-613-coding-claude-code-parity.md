@@ -89,7 +89,7 @@ fallback directory outside the repository. Do not copy or stage the dirty main-w
 - Produces `ConversationService.create_session(title: str | None = None) -> InteractiveSession`, `submit(request: PromptRequest) -> Run`, `execute(run_id: UUID, sink: ProgressSink, cancellation: CancellationToken) -> RunSummary`, `snapshot(session_id: UUID) -> InteractiveSnapshot`, and `sessions() -> list[InteractiveSession]`.
 - Adds `Run.options: RunOptions` and `RunRequest.options: RunOptions`, defaulting to an empty value so legacy JSON and SQLite rows remain valid.
 
-- [ ] **Step 1: Write the failing domain and persistence tests**
+- [x] **Step 1: Write the failing domain and persistence tests**
 
 ```python
 def test_prompt_request_rejects_conflicting_session_selection() -> None:
@@ -123,7 +123,7 @@ def test_run_options_survive_storage_round_trip(tmp_path: Path) -> None:
     assert store.get_run(run.id).options == options  # type: ignore[union-attr]
 ```
 
-- [ ] **Step 2: Run the RED tests**
+- [x] **Step 2: Run the RED tests**
 
 ```bash
 uv run pytest tests/domain/test_conversation.py tests/application/test_conversation.py tests/adapters/storage/test_sqlite.py -q
@@ -132,7 +132,7 @@ uv run pytest tests/domain/test_conversation.py tests/application/test_conversat
 Expected failure: `RunOptions`, `PromptRequest`, `ConversationService`, and the `options_json`
 column do not exist.
 
-- [ ] **Step 3: Add immutable values and migration-safe storage**
+- [x] **Step 3: Add immutable values and migration-safe storage**
 
 Use Pydantic frozen values. Validate nonblank tool names and prompt text, reject a tool appearing
 in both filters, cap option strings at 100,000 characters, and store additional directories as
@@ -141,7 +141,7 @@ to the new `runs` schema. In the SQLite initializer, inspect `PRAGMA table_info(
 column inside the existing transaction when absent. Encode/decode only the non-secret options
 fields with sorted JSON; omit prompt contents from option metadata.
 
-- [ ] **Step 4: Implement the conversation facade and preserve wrappers**
+- [x] **Step 4: Implement the conversation facade and preserve wrappers**
 
 `ConversationService.submit` must select an explicit session, the latest project session, or a new
 session in that order; it must reject a session belonging to another project before creating a
@@ -150,7 +150,7 @@ Run. It delegates execution to `RunService` and snapshots to the existing store.
 remain valid. Pass `RunOptions.model` into `ModelContext.metadata["model"]` through the existing
 dependency factory without placing it in logs or events.
 
-- [ ] **Step 5: Run focused GREEN and static checks**
+- [x] **Step 5: Run focused GREEN and static checks**
 
 ```bash
 uv run pytest tests/domain/test_conversation.py tests/application/test_conversation.py tests/application/test_interactive.py tests/adapters/storage/test_sqlite.py -q
@@ -158,7 +158,7 @@ uv run ruff check src/coding613/domain/conversation.py src/coding613/ports/conve
 uv run mypy src/coding613/domain src/coding613/ports/conversation.py src/coding613/application/conversation.py src/coding613/application/run_service.py src/coding613/application/interactive.py src/coding613/adapters/storage
 ```
 
-- [ ] **Step 6: Commit the typed conversation boundary**
+- [x] **Step 6: Commit the typed conversation boundary**
 
 ```bash
 git add src/coding613/domain/conversation.py src/coding613/domain/models.py src/coding613/ports/conversation.py src/coding613/application/conversation.py src/coding613/application/run_service.py src/coding613/application/interactive.py src/coding613/adapters/storage/schema.sql src/coding613/adapters/storage/sqlite.py tests/domain/test_conversation.py tests/application/test_conversation.py tests/application/test_interactive.py tests/adapters/storage/test_sqlite.py
@@ -186,7 +186,7 @@ git commit -m "feat: add shared conversation request boundary"
 - Produces `EventSink.publish(event: SessionEvent) -> None`, `SequencedEventSink`, and `ProgressEventBridge(session_id, run_id, sink)`.
 - Produces `RunEnvelope.from_summary(summary: RunSummary, session_id: UUID, assistant_text: str, events: tuple[SessionEvent, ...])`, `TextOutputSerializer.render(envelope: RunEnvelope, verbose: bool)`, `JsonOutputSerializer.render(envelope: RunEnvelope)`, and `StreamJsonSerializer.render_event(event: SessionEvent)`.
 
-- [ ] **Step 1: Write the failing event and serializer tests**
+- [x] **Step 1: Write the failing event and serializer tests**
 
 ```python
 def test_progress_bridge_sequences_and_redacts_tool_output() -> None:
@@ -206,7 +206,7 @@ def test_stream_json_is_one_versioned_redacted_line_per_event() -> None:
     assert rendered.endswith("\n")
 ```
 
-- [ ] **Step 2: Run the RED tests**
+- [x] **Step 2: Run the RED tests**
 
 ```bash
 uv run pytest tests/application/test_events.py tests/cli/test_output.py tests/tui/test_controller.py -q
@@ -215,7 +215,7 @@ uv run pytest tests/application/test_events.py tests/cli/test_output.py tests/tu
 Expected failure: no versioned event envelope or serializer exists, and progress is still keyed
 only by the current TUI rendering path.
 
-- [ ] **Step 3: Implement immutable events and sequencing**
+- [x] **Step 3: Implement immutable events and sequencing**
 
 Make `SessionEvent` frozen and validate timezone-aware timestamps, positive sequence numbers, and
 JSON-compatible data. `SequencedEventSink` assigns the next sequence atomically and applies the
@@ -223,7 +223,7 @@ existing `redact_payload` before forwarding. `ProgressEventBridge` maps each `Pr
 `EventType`, copies `tool_call_id`, and never uses a tool name as identity. Keep token deltas
 ephemeral; only the selected output sink receives them.
 
-- [ ] **Step 4: Implement the three serializers**
+- [x] **Step 4: Implement the three serializers**
 
 Text output returns assistant text plus `status=<state> stop_reason=<reason>` and includes tool/
 validation detail only when verbose. JSON serializes one `RunEnvelope`; when `--input-format
@@ -232,13 +232,13 @@ stream-json` yields multiple runs, serialize a `SessionEnvelope` containing
 per line and ends with a terminal run event. Use `model_dump(mode="json")`, sorted keys, and no
 secret-bearing exception chaining.
 
-- [ ] **Step 5: Connect the controller without changing policy**
+- [x] **Step 5: Connect the controller without changing policy**
 
 Give `TuiController` a queue-backed `EventSink` and retain a compatibility `drain_progress` view
 for existing tests. The controller creates one bridge per run and forwards both progress rendering
 and serialized event output through the shared sequencing boundary.
 
-- [ ] **Step 6: Run focused GREEN and static checks**
+- [x] **Step 6: Run focused GREEN and static checks**
 
 ```bash
 uv run pytest tests/application/test_events.py tests/cli/test_output.py tests/tui/test_controller.py -q
@@ -246,7 +246,7 @@ uv run ruff check src/coding613/ports/events.py src/coding613/application/events
 uv run mypy src/coding613/ports/events.py src/coding613/application/events.py src/coding613/cli/output.py src/coding613/tui/controller.py
 ```
 
-- [ ] **Step 7: Commit event and output contracts**
+- [x] **Step 7: Commit event and output contracts**
 
 ```bash
 git add src/coding613/ports/events.py src/coding613/application/events.py src/coding613/cli/output.py src/coding613/ports/progress.py src/coding613/tui/controller.py src/coding613/domain/events.py tests/application/test_events.py tests/cli/test_output.py tests/tui/test_controller.py
@@ -274,7 +274,7 @@ git commit -m "feat: add versioned conversation event stream"
 - Produces `parse_text_input(stream) -> tuple[str, ...]` and `parse_stream_json_input(stream) -> tuple[str, ...]`; malformed JSON, unknown schema versions, and blank prompts raise `InputFormatError`.
 - Produces `ExitCode` values `SUCCESS=0`, `FAILURE=1`, `INVALID_INPUT=2`, `POLICY_BLOCKED=3`, `PROVIDER_UNAVAILABLE=4`, and `BUDGET_STOP=5`.
 
-- [ ] **Step 1: Write the failing root and stdin tests**
+- [x] **Step 1: Write the failing root and stdin tests**
 
 ```python
 def test_print_request_captures_prompt_and_options() -> None:
@@ -294,7 +294,7 @@ def test_stream_json_input_preserves_order_and_rejects_unknown_type() -> None:
         parse_stream_json_input(io.StringIO('{"schema_version":1,"type":"tool.result","text":"x"}\n'))
 ```
 
-- [ ] **Step 2: Run the RED tests**
+- [x] **Step 2: Run the RED tests**
 
 ```bash
 uv run pytest tests/cli/test_prompt.py tests/cli/test_input.py tests/cli/test_entrypoint.py -q
@@ -303,7 +303,7 @@ uv run pytest tests/cli/test_prompt.py tests/cli/test_input.py tests/cli/test_en
 Expected failure: the root parser only understands `--repo`/`--resume`, and no print execution or
 input decoder exists.
 
-- [ ] **Step 3: Implement strict root parsing**
+- [x] **Step 3: Implement strict root parsing**
 
 Parse management commands before root options. Support the canonical options from the approved
 spec, both `--allowed-tools`/`--allowedTools` and `--disallowed-tools`/`--disallowedTools`, repeated
@@ -311,28 +311,28 @@ spec, both `--allowed-tools`/`--allowedTools` and `--disallowed-tools`/`--disall
 `--system-prompt` plus an empty value, validate paths before service construction, and preserve the
 current no-argument TUI behavior.
 
-- [ ] **Step 4: Implement input decoding and exit mapping**
+- [x] **Step 4: Implement input decoding and exit mapping**
 
 Text input reads one prompt from the positional value or stdin. Stream JSON validates each line
 with Pydantic and returns ordered user-message texts. Map `RunSummary` stop reasons and typed
 provider/policy/input exceptions to the `ExitCode` table; never print exception causes that may
 contain credentials.
 
-- [ ] **Step 5: Implement `run_print` on the shared service**
+- [x] **Step 5: Implement `run_print` on the shared service**
 
 Build services once, select/create/continue the session through `ConversationService`, execute each
 prompt in order with a `SequencedEventSink`, and call the selected serializer. A prompt invocation
 without `-p` launches the existing TUI with the same `RootLaunchRequest`; `-p` never imports or
 starts Textual. Inject stdin/stdout and the service factory for tests.
 
-- [ ] **Step 6: Add CLI contract tests for every option**
+- [x] **Step 6: Add CLI contract tests for every option**
 
 Assert that `--continue`, `--resume`, model, permission mode, tool filters, additional directories,
 system-prompt options, all four budget options, verbose, text/json/stream-json, and `--` reach one
 `PromptRequest` with no duplicate Run. Assert invalid options fail before `create_session` or
 `create_run` is called. Add success, provider, policy, validation, timeout, and budget exit tests.
 
-- [ ] **Step 7: Run focused GREEN and static checks**
+- [x] **Step 7: Run focused GREEN and static checks**
 
 ```bash
 uv run pytest tests/cli/test_prompt.py tests/cli/test_input.py tests/cli/test_entrypoint.py tests/cli/test_output.py -q
@@ -340,7 +340,7 @@ uv run ruff check src/coding613/cli tests/cli
 uv run mypy src/coding613/cli
 ```
 
-- [ ] **Step 8: Commit the print CLI**
+- [x] **Step 8: Commit the print CLI**
 
 ```bash
 git add src/coding613/cli/input.py src/coding613/cli/prompt.py src/coding613/cli/exit_codes.py src/coding613/cli/entrypoint.py src/coding613/cli/tui.py src/coding613/cli/main.py tests/cli/test_prompt.py tests/cli/test_input.py tests/cli/test_entrypoint.py
@@ -368,7 +368,7 @@ git commit -m "feat: add prompt and print CLI modes"
 - Extends `TuiController` with `history()`, `context_report()`, `compact()`, `diagnostics()`, and `status()` methods that delegate to injected services.
 - Extends `TaskComposer` with draft/history navigation without writing history outside the session store.
 
-- [ ] **Step 1: Write failing catalog and Pilot tests**
+- [x] **Step 1: Write failing catalog and Pilot tests**
 
 ```python
 def test_catalog_lists_and_parses_all_commands() -> None:
@@ -389,7 +389,7 @@ async def test_pilot_history_restores_previous_prompt() -> None:
         assert composer.text == "first"
 ```
 
-- [ ] **Step 2: Run RED tests**
+- [x] **Step 2: Run RED tests**
 
 ```bash
 uv run pytest tests/tui/test_commands.py tests/tui/test_controller.py tests/tui/test_app.py -q
@@ -398,28 +398,28 @@ uv run pytest tests/tui/test_commands.py tests/tui/test_controller.py tests/tui/
 Expected failure: commands are hard-coded in `CodingApp`, no history navigation exists, and
 controller methods for context/diagnostics are absent.
 
-- [ ] **Step 3: Add the command catalog and strict argument parsers**
+- [x] **Step 3: Add the command catalog and strict argument parsers**
 
 Move command definitions into `CommandCatalog.default()` for `/help`, `/clear`, `/compact`,
 `/context`, `/cost`, `/doctor`, `/model`, `/permissions`, `/resume`, `/runs`, `/status`, and
 `/quit`. Keep `shlex` parsing, validate modes and UUIDs, and make `/help [COMMAND]` use the same
 catalog as parsing. `//text` becomes a model prompt beginning with `/text`.
 
-- [ ] **Step 4: Add controller service calls and prompt history**
+- [x] **Step 4: Add controller service calls and prompt history**
 
 Have the controller pass `PromptRequest` options to `ConversationService`, serialize history from
 the current snapshot's user transcript entries, and expose async wrappers for context, compaction,
 diagnostics, cost, and status. Keep all blocking calls in `asyncio.to_thread`. History navigation
 must preserve the current draft and never submit automatically.
 
-- [ ] **Step 5: Render active operation, diagnostics, context, and long output safely**
+- [x] **Step 5: Render active operation, diagnostics, context, and long output safely**
 
 Add widgets for context source counts, compaction result, diagnostic check status, cost/budget, and
 pending approvals. Use call IDs for tool widget maps; render long paths/output in scrollable
 containers and redact values before mounting. Keep input disabled only while a blocking operation
 is active or approval is unresolved.
 
-- [ ] **Step 6: Run focused GREEN, Pilot, and static checks**
+- [x] **Step 6: Run focused GREEN, Pilot, and static checks**
 
 ```bash
 uv run pytest tests/tui/test_commands.py tests/tui/test_controller.py tests/tui/test_app.py tests/tui/test_renderers.py -q
@@ -427,7 +427,7 @@ uv run ruff check src/coding613/tui tests/tui
 uv run mypy src/coding613/tui
 ```
 
-- [ ] **Step 7: Commit the TUI parity adapter**
+- [x] **Step 7: Commit the TUI parity adapter**
 
 ```bash
 git add src/coding613/tui tests/tui
@@ -461,7 +461,7 @@ git commit -m "feat: expand tui conversation controls"
 - Produces `PermissionRule(scope: Literal["tool", "path"], pattern: str, effect: Literal["allow", "deny"])` and a store protocol for project-scoped rules.
 - Produces `/permissions list`, `/permissions allow TOOL`, `/permissions deny TOOL`, and `/permissions clear TOOL` through the application service; UI parsing never edits SQLite directly.
 
-- [ ] **Step 1: Write RED precedence and persistence tests**
+- [x] **Step 1: Write RED precedence and persistence tests**
 
 ```python
 def test_disallowed_tool_cannot_override_hard_secret_denial(tmp_path: Path) -> None:
@@ -479,7 +479,7 @@ def test_project_permission_rule_round_trip(tmp_path: Path) -> None:
     assert store.list_permission_rules(project_id) == [rule]
 ```
 
-- [ ] **Step 2: Run RED tests**
+- [x] **Step 2: Run RED tests**
 
 ```bash
 uv run pytest tests/application/test_permission_filters.py tests/application/test_policy.py tests/application/test_loop.py tests/adapters/storage/test_sqlite.py -q
@@ -488,7 +488,7 @@ uv run pytest tests/application/test_permission_filters.py tests/application/tes
 Expected failure: `ToolFilter`, `PermissionRule`, `LoopDependencies.tool_filter`, and the rule
 table do not exist.
 
-- [ ] **Step 3: Implement filters after hard policy evaluation**
+- [x] **Step 3: Implement filters after hard policy evaluation**
 
 Keep `PolicyEngine.evaluate` first so hard denial identifiers win. Apply invocation filters only
 when the policy decision is not already `DENY`; an allowlist denies names not listed and a denylist
@@ -496,7 +496,7 @@ denies listed names. A filter never changes a hard denial into allow or changes 
 an allowed tool. Persist the selected filters in `RunOptions` and inject them when a Run's loop
 dependencies are built.
 
-- [ ] **Step 4: Add schema-validated project rules**
+- [x] **Step 4: Add schema-validated project rules**
 
 Create `permission_rules(project_id, scope, pattern, effect, created_at)` with a uniqueness key.
 Migrate existing databases idempotently. Validate tool patterns against the registered tool names,
@@ -504,14 +504,14 @@ normalize path patterns without resolving outside the project, and reject shell 
 material. The PolicyEngine consults rules after hard checks and repository policy but before mode
 and approval.
 
-- [ ] **Step 5: Connect CLI/TUI commands and tests**
+- [x] **Step 5: Connect CLI/TUI commands and tests**
 
 Route CLI tool options and slash commands through `PromptRequest.options` and the conversation
 service. Test that invalid tools fail before a Run exists, exact rules persist across a new service
 composition, strict writes still ask for approval, autonomous mode still denies hard escapes, and
 approval rechecks the current policy before execution.
 
-- [ ] **Step 6: Run focused GREEN and static checks**
+- [x] **Step 6: Run focused GREEN and static checks**
 
 ```bash
 uv run pytest tests/application/test_permission_filters.py tests/application/test_policy.py tests/application/test_loop.py tests/adapters/storage/test_sqlite.py tests/tui/test_commands.py tests/cli/test_prompt.py -q
@@ -519,7 +519,7 @@ uv run ruff check src/coding613/domain/permissions.py src/coding613/application/
 uv run mypy src/coding613/domain/permissions.py src/coding613/application/policy.py src/coding613/application/loop.py src/coding613/application/composition.py src/coding613/adapters/storage
 ```
 
-- [ ] **Step 7: Commit the permission boundary**
+- [x] **Step 7: Commit the permission boundary**
 
 ```bash
 git add src/coding613/domain/permissions.py src/coding613/application/policy.py src/coding613/application/loop.py src/coding613/application/composition.py src/coding613/application/run_service.py src/coding613/adapters/storage/schema.sql src/coding613/adapters/storage/sqlite.py src/coding613/tui/commands.py src/coding613/cli/prompt.py tests/application/test_permission_filters.py tests/application/test_policy.py tests/application/test_loop.py tests/adapters/storage/test_sqlite.py tests/tui/test_commands.py tests/cli/test_prompt.py
@@ -527,6 +527,12 @@ git commit -m "feat: enforce invocation permission filters"
 ```
 
 ---
+
+#### Task 5 execution evidence
+
+- RED: `uv run pytest tests/application/test_permission_filters.py tests/adapters/storage/test_permissions.py -q` initially reported the missing SQLite permission-rule methods; policy RED then reported that `RepositoryPolicyConfig` ignored project rules; loop RED reported the missing `LoopDependencies.tool_filter` field; application-service RED reported the missing module.
+- GREEN: permission, policy, loop, composition, storage, TUI, and CLI focused suite passed 126 tests. Final Task 5 gate passed 36 focused tests, `uv run ruff check .`, `uv run mypy src`, and `git diff --check`.
+- Commit: `b7111cd` (`feat: enforce invocation permission filters`). Hard safety decisions remain authoritative; invocation filters and persisted project rules cannot turn a denial into an allow.
 
 ### Task 6: Context accounting, explicit compaction, and diagnostics
 

@@ -145,6 +145,13 @@ force.
 
 The strongest brainstorming outcome was forcing explicit boundaries around objective feedback, dangerous actions, memory authority, and the distinction between the development host and the delivered Harness. The main unresolved execution risk is scope: three substantial runtime areas must be delivered with the feedback loop still visibly deeper than the supporting systems.
 
+### Iteration 12: Parity execution approval
+
+- Question: which workflow should execute the approved Claude-Code-like TUI/CLI parity plan?
+- Decision: the user approved Inline Execution after the detailed plan review; implementation is isolated in `.worktrees/claude-code-parity` and proceeds task-by-task with TDD.
+- Uncertainty exposed: permissions and context controls must be shared application services rather than TUI-only state. Task 5 therefore added persisted project rules and run-scoped filters behind the existing policy boundary before continuing to context work.
+- Before/after: before, the root registry and delivery status marked parity implementation pending; after approval and Task 5, Tasks 1-5 are committed and offline verified while Tasks 6-7 remain explicitly open.
+
 ### Iteration 11: Official OpenAI SDK migration
 
 - Question: should the LLM adapter continue maintaining direct HTTP/SSE protocol code or use the
