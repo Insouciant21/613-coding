@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-
-import httpx
+from types import SimpleNamespace
 
 from coding613.adapters.llm.mock import ScriptedLLM
 from coding613.application.composition import build_services
@@ -30,6 +29,26 @@ class _SecretStore:
     def read_secret(self, provider: str) -> str:
         self.providers.append(provider)
         return self.value
+
+
+class _SdkCompletions:
+    def create(self, **kwargs: object) -> SimpleNamespace:
+        del kwargs
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(content="", tool_calls=[]),
+                )
+            ]
+        )
+
+
+class _SdkClient:
+    def __init__(self) -> None:
+        self.chat = SimpleNamespace(completions=_SdkCompletions())
+
+    def close(self) -> None:
+        return None
 
 
 def test_local_composition_persists_runs_and_can_cancel_without_provider(tmp_path: Path) -> None:
@@ -138,20 +157,11 @@ total_model_calls = 1
         encoding="utf-8",
     )
     secrets = _SecretStore("sk-composition-secret")
-    captured: dict[str, str] = {}
+    captured: list[tuple[str, str, float]] = []
 
-    def client_factory(headers: dict[str, str], timeout: float) -> httpx.Client:
-        del timeout
-        captured.update(headers)
-        return httpx.Client(
-            transport=httpx.MockTransport(
-                lambda request: httpx.Response(
-                    200,
-                    json={"choices": [{"message": {"content": "", "tool_calls": []}}]},
-                )
-            ),
-            headers=headers,
-        )
+    def client_factory(api_key: str, base_url: str, timeout: float) -> _SdkClient:
+        captured.append((api_key, base_url, timeout))
+        return _SdkClient()
 
     services = build_services(
         tmp_path,
@@ -162,7 +172,7 @@ total_model_calls = 1
     summary = services.run_service.resume(run.id)
 
     assert secrets.providers == ["openai"]
-    assert captured["Authorization"] == "Bearer sk-composition-secret"
+    assert captured == [("sk-composition-secret", "https://api.example.test/v1", 60.0)]
     assert summary.status is RunState.FAILED
     events = services.list_events(run.id)
     assert all("sk-composition-secret" not in event.model_dump_json() for event in events)

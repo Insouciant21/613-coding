@@ -17,8 +17,8 @@ from uuid import UUID
 from coding613.adapters.credentials.keyring import KeyringCredentialStore
 from coding613.adapters.embeddings.mock import DeterministicEmbedding
 from coding613.adapters.llm.credentialed import (
-    ClientFactory,
     CredentialedOpenAICompatibleLLM,
+    SDKClientFactory,
 )
 from coding613.adapters.storage.lancedb_index import LanceMemoryIndex
 from coding613.adapters.storage.memory import MemoryRepository
@@ -105,7 +105,7 @@ def build_services(
     *,
     provider: LLMProvider | None = None,
     credential_store: KeyringCredentialStore | None = None,
-    client_factory: ClientFactory | None = None,
+    client_factory: SDKClientFactory | None = None,
 ) -> LocalServices:
     root = Path(repo_root).expanduser().resolve(strict=True)
     config = load_config(root)

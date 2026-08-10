@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from uuid import uuid4
 
-import httpx
 import pytest
+from sdk_fakes import (
+    FakeChunk,
+    FakeCompletion,
+    FakeMessage,
+    FakeSDKClient,
+    FakeStream,
+    empty_completion,
+)
 
+import coding613.adapters.llm.credentialed as credentialed_module
 from coding613.adapters.llm.credentialed import (
     CredentialedOpenAICompatibleLLM,
     ProviderCredentialError,
 )
-from coding613.domain.actions import ToolCall
-from coding613.ports.llm import LLMResponse, ModelContext, ToolDefinition
+from coding613.ports.llm import ModelContext, ModelMessage
 
 
 class _Reader:
@@ -26,39 +32,18 @@ class _Reader:
         return self.value
 
 
-def test_credentialed_provider_reads_key_lazily_and_sends_auth_header() -> None:
+def test_credentialed_provider_reads_key_lazily_and_reuses_sdk_client() -> None:
     reader = _Reader("sk-test-secret")
-    captured: dict[str, str] = {}
+    client_creations: list[tuple[str, str, float]] = []
+    client = FakeSDKClient(
+        completion=FakeCompletion(
+            FakeMessage(content="ok")
+        )
+    )
 
-    def factory(headers: dict[str, str], timeout: float) -> httpx.Client:
-        captured.update(headers)
-        assert timeout == 12.0
-
-        def handler(request: httpx.Request) -> httpx.Response:
-            assert request.headers["authorization"] == "Bearer sk-test-secret"
-            return httpx.Response(
-                200,
-                json={
-                    "choices": [
-                        {
-                            "message": {
-                                "content": "",
-                                "tool_calls": [
-                                    {
-                                        "id": "call-1",
-                                        "function": {
-                                            "name": "read_file",
-                                            "arguments": '{"path":"a.py"}',
-                                        },
-                                    }
-                                ],
-                            }
-                        }
-                    ]
-                },
-            )
-
-        return httpx.Client(headers=headers, transport=httpx.MockTransport(handler))
+    def factory(api_key: str, base_url: str, timeout: float) -> FakeSDKClient:
+        client_creations.append((api_key, base_url, timeout))
+        return client
 
     provider = CredentialedOpenAICompatibleLLM(
         provider="openai",
@@ -68,19 +53,19 @@ def test_credentialed_provider_reads_key_lazily_and_sends_auth_header() -> None:
         client_factory=factory,
         timeout_seconds=12.0,
     )
-    context = ModelContext(run_id=uuid4(), task="read a.py")
-    tools: Sequence[ToolDefinition] = (
-        ToolDefinition(name="read_file", description="Read", input_schema={"type": "object"}),
+    context = ModelContext(
+        run_id=uuid4(),
+        task="task",
+        messages=(ModelMessage(role="user", content="task"),),
     )
 
     assert reader.calls == []
-    response = provider.complete(context, tools)
+    provider.complete(context, ())
+    provider.complete(context, ())
 
     assert reader.calls == ["openai"]
-    assert captured["Authorization"] == "Bearer sk-test-secret"
-    assert response.actions[0].action == ToolCall(
-        name="read_file", arguments={"path": "a.py"}
-    )
+    assert client_creations == [("sk-test-secret", "https://api.example.test/v1", 12.0)]
+    assert len(client.chat.completions.calls) == 2
 
 
 def test_credentialed_provider_does_not_expose_missing_secret() -> None:
@@ -100,23 +85,17 @@ def test_credentialed_provider_does_not_expose_missing_secret() -> None:
 def test_credentialed_provider_delegates_streaming_lazily() -> None:
     reader = _Reader("sk-test-secret")
     client_creations = 0
+    client = FakeSDKClient(stream=FakeStream((FakeChunk(content="stream"),)))
 
-    def factory(headers: dict[str, str], timeout: float) -> httpx.Client:
+    def factory(api_key: str, base_url: str, timeout: float) -> FakeSDKClient:
         nonlocal client_creations
         client_creations += 1
-        assert headers == {"Authorization": "Bearer sk-test-secret"}
-        assert timeout == 60.0
-        return httpx.Client(
-            headers=headers,
-            transport=httpx.MockTransport(
-                lambda request: httpx.Response(
-                    200,
-                    headers={"content-type": "text/event-stream"},
-                    content='data: {"choices":[{"delta":{"content":"stream"}}]}\n\ndata: [DONE]\n\n',
-                    request=request,
-                )
-            ),
+        assert (api_key, base_url, timeout) == (
+            "sk-test-secret",
+            "https://api.example.test/v1",
+            60.0,
         )
+        return client
 
     provider = CredentialedOpenAICompatibleLLM(
         provider="openai",
@@ -125,20 +104,52 @@ def test_credentialed_provider_delegates_streaming_lazily() -> None:
         read_secret=reader.read_secret,
         client_factory=factory,
     )
-    first_deltas: list[str] = []
-    second_deltas: list[str] = []
+    deltas: list[str] = []
 
-    first = provider.complete_stream(
-        ModelContext(run_id=uuid4(), task="first"), (), first_deltas.append, lambda: False
-    )
-    second = provider.complete_stream(
-        ModelContext(run_id=uuid4(), task="second"), (), second_deltas.append, lambda: False
+    response = provider.complete_stream(
+        ModelContext(run_id=uuid4(), task="first"), (), deltas.append, lambda: False
     )
 
-    expected = LLMResponse(content="stream", provider_metadata={"tool_call_ids": []})
-    assert first == expected
-    assert second == expected
-    assert first_deltas == ["stream"]
-    assert second_deltas == ["stream"]
+    assert response.content == "stream"
+    assert deltas == ["stream"]
     assert reader.calls == ["openai"]
     assert client_creations == 1
+
+
+def test_credentialed_provider_closes_sdk_client() -> None:
+    client = FakeSDKClient(completion=empty_completion())
+    provider = CredentialedOpenAICompatibleLLM(
+        provider="openai",
+        base_url="https://api.example.test/v1",
+        model="coding-model",
+        read_secret=lambda _: "secret",
+        client_factory=lambda *_: client,
+    )
+
+    provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+    provider.close()
+
+    assert client.closed is True
+
+
+def test_default_client_uses_sdk_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+    client = FakeSDKClient()
+
+    def fake_openai(**kwargs: object) -> FakeSDKClient:
+        captured.update(kwargs)
+        return client
+
+    monkeypatch.setattr(credentialed_module, "OpenAI", fake_openai)
+
+    result = credentialed_module._default_client(
+        "sk-test-secret", "https://api.example.test/v1", 12.0
+    )
+
+    assert result is client
+    assert captured == {
+        "api_key": "sk-test-secret",
+        "base_url": "https://api.example.test/v1",
+        "timeout": 12.0,
+        "max_retries": 0,
+    }

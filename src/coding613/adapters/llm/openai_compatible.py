@@ -1,12 +1,23 @@
-"""Single-call adapter for OpenAI-compatible chat-completions APIs."""
+"""OpenAI SDK adapter for OpenAI-compatible chat-completions providers."""
 
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Sequence
-from typing import Any
+import time
+from collections.abc import Callable, Iterator, Sequence
+from queue import Empty, Queue
+from threading import Thread
+from typing import Any, Protocol
 
-import httpx
+from openai import (
+    APIConnectionError,
+    APIError,
+    APIStatusError,
+    APITimeoutError,
+    AuthenticationError,
+    OpenAIError,
+    RateLimitError,
+)
 
 from coding613.application.progress import ProviderCancelledError
 from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
@@ -37,36 +48,45 @@ class ProviderResponseError(ProviderError):
     pass
 
 
+class SDKClient(Protocol):
+    """Minimal official SDK client surface required by the adapter."""
+
+    @property
+    def chat(self) -> Any: ...
+
+    def close(self) -> None: ...
+
+
 class OpenAICompatibleLLM:
-    def __init__(self, base_url: str, model: str, http_client: httpx.Client) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        client: SDKClient,
+        *,
+        timeout_seconds: float = 60.0,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
-        self._http_client = http_client
+        self._client = client
+        self._timeout_seconds = timeout_seconds
+        self._clock = clock
 
     def complete(
         self, context: ModelContext, tools: Sequence[ToolDefinition]
     ) -> LLMResponse:
-        payload = {
-            "model": self._model,
-            "messages": self._messages(context),
-            "tools": [self._tool_payload(tool) for tool in tools],
-        }
         try:
-            response = self._http_client.post(
-                f"{self._base_url}/chat/completions", json=payload
+            completion = self._client.chat.completions.create(
+                model=self._model,
+                messages=self._messages(context),
+                tools=[self._tool_payload(tool) for tool in tools],
             )
-        except httpx.TimeoutException as error:
-            raise ProviderTimeoutError("provider request timed out") from error
-        except httpx.HTTPError as error:
-            raise ProviderHTTPError("provider transport failed") from error
-
-        if response.status_code in {401, 403}:
-            raise ProviderAuthenticationError("provider rejected authentication")
-        if response.status_code == 429:
-            raise ProviderRateLimitError("provider rate limit exceeded")
-        if response.is_error:
-            raise ProviderHTTPError(f"provider returned HTTP {response.status_code}")
-        return self._parse_response(response)
+        except ProviderError:
+            raise
+        except Exception as error:
+            raise self._map_sdk_error(error) from error
+        return self._parse_completion(completion)
 
     def complete_stream(
         self,
@@ -75,71 +95,117 @@ class OpenAICompatibleLLM:
         on_text_delta: Callable[[str], None],
         cancelled: Callable[[], bool],
     ) -> LLMResponse:
-        payload = {
-            "model": self._model,
-            "messages": self._messages(context),
-            "tools": [self._tool_payload(tool) for tool in tools],
-            "stream": True,
-        }
+        started_at = self._clock()
+        stream: Any = None
+        primary_error: BaseException | None = None
         try:
-            stream = self._http_client.stream(
-                "POST", f"{self._base_url}/chat/completions", json=payload
+            if cancelled():
+                raise ProviderCancelledError("provider stream was cancelled")
+            stream = self._client.chat.completions.create(
+                model=self._model,
+                messages=self._messages(context),
+                tools=[self._tool_payload(tool) for tool in tools],
+                stream=True,
             )
-            with stream as response:
-                self._raise_for_status(response)
-                content_parts: dict[int, list[str]] = {}
-                tool_calls: dict[int, dict[str, str]] = {}
-                saw_done = False
-                for line in response.iter_lines():
-                    if cancelled():
-                        raise ProviderCancelledError("provider stream was cancelled")
-                    if not line or not line.startswith("data:"):
-                        continue
-                    data = line[5:].strip()
-                    if data == "[DONE]":
-                        saw_done = True
-                        break
-                    try:
-                        chunk = json.loads(data)
-                    except (TypeError, ValueError, json.JSONDecodeError) as error:
-                        raise ProviderResponseError("provider returned malformed stream data") from error
-                    self._accumulate_stream_chunk(chunk, content_parts, tool_calls, on_text_delta)
-                if not saw_done:
-                    raise ProviderResponseError("provider stream ended before [DONE]")
-                if any(not value["id"] for value in tool_calls.values()):
-                    raise ProviderResponseError("provider stream tool call has no id")
-                message: dict[str, Any] = {
-                    "content": "".join(part for index in sorted(content_parts) for part in content_parts[index]),
-                    "tool_calls": [
-                        {
-                            "id": value["id"],
-                            "type": "function",
-                            "function": {
-                                "name": value.get("name", ""),
-                                "arguments": value.get("arguments", ""),
-                            },
-                        }
-                        for index, value in sorted(tool_calls.items())
-                    ],
-                }
-                return self._parse_message(message)
-        except ProviderError:
+            content_parts: dict[int, list[str]] = {}
+            tool_calls: dict[int, dict[str, str]] = {}
+            saw_chunk = False
+            for chunk in self._stream_chunks(stream, started_at, cancelled):
+                saw_chunk = True
+                self._accumulate_stream_chunk(chunk, content_parts, tool_calls, on_text_delta)
+            self._check_stream_limits(started_at, cancelled)
+            if not saw_chunk:
+                raise ProviderResponseError("provider stream returned no chunks")
+            if any(not value["id"] for value in tool_calls.values()):
+                raise ProviderResponseError("provider stream tool call has no id")
+            message: dict[str, Any] = {
+                "content": "".join(
+                    part for index in sorted(content_parts) for part in content_parts[index]
+                ),
+                "tool_calls": [
+                    {
+                        "id": value["id"],
+                        "type": "function",
+                        "function": {
+                            "name": value["name"],
+                            "arguments": value["arguments"],
+                        },
+                    }
+                    for index, value in sorted(tool_calls.items())
+                ],
+            }
+            return self._parse_message(message)
+        except ProviderError as error:
+            primary_error = error
             raise
-        except httpx.TimeoutException as error:
-            raise ProviderTimeoutError("provider request timed out") from error
-        except httpx.HTTPError as error:
-            raise ProviderHTTPError("provider transport failed") from error
-
-    def _raise_for_status(self, response: httpx.Response) -> None:
-        if response.status_code in {401, 403}:
-            raise ProviderAuthenticationError("provider rejected authentication")
-        if response.status_code == 429:
-            raise ProviderRateLimitError("provider rate limit exceeded")
-        if response.is_error:
-            raise ProviderHTTPError(f"provider returned HTTP {response.status_code}")
+        except ProviderCancelledError as error:
+            primary_error = error
+            raise
+        except Exception as error:
+            mapped = self._map_sdk_error(error)
+            primary_error = mapped
+            raise mapped from error
+        finally:
+            if stream is not None:
+                try:
+                    close = getattr(stream, "close", None)
+                    if callable(close):
+                        close()
+                except Exception as cleanup_error:
+                    if primary_error is None:
+                        raise ProviderHTTPError("provider stream cleanup failed") from cleanup_error
 
     def close(self) -> None:
-        self._http_client.close()
+        self._client.close()
+
+    def _check_stream_limits(
+        self, started_at: float, cancelled: Callable[[], bool]
+    ) -> None:
+        if self._clock() - started_at >= self._timeout_seconds:
+            raise ProviderTimeoutError("provider stream exceeded its deadline")
+        if cancelled():
+            raise ProviderCancelledError("provider stream was cancelled")
+
+    def _stream_chunks(
+        self,
+        stream: Any,
+        started_at: float,
+        cancelled: Callable[[], bool],
+    ) -> Iterator[Any]:
+        events: Queue[tuple[str, Any]] = Queue()
+
+        def produce() -> None:
+            try:
+                for chunk in stream:
+                    events.put(("chunk", chunk))
+            except Exception as error:  # noqa: BLE001 - preserve any provider iterator error
+                events.put(("error", error))
+            finally:
+                events.put(("end", None))
+
+        producer = Thread(target=produce, daemon=True)
+        producer.start()
+        try:
+            while True:
+                if cancelled():
+                    raise ProviderCancelledError("provider stream was cancelled")
+                remaining = self._timeout_seconds - (self._clock() - started_at)
+                if remaining <= 0:
+                    raise ProviderTimeoutError("provider stream exceeded its deadline")
+                try:
+                    kind, value = events.get(timeout=remaining)
+                except Empty as error:
+                    raise ProviderTimeoutError("provider stream exceeded its deadline") from error
+                if kind == "chunk":
+                    yield value
+                    continue
+                if kind == "error":
+                    if isinstance(value, BaseException):
+                        raise value
+                    raise ProviderHTTPError("provider stream failed")
+                return
+        finally:
+            producer.join(timeout=0.1)
 
     @staticmethod
     def _messages(context: ModelContext) -> list[dict[str, str]]:
@@ -152,49 +218,51 @@ class OpenAICompatibleLLM:
 
     @staticmethod
     def _tool_payload(tool: ToolDefinition) -> dict[str, Any]:
+        parameters = {
+            key: value for key, value in tool.input_schema.items() if key != "$id"
+        }
         return {
             "type": "function",
             "function": {
                 "name": tool.name,
                 "description": tool.description,
-                "parameters": tool.input_schema,
+                "parameters": parameters,
             },
         }
 
     @classmethod
-    def _parse_response(cls, response: httpx.Response) -> LLMResponse:
-        try:
-            body = response.json()
-            choices = body["choices"]
-            message = choices[0]["message"]
-        except (KeyError, IndexError, TypeError, ValueError) as error:
-            raise ProviderResponseError("provider response has no valid choice") from error
-        return cls._parse_message(message)
+    def _parse_completion(cls, completion: Any) -> LLMResponse:
+        choices = cls._field(completion, "choices")
+        if not isinstance(choices, (list, tuple)) or not choices:
+            raise ProviderResponseError("provider response has no valid choice")
+        return cls._parse_message(cls._field(choices[0], "message"))
 
     @classmethod
     def _parse_message(cls, message: Any) -> LLMResponse:
-        if not isinstance(message, dict):
+        if not cls._is_object(message):
             raise ProviderResponseError("provider message must be an object")
 
         actions: list[ActionEnvelope] = []
         call_ids: list[str] = []
-        raw_tool_calls = message.get("tool_calls")
+        raw_tool_calls = cls._field(message, "tool_calls")
         if raw_tool_calls is None:
             raw_tool_calls = []
-        if not isinstance(raw_tool_calls, list):
+        if not isinstance(raw_tool_calls, (list, tuple)):
             raise ProviderResponseError("provider tool calls must be a list")
         for item in raw_tool_calls:
             try:
-                if not isinstance(item, dict):
+                if not cls._is_object(item):
                     raise TypeError("tool call must be an object")
-                function = item["function"]
-                if not isinstance(function, dict):
+                function = cls._field(item, "function")
+                if not cls._is_object(function):
                     raise TypeError("tool call function must be an object")
-                call_id = item["id"]
-                name = function["name"]
-                arguments_text = function["arguments"]
-                if not isinstance(call_id, str) or not isinstance(name, str):
-                    raise TypeError("tool call identity must be a string")
+                call_id = cls._field(item, "id")
+                name = cls._field(function, "name")
+                arguments_text = cls._field(function, "arguments")
+                if not isinstance(call_id, str) or not call_id:
+                    raise TypeError("tool call id must be a non-empty string")
+                if not isinstance(name, str) or not name:
+                    raise TypeError("tool call name must be a non-empty string")
                 if not isinstance(arguments_text, str):
                     raise TypeError("tool call arguments must be a string")
                 arguments = json.loads(arguments_text)
@@ -210,7 +278,9 @@ class OpenAICompatibleLLM:
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
                 raise ProviderResponseError("provider returned an invalid tool call") from error
 
-        content = message.get("content") or ""
+        content = cls._field(message, "content")
+        if content is None:
+            content = ""
         if not isinstance(content, str):
             raise ProviderResponseError("provider content must be a string or null")
         return LLMResponse(
@@ -219,74 +289,88 @@ class OpenAICompatibleLLM:
             provider_metadata={"tool_call_ids": call_ids},
         )
 
-    @staticmethod
+    @classmethod
     def _accumulate_stream_chunk(
+        cls,
         chunk: Any,
         content_parts: dict[int, list[str]],
         tool_calls: dict[int, dict[str, str]],
         on_text_delta: Callable[[str], None],
     ) -> None:
-        try:
-            choices = chunk["choices"]
-        except (KeyError, TypeError) as error:
-            raise ProviderResponseError("provider stream chunk has no choices") from error
-        if not isinstance(choices, list):
+        choices = cls._field(chunk, "choices")
+        if not isinstance(choices, (list, tuple)):
             raise ProviderResponseError("provider stream choices must be a list")
         for choice in choices:
-            try:
-                if not isinstance(choice, dict):
-                    raise TypeError("choice must be an object")
-                raw_index = choice.get("index", 0)
-                if type(raw_index) is not int:
-                    raise TypeError("choice index must be an integer")
-                index = raw_index
-                delta = choice["delta"]
-            except (AttributeError, KeyError, TypeError, ValueError) as error:
-                raise ProviderResponseError("provider stream choice is invalid") from error
-            if not isinstance(delta, dict):
+            delta = cls._field(choice, "delta")
+            if not cls._is_object(delta):
                 raise ProviderResponseError("provider stream delta must be an object")
-            text = delta.get("content")
+            text = cls._field(delta, "content")
             if text is not None:
                 if not isinstance(text, str):
                     raise ProviderResponseError("provider stream content must be a string")
+                index = cls._field(choice, "index")
+                if index is None:
+                    index = 0
+                if type(index) is not int:
+                    raise ProviderResponseError("provider stream choice index must be an integer")
                 content_parts.setdefault(index, []).append(text)
                 on_text_delta(text)
-            raw_tool_calls = delta.get("tool_calls")
+            raw_tool_calls = cls._field(delta, "tool_calls")
             if raw_tool_calls is None:
                 continue
-            if not isinstance(raw_tool_calls, list):
+            if not isinstance(raw_tool_calls, (list, tuple)):
                 raise ProviderResponseError("provider stream tool calls must be a list")
             for call in raw_tool_calls:
-                try:
-                    if not isinstance(call, dict):
-                        raise TypeError("tool call must be an object")
-                    raw_call_index = call["index"]
-                    if type(raw_call_index) is not int:
-                        raise TypeError("tool call index must be an integer")
-                    call_index = raw_call_index
-                    function = call.get("function")
-                    if function is None:
-                        function = {}
-                    if not isinstance(function, dict):
-                        raise TypeError("tool call function must be an object")
-                    call_type = call.get("type")
-                    if call_type is not None and call_type != "function":
-                        raise TypeError("tool call type must be function")
-                    call_id = call.get("id")
-                    if call_id is not None and not isinstance(call_id, str):
-                        raise TypeError("tool call id must be a string")
-                    name = function.get("name")
-                    if name is not None and not isinstance(name, str):
-                        raise TypeError("tool call name must be a string")
-                    arguments = function.get("arguments")
-                    if arguments is not None and not isinstance(arguments, str):
-                        raise TypeError("tool call arguments must be a string")
-                except (AttributeError, KeyError, TypeError, ValueError) as error:
-                    raise ProviderResponseError("provider stream tool call is invalid") from error
-                target = tool_calls.setdefault(call_index, {"id": "", "name": "", "arguments": ""})
+                if not cls._is_object(call):
+                    raise ProviderResponseError("provider stream tool call must be an object")
+                call_index = cls._field(call, "index")
+                if type(call_index) is not int:
+                    raise ProviderResponseError("provider stream tool call index must be an integer")
+                call_type = cls._field(call, "type")
+                if call_type is not None and call_type != "function":
+                    raise ProviderResponseError("provider stream tool call type must be function")
+                function = cls._field(call, "function")
+                if function is None:
+                    function = object()
+                if not cls._is_object(function):
+                    raise ProviderResponseError("provider stream tool call function must be an object")
+                call_id = cls._field(call, "id")
+                name = cls._field(function, "name")
+                arguments = cls._field(function, "arguments")
+                if call_id is not None and not isinstance(call_id, str):
+                    raise ProviderResponseError("provider stream tool call id must be a string")
+                if name is not None and not isinstance(name, str):
+                    raise ProviderResponseError("provider stream tool call name must be a string")
+                if arguments is not None and not isinstance(arguments, str):
+                    raise ProviderResponseError("provider stream tool call arguments must be a string")
+                target = tool_calls.setdefault(
+                    call_index, {"id": "", "name": "", "arguments": ""}
+                )
                 if call_id:
                     target["id"] = call_id
                 if name:
                     target["name"] += name
                 if arguments:
                     target["arguments"] += arguments
+
+    @staticmethod
+    def _is_object(value: Any) -> bool:
+        return isinstance(value, dict) or hasattr(value, "__dict__")
+
+    @staticmethod
+    def _field(value: Any, name: str) -> Any:
+        if isinstance(value, dict):
+            return value.get(name)
+        return getattr(value, name, None)
+
+    @staticmethod
+    def _map_sdk_error(error: Exception) -> ProviderError:
+        if isinstance(error, AuthenticationError):
+            return ProviderAuthenticationError("provider rejected authentication")
+        if isinstance(error, RateLimitError):
+            return ProviderRateLimitError("provider rate limit exceeded")
+        if isinstance(error, APITimeoutError):
+            return ProviderTimeoutError("provider request timed out")
+        if isinstance(error, (APIConnectionError, APIStatusError, APIError, OpenAIError)):
+            return ProviderHTTPError("provider request failed")
+        return ProviderHTTPError("provider transport failed")

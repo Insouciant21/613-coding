@@ -1,10 +1,21 @@
 from __future__ import annotations
 
-import json
+from types import SimpleNamespace
 from uuid import uuid4
 
 import httpx
 import pytest
+from openai import APIConnectionError, APITimeoutError, AuthenticationError, RateLimitError
+from sdk_fakes import (
+    FakeChunk,
+    FakeCompletion,
+    FakeFunction,
+    FakeMessage,
+    FakeSDKClient,
+    FakeStream,
+    FakeToolCall,
+    FakeToolDelta,
+)
 
 from coding613.adapters.llm.openai_compatible import (
     OpenAICompatibleLLM,
@@ -19,278 +30,268 @@ from coding613.domain.actions import FinishAction, ToolCall
 from coding613.ports.llm import ModelContext, ModelMessage, ToolDefinition
 
 
-def test_openai_adapter_maps_request_and_validates_tool_response() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        payload = json.loads(request.content)
-        assert request.url.path == "/v1/chat/completions"
-        assert payload["model"] == "test-model"
-        assert payload["messages"] == [{"role": "user", "content": "read a.py"}]
-        assert payload["tools"][0]["function"]["parameters"] == {"type": "object"}
-        return httpx.Response(
-            200,
-            json={
-                "choices": [
-                    {
-                        "message": {
-                            "content": "",
-                            "tool_calls": [
-                                {
-                                    "id": "call-1",
-                                    "type": "function",
-                                    "function": {
-                                        "name": "read_file",
-                                        "arguments": '{"path":"a.py"}',
-                                    },
-                                }
-                            ],
-                        }
-                    }
-                ]
-            },
+def test_openai_adapter_maps_sdk_request_and_tool_response() -> None:
+    client = FakeSDKClient(
+        completion=FakeCompletion(
+            FakeMessage(
+                content="",
+                tool_calls=(FakeToolCall("call-1", "read_file", '{"path":"a.py"}'),),
+            )
         )
+    )
+    provider = OpenAICompatibleLLM(
+        base_url="https://provider.invalid/v1", model="test-model", client=client
+    )
+    context = ModelContext(
+        run_id=uuid4(),
+        task="read a.py",
+        messages=(ModelMessage(role="user", content="read a.py"),),
+    )
+    definition = ToolDefinition(
+        name="read_file", description="Read file", input_schema={"type": "object"}
+    )
 
-    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-        provider = OpenAICompatibleLLM(
-            base_url="https://provider.invalid/v1", model="test-model", http_client=client
-        )
-        context = ModelContext(
-            run_id=uuid4(),
-            task="read a.py",
-            messages=(ModelMessage(role="user", content="read a.py"),),
-        )
-        definition = ToolDefinition(
-            name="read_file", description="Read file", input_schema={"type": "object"}
-        )
-        response = provider.complete(context, (definition,))
+    response = provider.complete(context, (definition,))
+
+    call = client.chat.completions.calls[0]
+    assert call["model"] == "test-model"
+    assert call["messages"] == [{"role": "user", "content": "read a.py"}]
+    assert call["tools"][0]["function"]["parameters"] == {"type": "object"}
     assert response.actions[0].action == ToolCall(
         name="read_file", arguments={"path": "a.py"}
     )
     assert response.provider_metadata["tool_call_ids"] == ["call-1"]
 
 
+def test_openai_adapter_omits_local_schema_id_without_mutating_definition() -> None:
+    client = FakeSDKClient(completion=FakeCompletion(FakeMessage(content="ok")))
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+    definition = ToolDefinition(
+        name="apply_patch",
+        description="Apply patch",
+        input_schema={"$id": "coding613.tool.apply_patch.v1", "type": "object"},
+    )
+
+    provider.complete(ModelContext(run_id=uuid4(), task="patch"), (definition,))
+
+    assert client.chat.completions.calls[0]["tools"][0]["function"]["parameters"] == {
+        "type": "object"
+    }
+    assert definition.input_schema["$id"] == "coding613.tool.apply_patch.v1"
+
+
 def test_openai_adapter_rejects_invalid_response() -> None:
-    transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"choices": []}))
-    with httpx.Client(transport=transport) as client:
-        provider = OpenAICompatibleLLM(
-            base_url="https://provider.invalid", model="test-model", http_client=client
-        )
-        with pytest.raises(ProviderResponseError):
-            provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+    client = FakeSDKClient()
+    client.chat.completions.completion = SimpleNamespace(choices=[])
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+
+    with pytest.raises(ProviderResponseError):
+        provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
 
 
 @pytest.mark.parametrize("message", [None, "text", []])
 def test_openai_adapter_rejects_non_object_response_messages(message: object) -> None:
-    transport = httpx.MockTransport(
-        lambda request: httpx.Response(200, json={"choices": [{"message": message}]})
+    client = FakeSDKClient()
+    client.chat.completions.completion = SimpleNamespace(
+        choices=[SimpleNamespace(message=message)]
     )
-    with httpx.Client(transport=transport) as client:
-        provider = OpenAICompatibleLLM(
-            base_url="https://provider.invalid", model="test-model", http_client=client
-        )
-        with pytest.raises(ProviderResponseError):
-            provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+
+    with pytest.raises(ProviderResponseError):
+        provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
 
 
 def test_openai_adapter_maps_finish_tool_call() -> None:
-    transport = httpx.MockTransport(
-        lambda request: httpx.Response(
-            200,
-            json={
-                "choices": [
-                    {
-                        "message": {
-                            "content": "",
-                            "tool_calls": [
-                                {
-                                    "id": "call-finish",
-                                    "type": "function",
-                                    "function": {
-                                        "name": "finish",
-                                        "arguments": '{"summary":"verified"}',
-                                    },
-                                }
-                            ],
-                        }
-                    }
-                ]
-            },
-            request=request,
+    client = FakeSDKClient(
+        completion=FakeCompletion(
+            FakeMessage(
+                content="",
+                tool_calls=(FakeToolCall("call-finish", "finish", '{"summary":"verified"}'),),
+            )
         )
     )
-    with httpx.Client(transport=transport) as client:
-        provider = OpenAICompatibleLLM(
-            base_url="https://provider.invalid", model="test-model", http_client=client
-        )
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
 
-        response = provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+    response = provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
 
     assert response.actions[0].action == FinishAction(summary="verified")
 
 
-def test_openai_adapter_maps_timeout() -> None:
-    def timeout(request: httpx.Request) -> httpx.Response:
-        raise httpx.ReadTimeout("slow", request=request)
-
-    with httpx.Client(transport=httpx.MockTransport(timeout)) as client:
-        provider = OpenAICompatibleLLM(
-            base_url="https://provider.invalid", model="test-model", http_client=client
-        )
-        with pytest.raises(ProviderTimeoutError):
-            provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+def _request() -> httpx.Request:
+    return httpx.Request("POST", "https://provider.invalid/v1/chat/completions")
 
 
 @pytest.mark.parametrize(
-    ("status", "error_type"),
-    [(401, ProviderAuthenticationError), (429, ProviderRateLimitError)],
-)
-def test_openai_adapter_maps_status_errors(
-    status: int, error_type: type[Exception]
-) -> None:
-    transport = httpx.MockTransport(lambda request: httpx.Response(status, request=request))
-    with httpx.Client(transport=transport) as client:
-        provider = OpenAICompatibleLLM(
-            base_url="https://provider.invalid", model="test-model", http_client=client
-        )
-        with pytest.raises(error_type):
-            provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
-
-
-def test_openai_adapter_streams_text_and_split_tool_arguments() -> None:
-    events = [
-        'data: {"choices":[{"index":0,"delta":{"content":"hel"}}]}\n\n',
-        'data: {"choices":[{"index":0,"delta":{"content":"lo","tool_calls":[{"index":0,"id":"call-1","function":{"name":"read_file","arguments":"{\\"pa"}}]}}]}\n\n',
-        'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"th\\":\\"a.py\\"}"}}]}}]}\n\n',
-        "data: [DONE]\n\n",
-    ]
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        payload = json.loads(request.content)
-        assert payload["stream"] is True
-        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content="".join(events))
-
-    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-        provider = OpenAICompatibleLLM("https://provider.invalid/v1", "model", client)
-        deltas: list[str] = []
-        response = provider.complete_stream(
-            ModelContext(run_id=uuid4(), task="read a.py"),
-            (ToolDefinition(name="read_file", description="Read", input_schema={"type": "object"}),),
-            deltas.append,
-            lambda: False,
-        )
-    assert deltas == ["hel", "lo"]
-    assert response.content == "hello"
-    assert response.actions[0].action == ToolCall(name="read_file", arguments={"path": "a.py"})
-    assert response.provider_metadata["tool_call_ids"] == ["call-1"]
-
-
-@pytest.mark.parametrize(
-    "body",
+    ("error", "error_type"),
     [
-        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{"}}]}}]}\n\n',
-        'data: {"choices":[{"delta":{"content":"hello"}}]}\n\n',
+        (APITimeoutError(_request()), ProviderTimeoutError),
+        (APIConnectionError(request=_request()), ProviderHTTPError),
+        (
+            AuthenticationError(
+                "bad auth", response=httpx.Response(401, request=_request()), body=None
+            ),
+            ProviderAuthenticationError,
+        ),
+        (
+            RateLimitError(
+                "rate limit", response=httpx.Response(429, request=_request()), body=None
+            ),
+            ProviderRateLimitError,
+        ),
     ],
 )
-def test_openai_adapter_rejects_malformed_or_premature_sse(body: str) -> None:
-    transport = httpx.MockTransport(
-        lambda request: httpx.Response(
-            200, headers={"content-type": "text/event-stream"}, content=body
+def test_openai_adapter_maps_sdk_errors(
+    error: Exception, error_type: type[Exception]
+) -> None:
+    client = FakeSDKClient(error=error)
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+
+    with pytest.raises(error_type):
+        provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+
+
+def test_openai_adapter_streams_sdk_text_and_split_tool_arguments() -> None:
+    stream = FakeStream(
+        [
+            FakeChunk(content="hel"),
+            FakeChunk(
+                content="lo",
+                tool_call=FakeToolDelta("call-1", "read_file", '{"pa'),
+            ),
+            FakeChunk(tool_call=FakeToolDelta(None, None, 'th":"a.py"}')),
+        ]
+    )
+    client = FakeSDKClient(stream=stream)
+    provider = OpenAICompatibleLLM("https://provider.invalid/v1", "model", client)
+    deltas: list[str] = []
+
+    response = provider.complete_stream(
+        ModelContext(run_id=uuid4(), task="read a.py"),
+        (ToolDefinition(name="read_file", description="Read", input_schema={"type": "object"}),),
+        deltas.append,
+        lambda: False,
+    )
+
+    assert deltas == ["hel", "lo"]
+    assert response.content == "hello"
+    assert response.actions[0].action == ToolCall(
+        name="read_file", arguments={"path": "a.py"}
+    )
+    assert response.provider_metadata["tool_call_ids"] == ["call-1"]
+    assert stream.closed is True
+    assert client.chat.completions.calls[0]["stream"] is True
+
+
+def test_openai_adapter_rejects_empty_stream() -> None:
+    stream = FakeStream(())
+    client = FakeSDKClient(stream=stream)
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+
+    with pytest.raises(ProviderResponseError):
+        provider.complete_stream(
+            ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False
         )
-    )
-    with httpx.Client(transport=transport) as client:
-        provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
-        with pytest.raises(ProviderResponseError):
-            provider.complete_stream(ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False)
+    assert stream.closed is True
 
 
-def test_openai_adapter_maps_stream_http_failure() -> None:
-    transport = httpx.MockTransport(lambda request: httpx.Response(503, request=request))
-    with httpx.Client(transport=transport) as client:
-        provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
-        with pytest.raises(ProviderHTTPError):
-            provider.complete_stream(ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False)
+def test_openai_adapter_maps_stream_iteration_error_and_closes() -> None:
+    error = APIConnectionError(request=_request())
+    stream = FakeStream((), iteration_error=error)
+    client = FakeSDKClient(stream=stream)
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
 
-
-def test_openai_adapter_stream_checks_cancellation_between_records() -> None:
-    events = (
-        'data: {"choices":[{"delta":{"content":"hello"}}]}\n\n'
-        "data: [DONE]\n\n"
-    )
-    transport = httpx.MockTransport(
-        lambda request: httpx.Response(
-            200, headers={"content-type": "text/event-stream"}, content=events
+    with pytest.raises(ProviderHTTPError):
+        provider.complete_stream(
+            ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False
         )
-    )
+    assert stream.closed is True
+
+
+def test_openai_adapter_reports_stream_cleanup_error() -> None:
+    stream = FakeStream([FakeChunk(content="ok")], close_error=RuntimeError("close failed"))
+    client = FakeSDKClient(stream=stream)
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+
+    with pytest.raises(ProviderHTTPError):
+        provider.complete_stream(
+            ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False
+        )
+    assert stream.closed is True
+
+
+def test_openai_adapter_stream_checks_cancellation_after_text_delta() -> None:
+    stream = FakeStream([FakeChunk(content="hello"), FakeChunk(content="world")])
+    client = FakeSDKClient(stream=stream)
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
     cancelled = False
 
     def on_delta(_: str) -> None:
         nonlocal cancelled
         cancelled = True
 
-    def is_cancelled() -> bool:
-        return cancelled
+    with pytest.raises(ProviderCancelledError):
+        provider.complete_stream(
+            ModelContext(run_id=uuid4(), task="task"), (), on_delta, lambda: cancelled
+        )
+    assert stream.closed is True
 
-    with httpx.Client(transport=transport) as client:
-        provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
-        with pytest.raises(ProviderCancelledError):
-            provider.complete_stream(ModelContext(run_id=uuid4(), task="task"), (), on_delta, is_cancelled)
+
+def test_openai_adapter_enforces_absolute_stream_deadline() -> None:
+    moments = iter((0.0, 0.4, 1.1))
+    stream = FakeStream([FakeChunk()])
+    client = FakeSDKClient(stream=stream)
+    provider = OpenAICompatibleLLM(
+        "https://provider.invalid", "model", client, timeout_seconds=1.0, clock=lambda: next(moments)
+    )
+
+    with pytest.raises(ProviderTimeoutError):
+        provider.complete_stream(
+            ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False
+        )
+    assert stream.closed is True
 
 
 @pytest.mark.parametrize(
     "tool_calls",
     [
         {},
-        [{"index": "0", "id": "call-1", "function": {"name": "read_file", "arguments": "{}"}}],
-        [{"index": 0, "id": 1, "function": {"name": "read_file", "arguments": "{}"}}],
-        [{"index": 0, "id": "call-1", "function": {"name": 1, "arguments": "{}"}}],
-        [{"index": 0, "id": "call-1", "function": "read_file"}],
+        [SimpleNamespace(index="0", id="call-1", function=FakeFunction("read_file", "{}"))],
+        [SimpleNamespace(index=0, id=1, function=FakeFunction("read_file", "{}"))],
+        [SimpleNamespace(index=0, id="call-1", function=FakeFunction(1, "{}"))],
+        [SimpleNamespace(index=0, id="call-1", function="read_file")],
     ],
 )
-def test_openai_adapter_rejects_invalid_stream_tool_call_containers_and_fragments(
+def test_openai_adapter_rejects_invalid_stream_tool_call_containers(
     tool_calls: object,
 ) -> None:
-    event = json.dumps({"choices": [{"delta": {"tool_calls": tool_calls}}]})
-    transport = httpx.MockTransport(
-        lambda request: httpx.Response(
-            200,
-            headers={"content-type": "text/event-stream"},
-            content=f"data: {event}\n\ndata: [DONE]\n\n",
-            request=request,
-        )
+    chunk = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                index=0,
+                delta=SimpleNamespace(content=None, tool_calls=tool_calls),
+            )
+        ]
     )
-    with httpx.Client(transport=transport) as client:
-        provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
-        with pytest.raises(ProviderResponseError):
-            provider.complete_stream(ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False)
+    stream = FakeStream((chunk,))
+    client = FakeSDKClient(stream=stream)
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+
+    with pytest.raises(ProviderResponseError):
+        provider.complete_stream(
+            ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False
+        )
+    assert stream.closed is True
 
 
 def test_openai_adapter_rejects_stream_tool_call_without_provider_id() -> None:
-    event = json.dumps(
-        {
-            "choices": [
-                {
-                    "delta": {
-                        "tool_calls": [
-                            {
-                                "index": 0,
-                                "function": {"name": "read_file", "arguments": "{}"},
-                            }
-                        ]
-                    }
-                }
-            ]
-        }
+    stream = FakeStream(
+        [FakeChunk(tool_call=FakeToolDelta(None, "read_file", "{}"))]
     )
-    transport = httpx.MockTransport(
-        lambda request: httpx.Response(
-            200,
-            headers={"content-type": "text/event-stream"},
-            content=f"data: {event}\n\ndata: [DONE]\n\n",
-            request=request,
+    client = FakeSDKClient(stream=stream)
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+
+    with pytest.raises(ProviderResponseError):
+        provider.complete_stream(
+            ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False
         )
-    )
-    with httpx.Client(transport=transport) as client:
-        provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
-        with pytest.raises(ProviderResponseError):
-            provider.complete_stream(
-                ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False
-            )
+    assert stream.closed is True

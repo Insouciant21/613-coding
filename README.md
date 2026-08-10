@@ -51,6 +51,10 @@ credential = "openai"
 timeout_seconds = 60.0
 ```
 
+Chat and tool calls use the official OpenAI Python SDK; `base_url` keeps OpenAI-compatible
+endpoints supported. The SDK client is created lazily with zero automatic retries so Harness model
+call budgets and provider errors remain deterministic.
+
 Store the key in the operating-system keyring:
 
 ```bash

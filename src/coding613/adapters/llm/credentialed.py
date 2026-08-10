@@ -1,25 +1,31 @@
-"""Lazy keyring-backed OpenAI-compatible provider composition."""
+"""Lazy keyring-backed OpenAI SDK provider composition."""
 
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-import httpx
+from openai import OpenAI
 
-from coding613.adapters.llm.openai_compatible import OpenAICompatibleLLM
 from coding613.ports.llm import LLMResponse, ModelContext, ToolDefinition
+
+from .openai_compatible import OpenAICompatibleLLM, SDKClient
 
 
 class ProviderCredentialError(RuntimeError):
     """Raised without exposing secret material when a provider key is unavailable."""
 
 
-ClientFactory = Callable[[dict[str, str], float], httpx.Client]
+SDKClientFactory = Callable[[str, str, float], SDKClient]
 SecretReader = Callable[[str], str]
 
 
-def _default_client(headers: dict[str, str], timeout: float) -> httpx.Client:
-    return httpx.Client(headers=headers, timeout=timeout)
+def _default_client(api_key: str, base_url: str, timeout: float) -> SDKClient:
+    return OpenAI(
+        api_key=api_key,
+        base_url=base_url,
+        timeout=timeout,
+        max_retries=0,
+    )
 
 
 class CredentialedOpenAICompatibleLLM:
@@ -33,7 +39,7 @@ class CredentialedOpenAICompatibleLLM:
         model: str,
         read_secret: SecretReader,
         timeout_seconds: float = 60.0,
-        client_factory: ClientFactory | None = None,
+        client_factory: SDKClientFactory | None = None,
     ) -> None:
         self._provider = provider
         self._base_url = base_url
@@ -46,11 +52,7 @@ class CredentialedOpenAICompatibleLLM:
     def complete(
         self, context: ModelContext, tools: Sequence[ToolDefinition]
     ) -> LLMResponse:
-        delegate = self._delegate
-        if delegate is None:
-            delegate = self._build_delegate()
-            self._delegate = delegate
-        return delegate.complete(context, tools)
+        return self._delegate_or_build().complete(context, tools)
 
     def complete_stream(
         self,
@@ -59,26 +61,34 @@ class CredentialedOpenAICompatibleLLM:
         on_text_delta: Callable[[str], None],
         cancelled: Callable[[], bool],
     ) -> LLMResponse:
+        return self._delegate_or_build().complete_stream(
+            context, tools, on_text_delta, cancelled
+        )
+
+    def close(self) -> None:
+        """Release the ephemeral SDK client without returning key material."""
+
+        if self._delegate is not None:
+            self._delegate.close()
+
+    def _delegate_or_build(self) -> OpenAICompatibleLLM:
         delegate = self._delegate
         if delegate is None:
             delegate = self._build_delegate()
             self._delegate = delegate
-        return delegate.complete_stream(context, tools, on_text_delta, cancelled)
-
-    def close(self) -> None:
-        """Release the ephemeral HTTP client without returning its key material."""
-
-        if self._delegate is not None:
-            self._delegate.close()
+        return delegate
 
     def _build_delegate(self) -> OpenAICompatibleLLM:
         try:
             secret = self._read_secret(self._provider)
             if not secret:
                 raise ValueError("empty credential")
-            client = self._client_factory(
-                {"Authorization": f"Bearer {secret}"}, self._timeout_seconds
-            )
+            client = self._client_factory(secret, self._base_url, self._timeout_seconds)
         except Exception as error:
             raise ProviderCredentialError("provider credential is unavailable") from error
-        return OpenAICompatibleLLM(self._base_url, self._model, client)
+        return OpenAICompatibleLLM(
+            self._base_url,
+            self._model,
+            client,
+            timeout_seconds=self._timeout_seconds,
+        )

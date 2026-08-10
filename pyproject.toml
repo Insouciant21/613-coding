@@ -11,6 +11,7 @@ scripts = { 613-coding = "coding613.cli.entrypoint:main" }
 dependencies = [
     "pydantic>=2.11,<3",
     "httpx>=0.28,<1",
+    "openai>=1,<3",
     "lancedb>=0.20,<1",
     "keyring>=25,<26",
     "typer>=0.15,<1",
