@@ -198,7 +198,11 @@ class TuiController:
             self.last_summary = await asyncio.to_thread(
                 self._runs.get_summary, self._snapshot.active_run.id
             )
-            if self._snapshot.active_run.state is RunState.PAUSED:
+            if self._snapshot.active_run.state in {
+                RunState.PAUSED,
+                RunState.RUNNING,
+                RunState.WAITING_MODEL,
+            }:
                 continued = await self._continue_active()
                 assert continued is not None
                 return continued

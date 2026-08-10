@@ -77,3 +77,15 @@ def test_current_docs_cover_tui_recovery_artifact_and_headless_boundaries() -> N
         "GitLab CI",
     ):
         assert required.lower() in current.lower()
+
+
+def test_readme_documents_print_stream_and_resume_contract() -> None:
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    for marker in (
+        "613-coding -p",
+        "--output-format stream-json",
+        "--continue",
+        "--resume",
+        "permission-mode",
+    ):
+        assert marker in text

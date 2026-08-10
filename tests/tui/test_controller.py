@@ -178,6 +178,26 @@ async def test_controller_resume_continues_same_paused_run() -> None:
 
 
 @pytest.mark.asyncio
+async def test_controller_resume_continues_an_interrupted_running_run() -> None:
+    interactive = FakeInteractive()
+    running = Run(
+        project_id=interactive.session.project_id,
+        session_id=interactive.session.id,
+        task="repair",
+        state=RunState.RUNNING,
+    )
+    interactive.runs.append(running)
+    runs = FakeRuns()
+    runs.summaries[running.id] = RunSummary(run_id=running.id, status=RunState.RUNNING)
+    controller = TuiController(interactive, runs)
+
+    snapshot = await controller.resume("latest")
+
+    assert interactive.execute_calls == [running.id]
+    assert snapshot.runs[-1].state is RunState.COMPLETED
+
+
+@pytest.mark.asyncio
 async def test_controller_resume_reconstructs_pending_approval_summary() -> None:
     interactive = FakeInteractive()
     waiting = Run(

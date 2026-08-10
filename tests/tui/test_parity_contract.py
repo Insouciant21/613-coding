@@ -1,0 +1,90 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from uuid import uuid4
+
+import pytest
+
+from coding613.application.interactive import InteractiveSnapshot, TranscriptEntry
+from coding613.application.progress import CancellationToken
+from coding613.domain.conversation import RunOptions
+from coding613.domain.interactive import InteractiveSession
+from coding613.domain.models import PermissionMode, Run, RunState, RunSummary, StopReason
+from coding613.ports.progress import ProgressSink
+from coding613.tui.controller import TuiController
+
+
+class RecordingInteractive:
+    def __init__(self) -> None:
+        self.session = InteractiveSession(project_id=uuid4())
+        self.requests: list[tuple[str, PermissionMode | None, RunOptions | None]] = []
+        self.runs: list[Run] = []
+
+    def create(self, title=None):
+        self.session = InteractiveSession(project_id=self.session.project_id, title=title)
+        return self.session
+
+    def list_sessions(self):
+        return [self.session]
+
+    def submit(self, session_id, message, permission_mode=None, options=None):
+        self.requests.append((message, permission_mode, options))
+        run = Run(
+            project_id=self.session.project_id,
+            session_id=session_id,
+            task=message,
+            permission_mode=permission_mode or PermissionMode.BALANCED,
+            options=options or RunOptions(),
+        )
+        self.runs.append(run)
+        return run
+
+    def execute(self, run_id, progress: ProgressSink, cancellation: CancellationToken):
+        del progress, cancellation
+        run = self.runs[-1]
+        self.runs[-1] = run.model_copy(
+            update={
+                "state": RunState.COMPLETED,
+                "stop_reason": StopReason.SUCCESS,
+                "updated_at": datetime.now(UTC),
+            }
+        )
+        return RunSummary(run_id=run_id, status=RunState.COMPLETED, stop_reason=StopReason.SUCCESS)
+
+    def resume_session(self, session_id):
+        return InteractiveSnapshot(
+            session=self.session,
+            runs=tuple(self.runs),
+            transcript=tuple(
+                TranscriptEntry(role="user", text=run.task, run_id=run.id)
+                for run in self.runs
+            ),
+        )
+
+
+class Runs:
+    def pause(self, run_id):
+        return RunSummary(run_id=run_id, status=RunState.PAUSED)
+
+    def approve(self, request_id):
+        return request_id
+
+    def reject(self, request_id):
+        return request_id
+
+    def get_approval(self, request_id):
+        raise KeyError(request_id)
+
+    def get_summary(self, run_id):
+        return RunSummary(run_id=run_id, status=RunState.COMPLETED, stop_reason=StopReason.SUCCESS)
+
+
+@pytest.mark.asyncio
+async def test_tui_contract_preserves_prompt_options_on_shared_interactive_boundary() -> None:
+    interactive = RecordingInteractive()
+    controller = TuiController(interactive, Runs())
+    options = RunOptions(model="gpt-test", allowed_tools=frozenset({"read_file"}))
+
+    await controller.submit("repair tests", PermissionMode.STRICT, options)
+
+    assert interactive.requests == [("repair tests", PermissionMode.STRICT, options)]

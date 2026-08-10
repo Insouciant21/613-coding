@@ -78,7 +78,8 @@ def dispatch(argv: Sequence[str]) -> int:
         TuiLaunchRequest(
             repo=request.repo,
             initial_task=request.prompt,
-            resume=request.resume,
+            resume=request.resume or ("latest" if request.continue_latest else None),
+            continue_latest=request.continue_latest,
             permission_mode=request.permission_mode or PermissionMode.BALANCED,
             options=request.options,
         )

@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 from pydantic import ConfigDict, Field, field_validator
 
+from .conversation import DiagnosticReport
 from .models import FeedbackKind, ResourceUsage, RunState, RunSummary, StopReason
 from .models_base import DomainModel
 
@@ -67,6 +68,7 @@ class RunEnvelope(DomainModel):
     approvals: tuple[UUID, ...] = ()
     completion_blockers: tuple[FeedbackKind, ...] = ()
     resource_usage: ResourceUsage
+    diagnostics: DiagnosticReport | None = None
 
     @classmethod
     def from_summary(
@@ -74,6 +76,7 @@ class RunEnvelope(DomainModel):
         summary: RunSummary,
         session_id: UUID,
         assistant_text: str,
+        diagnostics: DiagnosticReport | None = None,
     ) -> RunEnvelope:
         return cls(
             session_id=session_id,
@@ -86,6 +89,7 @@ class RunEnvelope(DomainModel):
             approvals=summary.approvals,
             completion_blockers=summary.completion_blockers,
             resource_usage=summary.resource_usage,
+            diagnostics=diagnostics,
         )
 
 

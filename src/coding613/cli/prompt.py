@@ -24,6 +24,7 @@ from coding613.application.progress import CancellationToken
 from coding613.cli.exit_codes import ExitCode
 from coding613.cli.input import InputFormatError, parse_stream_json_input, parse_text_input
 from coding613.domain.conversation import PromptRequest, RunOptions
+from coding613.domain.events import redact_payload
 from coding613.domain.models import FeedbackKind, PermissionMode, RunState, StopReason
 from coding613.domain.session_events import EventType, RunEnvelope, SessionEnvelope, SessionEvent
 
@@ -99,6 +100,11 @@ def parse_root_args(argv: Sequence[str]) -> RootLaunchRequest:
     namespace = parser.parse_args(list(argv))
     if namespace.continue_latest and namespace.resume is not None:
         parser.error("--continue and --resume cannot be selected together")
+    if namespace.resume is not None and namespace.resume != "latest":
+        try:
+            UUID(namespace.resume)
+        except ValueError:
+            parser.error("--resume expects latest or a session UUID")
     repo = Path(namespace.repo).expanduser()
     try:
         repo = repo.resolve(strict=True)
@@ -171,13 +177,16 @@ def run_print(
             prompts = parse_stream_json_input(input_stream)
         services = services_factory(request.repo)
         project_id = services.run_service.project.id
+        diagnostic_report = None
         if request.verbose:
             diagnostics = getattr(services, "diagnostics", None)
             if diagnostics is not None:
-                print(
-                    diagnostics.run(project_id).model_dump_json(), file=output_stream
-                )
+                diagnostic_report = diagnostics.run(project_id)
         events_by_run: list[tuple[RunEnvelope, tuple[SessionEvent, ...]]] = []
+        recording = _RecordingEventSink()
+        sequenced = SequencedEventSink(recording)
+        started_session_id: UUID | None = None
+        diagnostic_emitted = False
         session_id = _resume_session_id(request.resume)
         for index, prompt in enumerate(prompts):
             use_latest = (
@@ -195,8 +204,41 @@ def run_print(
             if run.session_id is None:
                 raise RuntimeError("conversation service returned a run without a session")
             session_id = run.session_id
-            recording = _RecordingEventSink()
-            sequenced = SequencedEventSink(recording)
+            event_start = len(recording.events)
+            if (
+                diagnostic_report is not None
+                and request.output_format is OutputFormat.STREAM_JSON
+                and not diagnostic_emitted
+            ):
+                diagnostic_emitted = True
+                sequenced.publish(
+                    SessionEvent(
+                        session_id=session_id,
+                        run_id=run.id,
+                        type=EventType.DIAGNOSTIC_COMPLETED,
+                        data=redact_payload(
+                            diagnostic_report.model_dump(mode="json")
+                        ),
+                    )
+                )
+            if started_session_id is None:
+                started_session_id = session_id
+                sequenced.publish(
+                    SessionEvent(
+                        session_id=session_id,
+                        run_id=run.id,
+                        type=EventType.SESSION_STARTED,
+                        data={"project_id": str(project_id)},
+                    )
+                )
+            sequenced.publish(
+                SessionEvent(
+                    session_id=session_id,
+                    run_id=run.id,
+                    type=EventType.USER_MESSAGE,
+                    data=redact_payload({"text": prompt}),
+                )
+            )
             bridge = ProgressEventBridge(session_id, run.id, sequenced)
             summary = services.conversation.execute(
                 run.id,
@@ -221,11 +263,12 @@ def run_print(
                     },
                 )
             )
-            events = tuple(recording.events)
+            events = tuple(recording.events[event_start:])
             envelope = RunEnvelope.from_summary(
                 summary,
                 session_id,
                 assistant_text_from_events(events),
+                diagnostics=diagnostic_report,
             )
             events_by_run.append((envelope, events))
             if summary.status is not RunState.COMPLETED:

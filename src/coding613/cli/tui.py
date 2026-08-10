@@ -6,6 +6,7 @@ import argparse
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from uuid import UUID
 
 from coding613.application.composition import LocalServices, build_services
 from coding613.domain.conversation import RunOptions
@@ -20,6 +21,7 @@ class TuiLaunchRequest:
     resume: str | None
     permission_mode: PermissionMode = PermissionMode.BALANCED
     options: RunOptions = field(default_factory=RunOptions)
+    continue_latest: bool = False
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -45,6 +47,11 @@ def parse_tui_args(argv: Sequence[str]) -> TuiLaunchRequest:
         _parser().error(f"repository does not exist: {repo}")
     if not repo.is_dir():
         _parser().error(f"repository is not a directory: {repo}")
+    if namespace.resume is not None and namespace.resume != "latest":
+        try:
+            UUID(namespace.resume)
+        except ValueError:
+            _parser().error("--resume expects latest or a session UUID")
     task = " ".join(namespace.task).strip() or None
     return TuiLaunchRequest(repo=repo, initial_task=task, resume=namespace.resume)
 
@@ -58,6 +65,7 @@ def launch_tui(
         services=services,
         initial_task=request.initial_task,
         resume=request.resume,
+        continue_latest=request.continue_latest,
         permission_mode=request.permission_mode or services.permission_mode,
         options=request.options,
     ).run()

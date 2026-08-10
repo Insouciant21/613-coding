@@ -23,3 +23,10 @@ def test_run_options_reject_overlapping_tool_filters() -> None:
             allowed_tools=frozenset({"read_file"}),
             disallowed_tools=frozenset({"read_file"}),
         )
+
+
+def test_run_options_reject_empty_prompt_overrides() -> None:
+    with pytest.raises(ValueError):
+        RunOptions(system_prompt="")
+    with pytest.raises(ValueError):
+        RunOptions(append_system_prompt="")

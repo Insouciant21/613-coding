@@ -7,6 +7,7 @@ from uuid import UUID
 import pytest
 
 from coding613.cli.prompt import parse_root_args, run_print
+from coding613.domain.conversation import DiagnosticCheck, DiagnosticReport
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import PermissionMode, Project, Run, RunState, RunSummary, StopReason
 from coding613.ports.progress import ProgressKind, RunProgress
@@ -37,6 +38,16 @@ class FakeServices:
         project = Project(canonical_root=root)
         self.run_service = type("RunService", (), {"project": project})()
         self.conversation = FakeConversation(project.id)
+        self.diagnostics = type(
+            "Diagnostics",
+            (),
+            {
+                "run": lambda _, project_id: DiagnosticReport(
+                    project_id=project_id,
+                    checks=(DiagnosticCheck(name="provider", status="pass", detail="ready"),),
+                )
+            },
+        )()
 
 
 def test_print_request_captures_prompt_and_options(tmp_path: Path) -> None:
@@ -70,6 +81,11 @@ def test_root_parser_rejects_conflicting_session_selectors(tmp_path: Path) -> No
         parse_root_args(["--repo", str(tmp_path), "--continue", "--resume", "latest"])
 
 
+def test_root_parser_rejects_invalid_resume_before_service_creation(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit):
+        parse_root_args(["--repo", str(tmp_path), "--resume", "not-a-session", "inspect"])
+
+
 def test_run_print_json_uses_shared_conversation_and_emits_final_envelope(tmp_path: Path) -> None:
     services = FakeServices(tmp_path)
     request = parse_root_args(
@@ -100,3 +116,12 @@ def test_run_print_reports_invalid_stdin_without_creating_services(tmp_path: Pat
     assert code == 2
     assert created is False
     assert "invalid input" in output.getvalue()
+
+
+def test_run_print_verbose_emits_injected_diagnostics(tmp_path: Path) -> None:
+    services = FakeServices(tmp_path)
+    request = parse_root_args(["-p", "--repo", str(tmp_path), "--verbose", "inspect"])
+    output = StringIO()
+
+    assert run_print(request, services_factory=lambda _: services, stdout=output) == 0
+    assert '"name":"provider"' in output.getvalue()

@@ -6,7 +6,11 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from coding613.application.progress import CancellationToken
-from coding613.domain.conversation import PromptRequest
+from coding613.domain.conversation import (
+    ContextSummary,
+    DiagnosticReport,
+    PromptRequest,
+)
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import Run, RunSummary
 from coding613.ports.progress import ProgressSink
@@ -16,6 +20,12 @@ class ConversationServicePort(Protocol):
     def create_session(self, title: str | None = None) -> InteractiveSession: ...
 
     def submit(self, request: PromptRequest) -> Run: ...
+
+    def continue_latest(self, project_id: UUID, message: str | None = None) -> Run: ...
+
+    def compact(self, session_id: UUID) -> ContextSummary: ...
+
+    def diagnostics(self, project_id: UUID) -> DiagnosticReport: ...
 
     def execute(
         self,

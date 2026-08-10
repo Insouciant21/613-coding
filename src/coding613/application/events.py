@@ -131,6 +131,15 @@ class TextOutputSerializer:
         if verbose:
             if envelope.changed_files:
                 lines.append("changed_files=" + ",".join(envelope.changed_files))
+            if envelope.diagnostics is not None:
+                lines.append(
+                    "diagnostics="
+                    + json.dumps(
+                        redact_payload(envelope.diagnostics.model_dump(mode="json")),
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                )
             lines.append(
                 "resource_usage="
                 + json.dumps(

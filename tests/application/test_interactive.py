@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
 from coding613.adapters.llm.mock import ScriptedLLM
 from coding613.application.composition import build_services
+from coding613.application.interactive import ConversationInteractiveAdapter
 from coding613.application.progress import CancellationToken
 from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
+from coding613.domain.conversation import RunOptions
 from coding613.domain.models import RunState
 from coding613.ports.llm import LLMResponse
 from coding613.ports.progress import NullProgressSink
@@ -95,3 +98,32 @@ def test_interactive_submit_rejects_invalid_message(tmp_path: Path, message: str
 
     with pytest.raises(ValueError):
         services.interactive.submit(session.id, message)
+
+
+def test_legacy_interactive_adapter_delegates_to_conversation_service() -> None:
+    class FakeConversation:
+        def create_session(self, title=None):
+            return ("session", title)
+
+        def submit(self, request):
+            return request
+
+        def execute(self, run_id, sink, cancellation):
+            return (run_id, sink, cancellation)
+
+        def snapshot(self, session_id):
+            return ("snapshot", session_id)
+
+        def sessions(self):
+            return ["session"]
+
+    adapter = ConversationInteractiveAdapter(FakeConversation(), uuid4())
+    session = adapter.create("title")
+    session_id = uuid4()
+    submitted = adapter.submit(session_id, "repair", options=RunOptions(model="test"))
+
+    assert session == ("session", "title")
+    assert submitted.text == "repair"
+    assert submitted.session_id == session_id
+    assert adapter.resume_session(session_id) == ("snapshot", session_id)
+    assert adapter.list_sessions() == ["session"]

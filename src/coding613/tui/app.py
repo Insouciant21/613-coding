@@ -62,6 +62,7 @@ class CodingApp(App[None]):
         controller: TuiController | None = None,
         initial_task: str | None = None,
         resume: str | None = None,
+        continue_latest: bool = False,
         permission_mode: PermissionMode = PermissionMode.BALANCED,
         options: RunOptions | None = None,
     ) -> None:
@@ -78,6 +79,7 @@ class CodingApp(App[None]):
             )
         self.initial_task = initial_task
         self.resume = resume
+        self.continue_latest = continue_latest
         self.permission_mode = permission_mode
         self.options = options
         self.command_catalog = CommandCatalog.default()
@@ -103,8 +105,10 @@ class CodingApp(App[None]):
         self.query_one(TaskComposer).focus()
         self._drain_timer = self.set_interval(0.05, self._drain_progress)
         if self.controller is not None:
-            if self.resume is not None:
-                self.run_worker(self._restore_session(), group="session")
+            if self.resume is not None or self.continue_latest:
+                self.run_worker(
+                    self._restore_session(submit_after=self.initial_task), group="session"
+                )
             elif self.initial_task:
                 self.run_worker(self._submit_message(self.initial_task), group="execution")
 
@@ -137,6 +141,13 @@ class CodingApp(App[None]):
 
     def on_task_composer_submitted(self, message: TaskComposer.Submitted) -> None:
         if self.controller is None or self._executing:
+            return
+        if message.text.startswith("//"):
+            self.run_worker(
+                self._submit_message(message.text[1:]),
+                group="execution",
+                exclusive=True,
+            )
             return
         if message.text.startswith("/"):
             self.run_worker(self._handle_command(message.text), group="command")
@@ -284,7 +295,7 @@ class CodingApp(App[None]):
             self._update_input_state()
             self.query_one(ActiveOperation).update("Idle")
 
-    async def _restore_session(self) -> None:
+    async def _restore_session(self, *, submit_after: str | None = None) -> None:
         if self.controller is None:
             return
         self._executing = True
@@ -293,6 +304,8 @@ class CodingApp(App[None]):
         try:
             snapshot = await self.controller.resume(self.resume or "latest")
             await self._render_snapshot(snapshot, clear=True)
+            if submit_after and self._approval_id is None:
+                await self._submit_message(submit_after)
         except Exception as error:
             await self.query_one(ConversationLog).mount(render_error(error))
         finally:

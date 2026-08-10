@@ -561,3 +561,14 @@ def test_concurrent_event_appends_are_serialized(tmp_path: Path) -> None:
         list(executor.map(store.append, events))
     restored = store.list_for_run(run.id)
     assert {event.payload["index"] for event in restored} == set(range(20))
+
+
+def test_run_task_is_redacted_before_persistence(tmp_path: Path) -> None:
+    store = SqliteEventStore(tmp_path / "state.sqlite")
+    run = Run(task="inspect token=secret-value")
+
+    store.create_run(run)
+
+    loaded = store.get_run(run.id)
+    assert loaded is not None
+    assert "secret-value" not in loaded.task

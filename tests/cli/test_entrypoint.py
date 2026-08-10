@@ -45,6 +45,8 @@ def test_parse_tui_args_rejects_unknown_option_and_missing_repo(tmp_path: Path) 
         parse_tui_args(["--unknown"])
     with pytest.raises(SystemExit):
         parse_tui_args(["--repo", str(tmp_path / "missing")])
+    with pytest.raises(SystemExit):
+        parse_tui_args(["--repo", str(tmp_path), "--resume", "not-a-session"])
 
 
 def test_root_help_does_not_launch_tui(monkeypatch, capsys) -> None:
@@ -64,3 +66,13 @@ def test_print_dispatch_does_not_launch_tui(monkeypatch, tmp_path: Path) -> None
     assert entrypoint.dispatch(["-p", "--repo", str(tmp_path), "inspect"]) == 0
     assert not launched
     assert requests[0].print_mode is True
+
+
+def test_continue_dispatch_resumes_latest_tui_session(monkeypatch, tmp_path: Path) -> None:
+    launched: list[TuiLaunchRequest] = []
+    monkeypatch.setattr(entrypoint, "launch_tui", launched.append)
+
+    assert entrypoint.dispatch(["--continue", "--repo", str(tmp_path)]) == 0
+
+    assert launched[0].resume == "latest"
+    assert launched[0].continue_latest is True

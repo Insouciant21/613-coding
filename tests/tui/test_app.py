@@ -267,6 +267,22 @@ async def test_tui_history_restores_previous_prompt_without_submitting() -> None
 
 
 @pytest.mark.asyncio
+async def test_tui_double_slash_escapes_a_prompt_starting_with_slash() -> None:
+    fake = FakeUiServices()
+    app = CodingApp(controller=_controller(fake))
+    async with app.run_test(size=(80, 24)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("//status")
+        await pilot.press("enter")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if fake.runs and fake.runs[-1].state is RunState.COMPLETED:
+                break
+
+        assert [run.task for run in fake.runs] == ["/status"]
+
+
+@pytest.mark.asyncio
 async def test_tui_shell_stays_stable_in_narrow_terminal() -> None:
     app = CodingApp()
     async with app.run_test(size=(60, 20)) as pilot:
@@ -411,6 +427,29 @@ async def test_tui_restart_resumes_paused_run_with_same_transcript_and_run_id() 
         assert fake.runs[-1].id == run_id
         assert fake.runs[-1].state is RunState.COMPLETED
         assert list(second.query(AssistantMessage))[-1].markdown_text == "resumed"
+
+
+@pytest.mark.asyncio
+async def test_tui_continue_with_prompt_restores_latest_session_then_submits_follow_up() -> None:
+    fake = FakeUiServices()
+    first = fake.submit(fake.session.id, "first")
+    fake.runs[-1] = first.model_copy(
+        update={
+            "state": RunState.COMPLETED,
+            "stop_reason": StopReason.SUCCESS,
+            "updated_at": datetime.now(UTC),
+        }
+    )
+    fake.transcript.append(TranscriptEntry(role="assistant", text="hello", run_id=first.id))
+
+    app = CodingApp(controller=_controller(fake), initial_task="follow-up", resume="latest")
+    async with app.run_test(size=(80, 24)) as pilot:
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if len(fake.runs) == 2 and fake.runs[-1].state is RunState.COMPLETED:
+                break
+
+        assert [run.task for run in fake.runs] == ["first", "follow-up"]
 
 
 @pytest.mark.asyncio

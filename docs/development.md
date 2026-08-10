@@ -37,6 +37,13 @@ Start the local terminal interface with `uv run 613-coding`, prefill a task with
 `uv run 613-coding --resume latest`. Enter submits, Ctrl+J inserts a newline, Esc pauses a Run,
 and `/resume` restores a selected session. The app keeps provider keys outside repository state.
 
+For scripts, use `uv run 613-coding -p "task"`, `--continue`, `--resume latest`,
+`--input-format stream-json`, and `--output-format text|json|stream-json`. Stream input is one
+versioned `user.message` JSON object per line. `--permission-mode`, model/system-prompt options,
+tool allow/deny filters, and budget flags are shared with the TUI. `/permissions`, `/context`,
+`/compact`, `/cost`, and `/doctor` are application-service commands; no adapter writes SQLite
+directly.
+
 On headless Linux, run a user D-Bus session with a Secret Service-compatible keyring backend before
 setting credentials. Verify the backend is reachable before use:
 
@@ -61,3 +68,7 @@ scripts/smoke_artifacts.sh dist
 GitHub Actions uploads these files on successful push and publishes them for `v*` tags. GitLab CI
 retains the same verified `dist/` artifact. Docker Engine is separately required when the agent
 starts isolated worker sandboxes.
+
+The current parity implementation deliberately leaves MCP transport for a later adapter. New
+tools must remain behind the versioned registry, deterministic policy, approvals, and redaction
+interfaces.

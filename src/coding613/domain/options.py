@@ -30,14 +30,23 @@ class RunOptions(DomainModel):
     allowed_tools: frozenset[str] = Field(default_factory=frozenset)
     disallowed_tools: frozenset[str] = Field(default_factory=frozenset)
     additional_dirs: tuple[str, ...] = ()
-    system_prompt: str | None = Field(default=None, max_length=100_000)
-    append_system_prompt: str | None = Field(default=None, max_length=100_000)
+    system_prompt: str | None = Field(default=None, min_length=1, max_length=100_000)
+    append_system_prompt: str | None = Field(
+        default=None, min_length=1, max_length=100_000
+    )
     budget_overrides: dict[str, Any] = Field(default_factory=dict)
 
     _validate_allowed = field_validator("allowed_tools")(staticmethod(_validate_tool_names))
     _validate_disallowed = field_validator("disallowed_tools")(
         staticmethod(_validate_tool_names)
     )
+
+    @field_validator("system_prompt", "append_system_prompt")
+    @classmethod
+    def validate_prompt_override(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("system prompt overrides must not be blank")
+        return value
 
     @field_validator("additional_dirs")
     @classmethod

@@ -30,7 +30,10 @@ from coding613.application.context import ContextAssembler, ContextService, Sess
 from coding613.application.conversation import ConversationService
 from coding613.application.diagnostics import DiagnosticService, local_diagnostic_checks
 from coding613.application.feedback import FeedbackClassifier
-from coding613.application.interactive import InteractiveSessionService
+from coding613.application.interactive import (
+    ConversationInteractiveAdapter,
+    InteractiveSessionService,
+)
 from coding613.application.loop import AgentLoop, LoopDependencies
 from coding613.application.permissions import PermissionRuleService
 from coding613.application.policy import PolicyEngine
@@ -98,7 +101,7 @@ class LocalServices:
     ) -> None:
         self.run_service = run_service
         self._events = events
-        self.interactive = interactive
+        self._legacy_interactive = interactive
         self.llm_metadata = llm_metadata
         self.permission_mode = permission_mode
         self.context = context
@@ -108,6 +111,12 @@ class LocalServices:
             self.run_service.project.id,
             self._events,
             self.run_service,
+            context=self.context,
+            diagnostics=self.diagnostics,
+        )
+        self.interactive = ConversationInteractiveAdapter(
+            self.conversation,
+            self.run_service.project.id,
         )
 
     def list_events(self, run_id: UUID) -> list[Event]:

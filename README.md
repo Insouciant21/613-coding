@@ -27,6 +27,12 @@ pause the active Run, and Ctrl+Q to exit. A paused session resumes with the same
 `/model`, `/permissions`, `/runs`, `/resume`, `/clear`, and `/quit` provide the corresponding local
 workflows. `A` and `R` approve or reject the displayed exact-action request.
 
+`/permissions list` displays project rules; `/permissions allow TOOL`, `/permissions deny TOOL`,
+and `/permissions clear TOOL` update them through the application service. `/context` reports
+bounded transcript accounting, `/compact` stores an additive redacted summary, `/cost` shows
+resource usage, and `/doctor` runs injected local diagnostics. Compaction never deletes the
+authoritative transcript. Prefix a slash with `//` when it should be sent as prompt text.
+
 Build a Python package and install the console command with:
 
 ```bash
@@ -37,6 +43,38 @@ uv tool install .
 
 The first self-contained Linux x86_64 executable and checksums are produced by the pinned Docker
 artifact builder described in [`docs/deployment.md`](docs/deployment.md).
+
+## Prompt, Print, And Stream Mode
+
+The root command accepts the same prompt workflow as the TUI. `-p`/`--print` runs prompts without
+opening Textual, `--continue` selects the latest session, and `--resume SESSION_ID` (or
+`--resume latest`) continues a persisted session:
+
+```bash
+613-coding -p --repo . --output-format text "repair the tests"
+613-coding -p --continue --output-format json "run validation"
+613-coding -p --resume latest --permission-mode strict "inspect the approval"
+```
+
+Prompts can come from stdin. Text input is the default; stream input is one JSON object per line
+with `{"schema_version":1,"type":"user.message","text":"..."}`:
+
+```bash
+printf '%s\n' '{"schema_version":1,"type":"user.message","text":"review the diff"}' \
+  | 613-coding -p --input-format stream-json --output-format stream-json
+```
+
+`--output-format` accepts `text`, `json`, or `stream-json`. JSON emits a versioned `RunEnvelope`
+(or `SessionEnvelope` for multiple prompts); stream JSON emits ordered versioned session events,
+including `diagnostic.completed` when `--verbose` is set.
+Exit codes are `0` success, `1` general failure, `2` invalid input, `3` policy blocked, `4`
+provider unavailable, and `5` budget/timeout stop. `--verbose` adds diagnostics and resource
+usage without exposing credentials.
+
+The options `--model`, `--system-prompt`, `--append-system-prompt`, `--allowed-tools` /
+`--allowedTools`, `--disallowed-tools` / `--disallowedTools`, `--add-dir`, and budget flags are
+passed through the same `PromptRequest` used by the TUI. `--permission-mode` accepts `strict`,
+`balanced`, or `autonomous`; hard safety rules always remain active.
 
 ## Provider Configuration
 
@@ -80,6 +118,10 @@ untrusted-code impact but cannot guarantee protection from kernel or runtime vul
 Interactive runs do not have a product-wide five-turn cap. Configure per-agent turns, total model
 calls, wall time, or provider cost in `harness.toml`; unattended runs must set a finite model-call
 or cost budget.
+
+MCP transport is not part of this parity slice. The tool registry is injectable and versioned;
+future MCP integration must pass through the same schema, policy, approval, and redaction
+boundaries rather than bypassing the owned AgentLoop.
 
 ## Development And CI
 

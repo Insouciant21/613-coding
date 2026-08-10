@@ -9,7 +9,7 @@ from pydantic import Field
 
 from coding613.application.progress import CancellationToken
 from coding613.application.run_service import RunRequest, RunService
-from coding613.domain.conversation import RunOptions
+from coding613.domain.conversation import PromptRequest, RunOptions
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import IterationRecord, PermissionMode, Run, RunSummary
 from coding613.domain.models_base import DomainModel
@@ -42,6 +42,66 @@ class InteractiveSnapshot(DomainModel):
     runs: tuple[Run, ...]
     active_run: Run | None = None
     transcript: tuple[TranscriptEntry, ...]
+
+
+class ConversationWorkflow(Protocol):
+    def create_session(self, title: str | None = None) -> InteractiveSession: ...
+
+    def submit(self, request: PromptRequest) -> Run: ...
+
+    def execute(
+        self,
+        run_id: UUID,
+        sink: ProgressSink,
+        cancellation: CancellationToken,
+    ) -> RunSummary: ...
+
+    def snapshot(self, session_id: UUID) -> InteractiveSnapshot: ...
+
+    def sessions(self) -> list[InteractiveSession]: ...
+
+
+class ConversationInteractiveAdapter:
+    """Keep the old interactive shape while delegating every operation to conversation."""
+
+    def __init__(self, conversation: ConversationWorkflow, project_id: UUID) -> None:
+        self._conversation = conversation
+        self._project_id = project_id
+
+    def create(self, title: str | None = None) -> InteractiveSession:
+        return self._conversation.create_session(title)
+
+    def submit(
+        self,
+        session_id: UUID,
+        message: str,
+        permission_mode: PermissionMode | None = None,
+        options: RunOptions | None = None,
+    ) -> Run:
+        return self._conversation.submit(
+            PromptRequest(
+                project_id=self._project_id,
+                session_id=session_id,
+                text=message,
+                permission_mode=permission_mode,
+                options=options or RunOptions(),
+            )
+        )
+
+    def execute(
+        self,
+        run_id: UUID,
+        progress: ProgressSink,
+        cancellation: CancellationToken,
+    ) -> RunSummary:
+        return self._conversation.execute(run_id, progress, cancellation)
+
+    def resume_session(self, session_id: UUID) -> InteractiveSnapshot:
+        return self._conversation.snapshot(session_id)
+
+    def list_sessions(self) -> list[InteractiveSession]:
+        return self._conversation.sessions()
+
 
 
 def transcript_for_runs(store: InteractiveStore, runs: list[Run]) -> tuple[TranscriptEntry, ...]:
