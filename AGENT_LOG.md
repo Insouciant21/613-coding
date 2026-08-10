@@ -1065,3 +1065,13 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   pytest-asyncio deprecation warnings; Ruff, mypy, `uv lock --check`, and `git diff --check` passed.
   Untracked `.claude/`, course documents, and `tmp/` were not touched. No remote provider,
   credential, pipeline, or deployment operation was performed.
+
+### 2026-08-10 12:26:41 Asia/Shanghai - OpenAI SDK merged-main completion audit
+
+- Current `main` tip `0ea395d` contains the official SDK chat migration and integration records;
+  the source boundary shows `OpenAI` plus `chat.completions.create` in the chat adapter, while
+  `httpx` remains only in the explicitly out-of-scope embedding adapter.
+- Fresh merged-main evidence: `uv run pytest -q --ignore=tmp` passed 408 tests with 127 existing
+  pytest-asyncio deprecation warnings; `uv run ruff check .`, `uv run mypy src`, documentation
+  tests (5), `uv lock --check`, and `git diff --check` passed. The five restored user paths and
+  untracked `.claude/`, course documents, and `tmp/` remain outside the SDK commits.
