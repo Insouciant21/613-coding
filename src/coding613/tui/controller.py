@@ -7,10 +7,13 @@ from queue import Empty, SimpleQueue
 from typing import Any, Protocol
 from uuid import UUID
 
+from coding613.application.events import ProgressEventBridge, SequencedEventSink
 from coding613.application.interactive import InteractiveSnapshot
 from coding613.application.progress import CancellationToken
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import ApprovalRequest, PermissionMode, RunState, RunSummary
+from coding613.domain.session_events import SessionEvent
+from coding613.ports.events import EventSink
 from coding613.ports.progress import ProgressSink, RunProgress
 
 
@@ -56,12 +59,22 @@ class QueueProgressSink:
         self._queue.put(update)
 
 
+class QueueEventSink:
+    def __init__(self, queue: SimpleQueue[SessionEvent]) -> None:
+        self._queue = queue
+
+    def publish(self, event: SessionEvent) -> None:
+        self._queue.put(event)
+
+
 class TuiController:
     def __init__(self, interactive: InteractiveService, runs: RunActions) -> None:
         self._interactive = interactive
         self._runs = runs
         self._queue: SimpleQueue[RunProgress] = SimpleQueue()
         self._sink = QueueProgressSink(self._queue)
+        self._event_queue: SimpleQueue[SessionEvent] = SimpleQueue()
+        self._event_sink: EventSink = SequencedEventSink(QueueEventSink(self._event_queue))
         self._cancellation = CancellationToken()
         self._session_id: UUID | None = None
         self._snapshot: InteractiveSnapshot | None = None
@@ -87,10 +100,11 @@ class TuiController:
             self.active_run_id = run.id
             self._pause_requested_for = None
             self._cancellation.reset()
+            event_sink = self._progress_bridge(run.id)
             summary = await asyncio.to_thread(
                 self._interactive.execute,
                 run.id,
-                self._sink,
+                event_sink,
                 self._cancellation,
             )
             self.last_summary = summary
@@ -186,15 +200,24 @@ class TuiController:
             except Empty:
                 return tuple(updates)
 
+    def drain_events(self) -> tuple[SessionEvent, ...]:
+        events: list[SessionEvent] = []
+        while True:
+            try:
+                events.append(self._event_queue.get_nowait())
+            except Empty:
+                return tuple(events)
+
     async def _continue_active(self) -> InteractiveSnapshot | None:
         if self.active_run_id is None or self._session_id is None:
             return self._snapshot
         self._pause_requested_for = None
         self._cancellation.reset()
+        event_sink = self._progress_bridge(self.active_run_id)
         summary = await asyncio.to_thread(
             self._interactive.execute,
             self.active_run_id,
-            self._sink,
+            event_sink,
             self._cancellation,
         )
         self.last_summary = summary
@@ -204,3 +227,13 @@ class TuiController:
             self._interactive.resume_session, self._session_id
         )
         return self._snapshot
+
+    def _progress_bridge(self, run_id: UUID) -> ProgressSink:
+        if self._session_id is None:
+            raise RuntimeError("interactive session is not selected")
+        return ProgressEventBridge(
+            self._session_id,
+            run_id,
+            self._event_sink,
+            progress=self._sink,
+        )

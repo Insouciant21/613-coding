@@ -8,6 +8,7 @@ import pytest
 from coding613.application.interactive import InteractiveSnapshot, TranscriptEntry
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import PermissionMode, Run, RunState, RunSummary, StopReason
+from coding613.domain.session_events import EventType
 from coding613.ports.progress import ProgressKind, RunProgress
 from coding613.tui.controller import TuiController
 
@@ -101,6 +102,11 @@ async def test_controller_streams_deltas_and_restores_final_transcript() -> None
     assert [(entry.role, entry.text) for entry in snapshot.transcript] == [
         ("user", "repair"),
         ("assistant", "hello"),
+    ]
+    events = controller.drain_events()
+    assert [event.type for event in events] == [
+        EventType.ASSISTANT_DELTA,
+        EventType.ASSISTANT_DELTA,
     ]
 
 
