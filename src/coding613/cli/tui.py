@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from coding613.application.composition import LocalServices, build_services
+from coding613.domain.conversation import RunOptions
+from coding613.domain.models import PermissionMode
 from coding613.tui.app import CodingApp
 
 
@@ -16,6 +18,8 @@ class TuiLaunchRequest:
     repo: Path
     initial_task: str | None
     resume: str | None
+    permission_mode: PermissionMode = PermissionMode.BALANCED
+    options: RunOptions = field(default_factory=RunOptions)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -54,5 +58,5 @@ def launch_tui(
         services=services,
         initial_task=request.initial_task,
         resume=request.resume,
-        permission_mode=services.permission_mode,
+        permission_mode=request.permission_mode,
     ).run()

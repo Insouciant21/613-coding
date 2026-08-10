@@ -8,9 +8,31 @@ from collections.abc import Sequence
 import click
 
 from .main import app
-from .tui import TuiLaunchRequest, launch_tui, parse_tui_args
+from .prompt import parse_root_args, run_print
+from .tui import TuiLaunchRequest, launch_tui
 
 _MANAGEMENT_COMMANDS = frozenset({"credentials", "config", "run", "runs", "demo"})
+_ROOT_VALUE_OPTIONS = frozenset(
+    {
+        "--repo",
+        "--resume",
+        "--add-dir",
+        "--input-format",
+        "--output-format",
+        "--model",
+        "--permission-mode",
+        "--allowed-tools",
+        "--allowedTools",
+        "--disallowed-tools",
+        "--disallowedTools",
+        "--max-turns",
+        "--max-model-calls",
+        "--max-wall-time",
+        "--max-cost",
+        "--system-prompt",
+        "--append-system-prompt",
+    }
+)
 
 
 def _first_command(argv: Sequence[str]) -> str | None:
@@ -21,7 +43,7 @@ def _first_command(argv: Sequence[str]) -> str | None:
             continue
         if value == "--":
             return None
-        if value in {"--repo", "--resume"}:
+        if value in _ROOT_VALUE_OPTIONS:
             skip_value = True
             continue
         if value.startswith("-"):
@@ -42,13 +64,23 @@ def dispatch(argv: Sequence[str]) -> int:
     values = list(argv)
     if values in (["--help"], ["-h"]):
         try:
-            parse_tui_args(values)
+            parse_root_args(values)
         except SystemExit as error:
             return int(error.code or 0)
     if _first_command(values) in _MANAGEMENT_COMMANDS:
         return run_management(values)
-    request = parse_tui_args(values)
-    launch_tui(request)
+    request = parse_root_args(values)
+    if request.print_mode:
+        return run_print(request)
+    launch_tui(
+        TuiLaunchRequest(
+            repo=request.repo,
+            initial_task=request.prompt,
+            resume=request.resume,
+            permission_mode=request.permission_mode,
+            options=request.options,
+        )
+    )
     return 0
 
 

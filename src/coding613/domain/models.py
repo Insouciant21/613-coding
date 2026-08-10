@@ -11,8 +11,8 @@ from uuid import UUID, uuid4
 from pydantic import Field, field_validator, model_validator
 
 from .actions import ActionEnvelope, ToolCall
-from .conversation import RunOptions
 from .models_base import DomainModel
+from .options import RunOptions
 
 
 class RunState(StrEnum):

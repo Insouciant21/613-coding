@@ -39,6 +39,7 @@ class ConversationService:
                 task=request.text,
                 project_id=session.project_id,
                 session_id=session.id,
+                permission_mode=request.permission_mode,
                 options=request.options,
             )
         )

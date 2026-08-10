@@ -53,3 +53,14 @@ def test_root_help_does_not_launch_tui(monkeypatch, capsys) -> None:
     assert entrypoint.dispatch(["--help"]) == 0
     assert not launched
     assert "613-coding" in capsys.readouterr().out
+
+
+def test_print_dispatch_does_not_launch_tui(monkeypatch, tmp_path: Path) -> None:
+    launched: list[TuiLaunchRequest] = []
+    requests = []
+    monkeypatch.setattr(entrypoint, "launch_tui", launched.append)
+    monkeypatch.setattr(entrypoint, "run_print", lambda request: requests.append(request) or 0)
+
+    assert entrypoint.dispatch(["-p", "--repo", str(tmp_path), "inspect"]) == 0
+    assert not launched
+    assert requests[0].print_mode is True
