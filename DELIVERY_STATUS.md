@@ -7,7 +7,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
-| Official OpenAI SDK chat adapter | design approved; implementation plan pending | `docs/superpowers/specs/2026-08-10-openai-sdk-llm-design.md`; `SPEC_PROCESS.md` Iteration 11 | user reviews committed design, then write implementation plan |
+| Official OpenAI SDK chat adapter | design approved; implementation plan pending | design commit `b4b5a94`; `docs/superpowers/specs/2026-08-10-openai-sdk-llm-design.md`; `SPEC_PROCESS.md` Iteration 11 | user reviews committed design, then write implementation plan |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
 | Binary/wheel/sdist artifact builder | Docker-exported and runtime-smoked on main; CI/release configuration present | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08/TUI-09 evidence | push/tag when an operator wants remote CI artifacts or a GitHub release |

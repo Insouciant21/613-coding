@@ -984,3 +984,4 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   was protected by a browser challenge; no unverified documentation claim was substituted.
 - Evidence: `docs/superpowers/specs/2026-08-10-openai-sdk-llm-design.md` and the corresponding
   `SPEC_PROCESS.md` entry. No implementation or verification claim is made at this stage.
+- Design commit: `b4b5a94` (`docs: design OpenAI SDK LLM adapter`).
