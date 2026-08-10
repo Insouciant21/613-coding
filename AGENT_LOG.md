@@ -1096,3 +1096,18 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Verification: design self-review found no TODO/TBD markers and `git diff --check` passed for the
   new document. No implementation or passing-code claim is made; the next gate is a detailed
   implementation plan followed by user execution approval.
+
+### 2026-08-10 13:31:00 Asia/Shanghai - Claude-Code-like TUI and CLI parity implementation plan
+
+- Task: turn the approved parity design into seven independently testable TDD tasks covering the
+  shared conversation boundary, event/output contracts, root print CLI, expanded TUI, permission
+  filters, context compaction/diagnostics, and final documentation/evidence.
+- Skill: `writing-plans`.
+- Plan: `docs/superpowers/plans/2026-08-10-613-coding-claude-code-parity.md`; root `PLAN.md` registry
+  now tracks it as execution-choice pending. The plan defines exact files, interfaces, RED/GREEN
+  commands, commits, migration boundaries, and final review gates.
+- Self-review: reserved-marker scan found no unresolved marker, `git diff --check` passed, and the
+  task/type coverage checklist maps every approved design section to a task. The design was amended
+  to define the `SessionEnvelope` shape for multiple stream-JSON input messages.
+- Human intervention: execution has not started; the main worktree's modified context/loop/domain
+  files and untracked `.claude/`, course documents, and `tmp/` remain unstaged.

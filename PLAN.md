@@ -44,6 +44,7 @@ HTTPX for the independent embedding adapter, `unidiff`, and PyInstaller.
 | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | committed in `9ee205d`; pending execution approval |
 | `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
 | `docs/superpowers/plans/2026-08-10-openai-sdk-llm.md` | Replace chat/tool HTTP and SSE with the official OpenAI SDK | approved SDK design `b4b5a94` | implemented and integrated into `main` at `8e708e2` (implementation `f7f2301`, repair `0fcd2af`, evidence `581402b`/`8e708e2`) |
+| `docs/superpowers/plans/2026-08-10-613-coding-claude-code-parity.md` | Shared Claude-Code-like TUI/CLI conversation, permissions, context, resume, and output contracts | approved parity design `3a07f09` | detailed plan written; execution workflow selection pending |
 
 The completed historical critical path was `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. The current
 critical path is `SAFE_MUTATION → TUI_DISTRIBUTION → CUBE_RECOVERY → CUBE Tasks 4-9`. Do not start

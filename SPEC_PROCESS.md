@@ -181,3 +181,6 @@ The strongest brainstorming outcome was forcing explicit boundaries around objec
   application contract.
 - Human decision: user approved the proposed scope on 2026-08-10.
 - Approved design: `docs/superpowers/specs/2026-08-10-613-coding-claude-code-parity-design.md`.
+- Plan revision: the detailed plan adds a versioned `SessionEnvelope` for multiple stream-JSON
+  input messages so the output contract remains deterministic without dropping ordered follow-up
+  runs. Plan: `docs/superpowers/plans/2026-08-10-613-coding-claude-code-parity.md`.

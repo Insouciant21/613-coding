@@ -1,14 +1,14 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 13:23:35 (Asia/Shanghai)
-Responsible actor: `/root` for the approved Claude-Code-like TUI/CLI parity design; implementation planning is pending and no provider, deployment, or pipeline operation was performed.
+Last updated: 2026-08-10 13:31:00 (Asia/Shanghai)
+Responsible actor: `/root` for the approved Claude-Code-like TUI/CLI parity plan; execution workflow selection is pending and no provider, deployment, or pipeline operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
 | Official OpenAI SDK chat adapter | implemented, review-repaired, offline verified, and integrated into `main` | design `b4b5a94`; plan `d3e34f6`; implementation `f7f2301`; repair `0fcd2af`; integrated tip `8e708e2`; `PLAN.md` OPENAI-SDK-LLM evidence | retain the offline regression gate; run a real provider smoke only with user-controlled credentials |
-| Claude-Code-like TUI/CLI parity | approved design; implementation pending | `docs/superpowers/specs/2026-08-10-613-coding-claude-code-parity-design.md`; brainstorming and scope evidence in `SPEC_PROCESS.md` and `AGENT_LOG.md` | write and approve the detailed implementation plan, then run TDD slices in an isolated worktree |
+| Claude-Code-like TUI/CLI parity | approved design and detailed plan; implementation pending | design `3a07f09`; plan `docs/superpowers/plans/2026-08-10-613-coding-claude-code-parity.md`; brainstorming/plan evidence in `SPEC_PROCESS.md` and `AGENT_LOG.md` | select Subagent-Driven or Inline execution, create the isolated worktree, then run TDD slices |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
 | Binary/wheel/sdist artifact builder | Docker-exported and runtime-smoked on main; CI/release configuration present | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08/TUI-09 evidence | push/tag when an operator wants remote CI artifacts or a GitHub release |

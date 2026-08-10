@@ -118,7 +118,9 @@ Every non-interactive output has `schema_version: 1` and redacts secrets before 
   details are included when `--verbose` is set.
 - `json` prints one `RunEnvelope` after execution. It includes session/run IDs, final status, stop
   reason, assistant text, changed files, validation evidence, approvals, feedback blockers, and
-  resource usage.
+  resource usage. When `--input-format stream-json` supplies multiple user messages, the one JSON
+  document is a `SessionEnvelope` with `schema_version`, `session_id`, and ordered `runs` entries,
+  each using the same `RunEnvelope` shape.
 - `stream-json` prints one JSON object per line using the shared `SessionEvent` envelope. Events
   have `event_id`, monotonically increasing `sequence`, `session_id`, `run_id`, `type`, UTC
   `timestamp`, and a redacted `data` object. The final event is always `run.completed` or
