@@ -49,7 +49,7 @@ class RootLaunchRequest:
     input_format: InputFormat
     output_format: OutputFormat
     model: str | None
-    permission_mode: PermissionMode
+    permission_mode: PermissionMode | None
     options: RunOptions
     verbose: bool
 
@@ -67,7 +67,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--input-format", choices=[item.value for item in InputFormat], default=InputFormat.TEXT.value)
     parser.add_argument("--output-format", choices=[item.value for item in OutputFormat], default=OutputFormat.TEXT.value)
     parser.add_argument("--model")
-    parser.add_argument("--permission-mode", choices=[item.value for item in PermissionMode], default=PermissionMode.BALANCED.value)
+    parser.add_argument("--permission-mode", choices=[item.value for item in PermissionMode])
     parser.add_argument("--allowed-tools", "--allowedTools", action="append", default=[])
     parser.add_argument("--disallowed-tools", "--disallowedTools", action="append", default=[])
     parser.add_argument("--max-turns", type=int)
@@ -143,7 +143,11 @@ def parse_root_args(argv: Sequence[str]) -> RootLaunchRequest:
         input_format=InputFormat(namespace.input_format),
         output_format=OutputFormat(namespace.output_format),
         model=namespace.model,
-        permission_mode=PermissionMode(namespace.permission_mode),
+        permission_mode=(
+            PermissionMode(namespace.permission_mode)
+            if namespace.permission_mode is not None
+            else None
+        ),
         options=options,
         verbose=namespace.verbose,
     )

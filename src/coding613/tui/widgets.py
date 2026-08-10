@@ -35,12 +35,35 @@ class TaskComposer(TextArea):
             self.text = text
 
     def __init__(self, text: str = "") -> None:
+        self._history: tuple[str, ...] = ()
+        self._history_index = 0
+        self._draft = text
         super().__init__(
             text,
             id="task-composer",
             soft_wrap=True,
             show_line_numbers=False,
             tooltip="Task composer",
+        )
+
+    def set_history(self, entries: tuple[str, ...]) -> None:
+        self._history = tuple(entry for entry in entries if entry.strip())
+        self._history_index = len(self._history)
+
+    def history_previous(self) -> None:
+        if not self._history:
+            return
+        if self._history_index == len(self._history):
+            self._draft = self.text
+        self._history_index = max(0, self._history_index - 1)
+        self.load_text(self._history[self._history_index])
+
+    def history_next(self) -> None:
+        if not self._history or self._history_index >= len(self._history):
+            return
+        self._history_index += 1
+        self.load_text(
+            self._draft if self._history_index == len(self._history) else self._history[self._history_index]
         )
 
     def submit(self) -> None:

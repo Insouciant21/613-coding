@@ -13,11 +13,12 @@ from textual.widgets import Static
 
 from coding613.application.validation import ValidationResult
 from coding613.domain.actions import ToolCall
+from coding613.domain.conversation import RunOptions
 from coding613.domain.models import PermissionMode, RunState
 from coding613.ports.progress import ProgressKind, RunProgress
 from coding613.ports.tools import ToolResult
 
-from .commands import ParsedCommand, SlashCommand
+from .commands import CommandCatalog, ParsedCommand
 from .controller import TuiController
 from .renderers import (
     ApprovalView,
@@ -44,6 +45,8 @@ class CodingApp(App[None]):
     ] = [
         Binding("enter", "submit_task", "Submit", priority=True),
         Binding("ctrl+j", "insert_newline", "New line", show=False, priority=True),
+        Binding("up", "history_previous", "Previous prompt", show=False, priority=True),
+        Binding("down", "history_next", "Next prompt", show=False, priority=True),
         Binding("escape", "pause_run", "Pause", priority=True),
         Binding("ctrl+c", "confirm_exit", "Pause / exit", show=False, priority=True),
         Binding("ctrl+q", "quit", "Quit", priority=True),
@@ -59,6 +62,7 @@ class CodingApp(App[None]):
         initial_task: str | None = None,
         resume: str | None = None,
         permission_mode: PermissionMode = PermissionMode.BALANCED,
+        options: RunOptions | None = None,
     ) -> None:
         super().__init__()
         self.services = services
@@ -68,11 +72,14 @@ class CodingApp(App[None]):
         self.initial_task = initial_task
         self.resume = resume
         self.permission_mode = permission_mode
+        self.options = options
+        self.command_catalog = CommandCatalog.default()
         self._drafts: dict[UUID, str] = {}
         self._assistants: dict[UUID, AssistantMessage] = {}
         self._entries: set[tuple[str, UUID]] = set()
         self._tool_widgets: dict[str, DetailMessage] = {}
         self._tool_calls: dict[str, ToolCall] = {}
+        self._tool_keys_by_name: dict[str, list[str]] = {}
         self._validation_widget: Static | None = None
         self._approval_id: UUID | None = None
         self._pending_user: UserMessage | None = None
@@ -101,6 +108,12 @@ class CodingApp(App[None]):
     def action_insert_newline(self) -> None:
         self.query_one(TaskComposer).insert("\n")
 
+    def action_history_previous(self) -> None:
+        self.query_one(TaskComposer).history_previous()
+
+    def action_history_next(self) -> None:
+        self.query_one(TaskComposer).history_next()
+
     def action_pause_run(self) -> None:
         if self.controller is not None and self.controller.active_run_id is not None:
             self.run_worker(self._pause_run(), group="pause")
@@ -125,7 +138,7 @@ class CodingApp(App[None]):
 
     async def _handle_command(self, text: str) -> None:
         try:
-            command = SlashCommand.parse(text)
+            command = self.command_catalog.parse(text)
             await self._execute_command(command)
         except Exception as error:
             await self.query_one(ConversationLog).mount(render_error(error))
@@ -135,10 +148,18 @@ class CodingApp(App[None]):
             return
         log = self.query_one(ConversationLog)
         if command.name == "help":
-            await log.mount(Static("/help /model /permissions /resume /runs /clear /quit"))
+            await log.mount(Static(self.command_catalog.help(command.arguments[0] if command.arguments else None)))
         elif command.name == "model":
             metadata = getattr(self.services, "llm_metadata", None)
-            if metadata is None:
+            if command.arguments:
+                if self.options is None:
+                    from coding613.domain.conversation import RunOptions
+
+                    self.options = RunOptions(model=command.arguments[0])
+                else:
+                    self.options = self.options.model_copy(update={"model": command.arguments[0]})
+                await log.mount(Static(f"Model selected: {command.arguments[0]}"))
+            elif metadata is None:
                 await log.mount(Static("Model: not configured"))
             else:
                 await log.mount(
@@ -147,11 +168,19 @@ class CodingApp(App[None]):
                     )
                 )
         elif command.name == "permissions":
-            if command.arguments:
+            if command.arguments and command.arguments[0] in {
+                "strict",
+                "balanced",
+                "autonomous",
+            }:
                 self.permission_mode = PermissionMode(command.arguments[0])
-            self.query_one(StatusFooter).update(
-                f"613 Coding  |  {self.permission_mode.value}  |  ready"
-            )
+                self.query_one(StatusFooter).update(
+                    f"613 Coding  |  {self.permission_mode.value}  |  ready"
+                )
+            else:
+                await log.mount(
+                    Static("Permission rules are application-managed; use /permissions list")
+                )
         elif command.name == "runs":
             snapshot = await self.controller.snapshot()
             lines = [f"{run.id}  {run.state.value}  {run.task}" for run in snapshot.runs]
@@ -162,6 +191,33 @@ class CodingApp(App[None]):
         elif command.name == "clear":
             snapshot = await self.controller.clear()
             await self._render_snapshot(snapshot, clear=True)
+        elif command.name == "status":
+            summary = self.controller.last_summary
+            status = summary.status.value if summary is not None else "idle"
+            await log.mount(Static(f"Status: {status}; active_run={self.controller.active_run_id or 'none'}"))
+        elif command.name == "cost":
+            summary = self.controller.last_summary
+            if summary is None:
+                await log.mount(Static("Cost: no run yet"))
+            else:
+                await log.mount(Static(f"Resource usage: {summary.resource_usage.model_dump(mode='json')}"))
+        elif command.name in {"context", "compact", "doctor"}:
+            method_name = {
+                "context": "context_report",
+                "compact": "compact",
+                "doctor": "diagnostics",
+            }[command.name]
+            method = getattr(self.controller, method_name, None)
+            if method is None:
+                await log.mount(Static(f"/{command.name} is not available in this service bundle"))
+            else:
+                result = await method()
+                display = (
+                    result.model_dump_json()
+                    if hasattr(result, "model_dump_json")
+                    else str(result)
+                )
+                await log.mount(Static(display))
         elif command.name == "quit":
             await self.action_quit()
 
@@ -183,7 +239,11 @@ class CodingApp(App[None]):
         await self.query_one(ConversationLog).mount(pending)
         self.query_one(ActiveOperation).update("Starting run")
         try:
-            snapshot = await self.controller.submit(message, self._permission_mode)
+            snapshot = await self.controller.submit(
+                message,
+                self._permission_mode,
+                self.options,
+            )
             await self._render_snapshot(snapshot)
             self.controller.drain_progress()
         except Exception as error:
@@ -264,22 +324,27 @@ class CodingApp(App[None]):
                 self.query_one(ActiveOperation).update(str(state))
             elif update.kind is ProgressKind.TOOL_STARTED:
                 name = str(update.payload.get("tool", "tool"))
+                key = str(update.payload.get("tool_call_id") or f"{name}:{len(self._tool_widgets)}")
                 tool_widget = render_tool_call(
                     ToolCall(name=name, arguments=dict(update.payload.get("arguments", {})))
                 )
-                self._tool_widgets[name] = tool_widget
-                self._tool_calls[name] = ToolCall(
+                self._tool_widgets[key] = tool_widget
+                self._tool_calls[key] = ToolCall(
                     name=name, arguments=dict(update.payload.get("arguments", {}))
                 )
+                self._tool_keys_by_name.setdefault(name, []).append(key)
                 await log.mount(tool_widget)
                 self.query_one(ActiveOperation).update(f"Running {name}")
             elif update.kind is ProgressKind.TOOL_FINISHED:
                 name = str(update.payload.get("tool", "tool"))
-                finished_widget = self._tool_widgets.get(name)
+                key = str(update.payload.get("tool_call_id", ""))
+                if not key:
+                    key = self._tool_keys_by_name.get(name, [""])[-1]
+                finished_widget = self._tool_widgets.get(key)
                 if finished_widget is not None:
                     success = bool(update.payload.get("success", False))
                     call = self._tool_calls.get(
-                        name, ToolCall(name=name, arguments={})
+                        key, ToolCall(name=name, arguments={})
                     )
                     result = render_tool_result(
                         ToolResult(
@@ -321,6 +386,9 @@ class CodingApp(App[None]):
             self._entries.clear()
             self._assistants.clear()
             self._drafts.clear()
+            self._tool_widgets.clear()
+            self._tool_calls.clear()
+            self._tool_keys_by_name.clear()
         for entry in snapshot.transcript:
             key = (entry.role, entry.run_id)
             if key in self._entries:
@@ -342,6 +410,10 @@ class CodingApp(App[None]):
                 user_widget = UserMessage(entry.text)
                 await log.mount(user_widget)
             self._entries.add(key)
+        composer = self.query_one(TaskComposer)
+        composer.set_history(
+            tuple(entry.text for entry in snapshot.transcript if entry.role == "user")
+        )
         for approval_view in list(log.query(ApprovalView)):
             await approval_view.remove()
         self._approval_id = None

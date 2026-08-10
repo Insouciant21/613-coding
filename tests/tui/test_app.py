@@ -224,6 +224,24 @@ async def test_tui_shell_focuses_composer_and_inserts_initial_task() -> None:
 
 
 @pytest.mark.asyncio
+async def test_tui_history_restores_previous_prompt_without_submitting() -> None:
+    fake = FakeUiServices()
+    app = CodingApp(controller=_controller(fake))
+    async with app.run_test(size=(80, 24)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("first")
+        await pilot.press("enter")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if fake.runs and fake.runs[-1].state is RunState.COMPLETED:
+                break
+        before = len(fake.runs)
+        await pilot.press("up")
+        assert composer.text == "first"
+        assert len(fake.runs) == before
+
+
+@pytest.mark.asyncio
 async def test_tui_shell_stays_stable_in_narrow_terminal() -> None:
     app = CodingApp()
     async with app.run_test(size=(60, 20)) as pilot:
@@ -254,6 +272,59 @@ async def test_tui_submits_in_background_and_replaces_streamed_draft_once() -> N
         assert len(assistants) == 1
         assert assistants[0].markdown_text == "hello"
         assert app.query_one(ActiveOperation).renderable == "Idle"
+
+
+@pytest.mark.asyncio
+async def test_tui_tracks_repeated_tool_names_by_call_id() -> None:
+    app = CodingApp()
+    async with app.run_test(size=(80, 24)):
+        run_id = uuid4()
+        await app._render_progress(
+            (
+                RunProgress(
+                    run_id=run_id,
+                    kind=ProgressKind.TOOL_STARTED,
+                    payload={
+                        "tool_call_id": "call-1",
+                        "tool": "read_file",
+                        "arguments": {"path": "one.txt"},
+                    },
+                ),
+                RunProgress(
+                    run_id=run_id,
+                    kind=ProgressKind.TOOL_STARTED,
+                    payload={
+                        "tool_call_id": "call-2",
+                        "tool": "read_file",
+                        "arguments": {"path": "two.txt"},
+                    },
+                ),
+                RunProgress(
+                    run_id=run_id,
+                    kind=ProgressKind.TOOL_FINISHED,
+                    payload={
+                        "tool_call_id": "call-1",
+                        "tool": "read_file",
+                        "success": True,
+                        "output": "one",
+                    },
+                ),
+                RunProgress(
+                    run_id=run_id,
+                    kind=ProgressKind.TOOL_FINISHED,
+                    payload={
+                        "tool_call_id": "call-2",
+                        "tool": "read_file",
+                        "success": True,
+                        "output": "two",
+                    },
+                ),
+            )
+        )
+        details = [item.display_text for item in app.query(DetailMessage)]
+        assert len(details) == 2
+        assert any("one" in item for item in details)
+        assert any("two" in item for item in details)
 
 
 @pytest.mark.asyncio

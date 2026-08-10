@@ -7,6 +7,8 @@ from collections.abc import Sequence
 
 import click
 
+from coding613.domain.models import PermissionMode
+
 from .main import app
 from .prompt import parse_root_args, run_print
 from .tui import TuiLaunchRequest, launch_tui
@@ -77,7 +79,7 @@ def dispatch(argv: Sequence[str]) -> int:
             repo=request.repo,
             initial_task=request.prompt,
             resume=request.resume,
-            permission_mode=request.permission_mode,
+            permission_mode=request.permission_mode or PermissionMode.BALANCED,
             options=request.options,
         )
     )

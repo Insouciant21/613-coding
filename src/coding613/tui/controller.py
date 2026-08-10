@@ -10,6 +10,7 @@ from uuid import UUID
 from coding613.application.events import ProgressEventBridge, SequencedEventSink
 from coding613.application.interactive import InteractiveSnapshot
 from coding613.application.progress import CancellationToken
+from coding613.domain.conversation import RunOptions
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import ApprovalRequest, PermissionMode, RunState, RunSummary
 from coding613.domain.session_events import SessionEvent
@@ -25,6 +26,7 @@ class InteractiveService(Protocol):
         session_id: UUID,
         message: str,
         permission_mode: PermissionMode | None = None,
+        options: RunOptions | None = None,
     ) -> Any: ...
 
     def execute(
@@ -85,18 +87,30 @@ class TuiController:
         self.last_summary: RunSummary | None = None
 
     async def submit(
-        self, message: str, permission_mode: PermissionMode | None = None
+        self,
+        message: str,
+        permission_mode: PermissionMode | None = None,
+        options: RunOptions | None = None,
     ) -> InteractiveSnapshot:
         async with self._execution_lock:
             if self._session_id is None:
                 session = await asyncio.to_thread(self._interactive.create)
                 self._session_id = session.id
-            run = await asyncio.to_thread(
-                self._interactive.submit,
-                self._session_id,
-                message,
-                permission_mode,
-            )
+            if options is None or options == RunOptions():
+                run = await asyncio.to_thread(
+                    self._interactive.submit,
+                    self._session_id,
+                    message,
+                    permission_mode,
+                )
+            else:
+                run = await asyncio.to_thread(
+                    self._interactive.submit,
+                    self._session_id,
+                    message,
+                    permission_mode,
+                    options,
+                )
             self.active_run_id = run.id
             self._pause_requested_for = None
             self._cancellation.reset()

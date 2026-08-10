@@ -10,7 +10,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import ValidationError
 
@@ -1015,6 +1015,7 @@ class AgentLoop:
         policy_decision: PolicyDecisionEvidence,
         approval_update: ApprovalRequest | None = None,
     ) -> bool:
+        tool_call_id = str(uuid4())
         context = ToolContext(
             run_id=run_id,
             repository_root=dependencies.policy_config.repository_root,
@@ -1025,6 +1026,7 @@ class AgentLoop:
             ProgressKind.TOOL_STARTED,
             dependencies,
             payload={
+                "tool_call_id": tool_call_id,
                 "tool": call.name,
                 "arguments": redact_payload(call.arguments),
             },
@@ -1081,6 +1083,7 @@ class AgentLoop:
             ProgressKind.TOOL_FINISHED,
             dependencies,
             payload={
+                "tool_call_id": tool_call_id,
                 "tool": call.name,
                 "success": tool_result.success,
                 "output": _progress_text(tool_result.output),

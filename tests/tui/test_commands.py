@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from coding613.tui.commands import SlashCommand
+from coding613.tui.commands import CommandCatalog, SlashCommand
 
 
 @pytest.mark.parametrize(
@@ -38,3 +38,24 @@ def test_slash_command_parses_supported_commands(text, name, arguments) -> None:
 def test_slash_command_rejects_invalid_input(text: str) -> None:
     with pytest.raises(ValueError):
         SlashCommand.parse(text)
+
+
+def test_catalog_lists_and_parses_all_commands() -> None:
+    catalog = CommandCatalog.default()
+    assert {
+        "help",
+        "clear",
+        "compact",
+        "context",
+        "cost",
+        "doctor",
+        "model",
+        "permissions",
+        "resume",
+        "runs",
+        "status",
+        "quit",
+    } <= set(catalog.names())
+    assert catalog.parse("/resume latest").arguments == ("latest",)
+    with pytest.raises(ValueError, match="unknown slash command"):
+        catalog.parse("/not-a-command")
