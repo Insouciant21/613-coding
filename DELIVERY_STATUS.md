@@ -1,6 +1,6 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 14:50:00 (Asia/Shanghai)
+Last updated: 2026-08-10 14:56:00 (Asia/Shanghai)
 Responsible actor: `/root` for the approved Claude-Code-like TUI/CLI parity plan; implementation is verified in isolated worktree branch `feature/claude-code-parity`. No provider, deployment, or pipeline operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
@@ -512,7 +512,7 @@ Every completed plan task must link a commit and fresh verification output here.
 ## Claude-Code-Parity Task 7 Evidence
 
 - Verification timestamp: 2026-08-10 14:50:00 Asia/Shanghai.
-- Commits: `fd8871e` (`feat: align tui and cli conversation workflow`) and `f27dba6` (documentation and evidence updates).
+- Commits: `fd8871e` (`feat: align tui and cli conversation workflow`), `f27dba6` (documentation and evidence updates), and `aefde6e` (final references).
 - TDD/verification: focused RED/GREEN contracts cover documentation, shared TUI/CLI request delegation, follow-up after resume, escaped slash prompts, lifecycle/diagnostic stream events, invalid selectors, active-run prevention, and prompt redaction. `uv run pytest -q --ignore=tmp` passed `460`; Ruff, mypy across 102 source files, `uv lock --check`, and `git diff --check` passed.
 - Smoke/review: `uv run 613-coding --help` returned 0. Provider-unconfigured print and verbose stream smokes returned documented exit code 4 with versioned redacted output. Independent review agents disconnected before returning reports; local spec/security/type review found no unresolved Critical issue, and no independent pass is claimed.
 - Boundary: the TUI compatibility adapter and print CLI share `ConversationService`; SQLite remains authoritative, active runs are not duplicated, and MCP remains an injectable future boundary. Main-worktree user changes and untracked files were not staged.

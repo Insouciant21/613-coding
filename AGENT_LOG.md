@@ -1162,3 +1162,16 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Lesson: root CLI/TUI parity requires a single conversation boundary plus a compatibility adapter;
   stream diagnostics must be events rather than an unversioned preamble, and active-session guards
   prevent a resume prompt from silently creating overlapping runs.
+
+### 2026-08-10 14:56:00 Asia/Shanghai - Claude-Code parity handoff verification
+
+- Task: verify the committed handoff state after the evidence-reference commit `aefde6e`.
+- Verification: clean isolated worktree on `feature/claude-code-parity` passed `uv run pytest -q
+  --ignore=tmp` (`460 passed`), `uv run ruff check .`, `uv run mypy src` (`102` files), `uv lock
+  --check`, and `git diff --check`. The branch is clean. The main worktree still contains only its
+  pre-existing user-owned modified context/loop/domain/test paths and untracked `.claude/`, course
+  documents, and `tmp/`.
+- Human intervention: no merge, push, provider call, credential access, deployment, or CI operation
+  was performed; integration remains a user choice under `finishing-a-development-branch`.
+- Lesson: final evidence must be rerun from the exact committed tree and must report the untouched
+  main-worktree boundary explicitly.
