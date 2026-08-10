@@ -985,3 +985,16 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Evidence: `docs/superpowers/specs/2026-08-10-openai-sdk-llm-design.md` and the corresponding
   `SPEC_PROCESS.md` entry. No implementation or verification claim is made at this stage.
 - Design commit: `b4b5a94` (`docs: design OpenAI SDK LLM adapter`).
+
+### 2026-08-10 11:47:00 Asia/Shanghai - OpenAI SDK migration implementation plan
+
+- Task: turn the approved SDK design into a bite-sized TDD implementation plan; triggered
+  `writing-plans` and `verification-before-completion`.
+- Plan: four tasks cover dependency/client injection, synchronous Chat Completions mapping, SDK
+  streaming/cancellation/deadline/cleanup, and credentialed composition/docs/final verification.
+- Boundary: embedding remains on its existing HTTP adapter. The plan explicitly carries overlapping
+  adapter reliability edits forward and leaves unrelated context/loop/domain user edits outside
+  migration staging.
+- Self-review: placeholder scan, type/signature consistency, spec coverage, and `git diff --check`
+  passed. No implementation or test-pass claim is made.
+- Plan commit: `d3e34f6` (`docs: plan OpenAI SDK provider migration`).
