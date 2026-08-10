@@ -87,6 +87,20 @@ def test_openai_adapter_maps_sdk_request_and_tool_response() -> None:
     assert response.provider_metadata["tool_call_ids"] == ["call-1"]
 
 
+def test_openai_adapter_uses_context_model_override() -> None:
+    client = FakeSDKClient(completion=FakeCompletion(FakeMessage(content="ok")))
+    provider = OpenAICompatibleLLM(
+        base_url="https://provider.invalid/v1", model="configured-model", client=client
+    )
+
+    provider.complete(
+        ModelContext(run_id=uuid4(), task="task", metadata={"model": "gpt-test"}),
+        (),
+    )
+
+    assert client.chat.completions.calls[0]["model"] == "gpt-test"
+
+
 def test_openai_adapter_omits_local_schema_id_without_mutating_definition() -> None:
     client = FakeSDKClient(completion=FakeCompletion(FakeMessage(content="ok")))
     provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)

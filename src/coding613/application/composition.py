@@ -26,8 +26,9 @@ from coding613.adapters.storage.sqlite import SqliteEventStore
 from coding613.adapters.tools.repository import build_repository_tools
 from coding613.application.approvals import ApprovalService
 from coding613.application.budgets import BudgetLimits
-from coding613.application.context import ContextAssembler, SessionContextBuilder
+from coding613.application.context import ContextAssembler, ContextService, SessionContextBuilder
 from coding613.application.conversation import ConversationService
+from coding613.application.diagnostics import DiagnosticService, local_diagnostic_checks
 from coding613.application.feedback import FeedbackClassifier
 from coding613.application.interactive import InteractiveSessionService
 from coding613.application.loop import AgentLoop, LoopDependencies
@@ -92,12 +93,16 @@ class LocalServices:
         *,
         llm_metadata: LLMConfig | None,
         permission_mode: PermissionMode,
+        context: ContextService,
+        diagnostics: DiagnosticService,
     ) -> None:
         self.run_service = run_service
         self._events = events
         self.interactive = interactive
         self.llm_metadata = llm_metadata
         self.permission_mode = permission_mode
+        self.context = context
+        self.diagnostics = diagnostics
         self.permission_rules = PermissionRuleService(self.run_service.project.id, self._events)
         self.conversation = ConversationService(
             self.run_service.project.id,
@@ -130,6 +135,7 @@ def build_services(
     memory = MemoryRepository(store.path)
     index = LanceMemoryIndex(state_root / "vectors", dimension=8)
     context = SessionContextBuilder(ContextAssembler(memory, index, embedding), store)
+    context_service = ContextService(store)
     policy = PolicyEngine()
     if provider is None and config.llm is not None:
         store_for_credentials = credential_store or KeyringCredentialStore()
@@ -190,6 +196,14 @@ def build_services(
         interactive,
         llm_metadata=config.llm,
         permission_mode=config.permission_mode,
+        context=context_service,
+        diagnostics=DiagnosticService(
+            local_diagnostic_checks(
+                root,
+                state_root,
+                provider_configured=config.llm is not None,
+            )
+        ),
     )
 
 

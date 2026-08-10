@@ -171,6 +171,12 @@ def run_print(
             prompts = parse_stream_json_input(input_stream)
         services = services_factory(request.repo)
         project_id = services.run_service.project.id
+        if request.verbose:
+            diagnostics = getattr(services, "diagnostics", None)
+            if diagnostics is not None:
+                print(
+                    diagnostics.run(project_id).model_dump_json(), file=output_stream
+                )
         events_by_run: list[tuple[RunEnvelope, tuple[SessionEvent, ...]]] = []
         session_id = _resume_session_id(request.resume)
         for index, prompt in enumerate(prompts):

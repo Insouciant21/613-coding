@@ -14,6 +14,7 @@ from coding613.application.context import ContextAssembler, SessionContextBuilde
 from coding613.domain.events import Event
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import MemoryEntry, MemoryType, Project, Run
+from coding613.domain.options import RunOptions
 
 
 class RecordingEmbedding:
@@ -179,6 +180,33 @@ def test_session_context_bounds_and_redacts_prior_transcript(tmp_path: Path) -> 
     assert all("sk-test-secret-1234" not in message.content for message in transcript)
     assert any(message.content == "Omitted 1 earlier transcript entries." for message in context.messages)
     assert context.messages[-1].content == "current task"
+
+
+def test_session_context_merges_run_system_prompts_and_model_metadata(tmp_path: Path) -> None:
+    repository, project, _, _, _ = setup_memory(tmp_path)
+    store = SqliteEventStore(repository.path)
+    session = InteractiveSession(project_id=project.id)
+    store.create_interactive_session(session)
+    run = Run(
+        project_id=project.id,
+        session_id=session.id,
+        task="current",
+        options=RunOptions(
+            model="gpt-test",
+            system_prompt="Use this repository convention.",
+            append_system_prompt="Do not expose sk-test-secret-1234.",
+        ),
+    )
+    store.create_run(run)
+    builder = SessionContextBuilder(
+        ContextAssembler(repository, FakeIndex(), RecordingEmbedding()), store
+    )
+
+    context = builder.build(run.id, run.task, ())
+
+    assert context.metadata["model"] == "gpt-test"
+    assert any("Use this repository convention." in message.content for message in context.messages)
+    assert all("sk-test-secret-1234" not in message.content for message in context.messages)
 
 
 def test_openai_compatible_embedding_maps_single_request() -> None:

@@ -10,7 +10,7 @@ from uuid import UUID
 from coding613.application.events import ProgressEventBridge, SequencedEventSink
 from coding613.application.interactive import InteractiveSnapshot
 from coding613.application.progress import CancellationToken
-from coding613.domain.conversation import RunOptions
+from coding613.domain.conversation import ContextSummary, DiagnosticReport, RunOptions
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import ApprovalRequest, PermissionMode, RunState, RunSummary
 from coding613.domain.session_events import SessionEvent
@@ -53,6 +53,16 @@ class RunActions(Protocol):
     def get_summary(self, run_id: UUID) -> RunSummary: ...
 
 
+class ContextActions(Protocol):
+    def report(self, session_id: UUID) -> ContextSummary: ...
+
+    def compact(self, session_id: UUID) -> ContextSummary: ...
+
+
+class DiagnosticActions(Protocol):
+    def run(self, project_id: UUID) -> DiagnosticReport: ...
+
+
 class QueueProgressSink:
     def __init__(self, queue: SimpleQueue[RunProgress]) -> None:
         self._queue = queue
@@ -70,9 +80,19 @@ class QueueEventSink:
 
 
 class TuiController:
-    def __init__(self, interactive: InteractiveService, runs: RunActions) -> None:
+    def __init__(
+        self,
+        interactive: InteractiveService,
+        runs: RunActions,
+        context: ContextActions | None = None,
+        diagnostics: DiagnosticActions | None = None,
+        project_id: UUID | None = None,
+    ) -> None:
         self._interactive = interactive
         self._runs = runs
+        self._context = context
+        self._diagnostics = diagnostics
+        self._project_id = project_id
         self._queue: SimpleQueue[RunProgress] = SimpleQueue()
         self._sink = QueueProgressSink(self._queue)
         self._event_queue: SimpleQueue[SessionEvent] = SimpleQueue()
@@ -206,6 +226,27 @@ class TuiController:
         )
         return self._snapshot
 
+    async def context_report(self) -> ContextSummary:
+        if self._context is None:
+            raise RuntimeError("context service is unavailable")
+        session_id = await self._ensure_session()
+        return await asyncio.to_thread(self._context.report, session_id)
+
+    async def compact(self) -> ContextSummary:
+        if self._context is None:
+            raise RuntimeError("context service is unavailable")
+        session_id = await self._ensure_session()
+        return await asyncio.to_thread(self._context.compact, session_id)
+
+    async def diagnostics(self) -> DiagnosticReport:
+        if self._diagnostics is None:
+            raise RuntimeError("diagnostic service is unavailable")
+        project_id = self._project_id
+        if project_id is None:
+            snapshot = await self.snapshot()
+            project_id = snapshot.session.project_id
+        return await asyncio.to_thread(self._diagnostics.run, project_id)
+
     def drain_progress(self) -> tuple[RunProgress, ...]:
         updates: list[RunProgress] = []
         while True:
@@ -241,6 +282,13 @@ class TuiController:
             self._interactive.resume_session, self._session_id
         )
         return self._snapshot
+
+    async def _ensure_session(self) -> UUID:
+        if self._session_id is None:
+            await self.snapshot()
+        if self._session_id is None:
+            raise RuntimeError("interactive session is unavailable")
+        return self._session_id
 
     def _progress_bridge(self, run_id: UUID) -> ProgressSink:
         if self._session_id is None:

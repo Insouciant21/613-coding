@@ -22,6 +22,7 @@ from openai import (
 
 from coding613.application.progress import ProviderCancelledError
 from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
+from coding613.domain.redaction import redact_text
 from coding613.ports.llm import LLMResponse, ModelContext, ToolDefinition
 
 
@@ -79,7 +80,7 @@ class OpenAICompatibleLLM:
     ) -> LLMResponse:
         try:
             completion = self._client.chat.completions.create(
-                model=self._model,
+                model=self._model_for(context),
                 messages=self._messages(context),
                 tools=[self._tool_payload(tool) for tool in tools],
             )
@@ -105,7 +106,7 @@ class OpenAICompatibleLLM:
             if cancelled():
                 raise ProviderCancelledError("provider stream was cancelled")
             stream = self._client.chat.completions.create(
-                model=self._model,
+                model=self._model_for(context),
                 messages=self._messages(context),
                 tools=[self._tool_payload(tool) for tool in tools],
                 stream=True,
@@ -230,14 +231,35 @@ class OpenAICompatibleLLM:
             return error
         return None
 
+    def _model_for(self, context: ModelContext) -> str:
+        override = context.metadata.get("model")
+        if isinstance(override, str) and 0 < len(override.strip()) <= 256:
+            return override.strip()
+        return self._model
+
     @staticmethod
     def _messages(context: ModelContext) -> list[dict[str, str]]:
-        if context.messages:
-            return [
-                {"role": message.role, "content": message.content}
-                for message in context.messages
-            ]
-        return [{"role": "user", "content": context.task}]
+        messages = [
+            {"role": message.role, "content": message.content}
+            for message in context.messages
+        ] or [{"role": "user", "content": context.task}]
+        prompt_messages: list[dict[str, str]] = []
+        for key in ("system_prompt", "append_system_prompt"):
+            value = context.metadata.get(key)
+            if isinstance(value, str) and value.strip():
+                safe = redact_text(value)
+                if not any(
+                    message["role"] == "system" and message["content"] == safe
+                    for message in messages
+                ):
+                    prompt_messages.append({"role": "system", "content": safe})
+        if prompt_messages:
+            insert_at = next(
+                (index for index, message in enumerate(messages) if message["role"] != "system"),
+                len(messages),
+            )
+            messages[insert_at:insert_at] = prompt_messages
+        return messages
 
     @staticmethod
     def _tool_payload(tool: ToolDefinition) -> dict[str, Any]:

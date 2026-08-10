@@ -25,6 +25,7 @@ from coding613.domain.models import (
     StopReason,
 )
 from coding613.domain.permissions import PermissionRule
+from coding613.domain.redaction import redact_text
 
 
 class SqliteEventStore:
@@ -282,6 +283,47 @@ class SqliteEventStore:
                 """,
                 (str(project_id), rule.scope, rule.pattern),
             )
+
+    def save_context_summary(
+        self, session_id: UUID, revision: str, text: str, created_at: datetime
+    ) -> None:
+        with self._transaction() as connection:
+            connection.execute(
+                """
+                INSERT INTO context_summaries (session_id, revision, summary_text, created_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    revision = excluded.revision,
+                    summary_text = excluded.summary_text,
+                    created_at = excluded.created_at
+                """,
+                (
+                    str(session_id),
+                    revision,
+                    redact_text(text),
+                    self._serialize_datetime(created_at),
+                ),
+            )
+
+    def get_context_summary(
+        self, session_id: UUID
+    ) -> tuple[str, str, datetime] | None:
+        with self._transaction() as connection:
+            row = connection.execute(
+                """
+                SELECT revision, summary_text, created_at
+                FROM context_summaries
+                WHERE session_id = ?
+                """,
+                (str(session_id),),
+            ).fetchone()
+        if row is None:
+            return None
+        return (
+            row["revision"],
+            row["summary_text"],
+            self._parse_datetime(row["created_at"]),
+        )
 
     def get_run(self, run_id: UUID) -> Run | None:
         with self._transaction() as connection:

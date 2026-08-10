@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 
 from coding613.application.interactive import InteractiveSnapshot, TranscriptEntry
+from coding613.domain.conversation import ContextSummary, DiagnosticCheck, DiagnosticReport
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import PermissionMode, Run, RunState, RunSummary, StopReason
 from coding613.domain.session_events import EventType
@@ -83,6 +84,37 @@ class FakeRuns:
 
     def get_summary(self, run_id):
         return self.summaries[run_id]
+
+
+class FakeContext:
+    def __init__(self, session_id):
+        self.session_id = session_id
+        self.report_calls = []
+        self.compact_calls = []
+
+    def report(self, session_id):
+        self.report_calls.append(session_id)
+        return ContextSummary(
+            summary_revision="report",
+            estimated_tokens=3,
+            max_tokens=100,
+        )
+
+    def compact(self, session_id):
+        self.compact_calls.append(session_id)
+        return ContextSummary(
+            summary_revision="compact",
+            estimated_tokens=2,
+            max_tokens=100,
+        )
+
+
+class FakeDiagnostics:
+    def run(self, project_id):
+        return DiagnosticReport(
+            project_id=project_id,
+            checks=(DiagnosticCheck(name="provider", status="pass", detail="ready"),),
+        )
 
 
 @pytest.mark.asyncio
@@ -171,3 +203,28 @@ async def test_controller_resume_reconstructs_pending_approval_summary() -> None
     assert controller.last_summary is not None
     assert controller.last_summary.approvals == (approval_id,)
     assert interactive.execute_calls == []
+
+
+@pytest.mark.asyncio
+async def test_controller_exposes_context_and_diagnostic_services() -> None:
+    interactive = FakeInteractive()
+    runs = FakeRuns()
+    context = FakeContext(interactive.session.id)
+    diagnostics = FakeDiagnostics()
+    controller = TuiController(
+        interactive,
+        runs,
+        context=context,
+        diagnostics=diagnostics,
+    )
+
+    report = await controller.context_report()
+    compacted = await controller.compact()
+    diagnostic_report = await controller.diagnostics()
+
+    assert report.summary_revision == "report"
+    assert compacted.summary_revision == "compact"
+    assert context.report_calls == [interactive.session.id]
+    assert context.compact_calls == [interactive.session.id]
+    assert diagnostic_report.checks[0].name == "provider"
+    assert diagnostic_report.project_id == interactive.session.project_id

@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID
 
 from coding613.adapters.storage.lancedb_index import MemoryQuery, VectorHit
 from coding613.adapters.storage.memory import MemoryRepository
 from coding613.application.interactive import InteractiveStore, transcript_for_runs
+from coding613.domain.conversation import ContextSummary
 from coding613.domain.events import Event
 from coding613.domain.models import MemoryEntry, Run
+from coding613.domain.options import RunOptions
 from coding613.domain.redaction import redact_text
+from coding613.ports.context import ContextCompactor, ContextSummaryStore, TranscriptSource
 from coding613.ports.embeddings import EmbeddingProvider
 from coding613.ports.llm import ModelContext, ModelMessage
 
@@ -111,8 +116,110 @@ class ContextAssembler:
         return permitted[: self._max_memories]
 
 
-class SessionContextStore(InteractiveStore, Protocol):
+class SessionContextStore(InteractiveStore, ContextSummaryStore, Protocol):
     def get_run(self, run_id: UUID) -> Run | None: ...
+
+
+class DeterministicContextCompactor:
+    """Small deterministic compactor used when no model-backed compactor is injected."""
+
+    def compact(self, transcript: tuple[TranscriptSource, ...], max_chars: int) -> str:
+        if max_chars < 1:
+            raise ValueError("max_chars must be positive")
+        lines = [f"{entry.role}: {redact_text(entry.text)}" for entry in transcript]
+        return "\n".join(lines)[-max_chars:]
+
+
+class ContextService:
+    """Account for and persist context summaries without mutating transcripts."""
+
+    def __init__(
+        self,
+        store: SessionContextStore,
+        *,
+        compactor: ContextCompactor | None = None,
+        max_entries: int = 12,
+        max_chars: int = 12_000,
+    ) -> None:
+        if min(max_entries, max_chars) < 1:
+            raise ValueError("context bounds must be positive")
+        self._store = store
+        self._compactor = compactor or DeterministicContextCompactor()
+        self._max_entries = max_entries
+        self._max_chars = max_chars
+
+    def report(self, session_id: UUID) -> ContextSummary:
+        entries = self._entries(session_id)
+        included, omitted = self._select(entries)
+        text = self._render(included)
+        return self._persist(session_id, text, included, omitted)
+
+    def compact(self, session_id: UUID) -> ContextSummary:
+        entries = self._entries(session_id)
+        compacted = redact_text(self._compactor.compact(tuple(entries), self._max_chars))
+        if not compacted.strip():
+            raise ValueError("context compactor returned empty text")
+        included = entries[-self._max_entries :]
+        omitted = entries[: max(0, len(entries) - len(included))]
+        return self._persist(session_id, compacted, included, omitted)
+
+    def _entries(self, session_id: UUID) -> list[TranscriptSource]:
+        session = self._store.get_interactive_session(session_id)
+        if session is None:
+            raise KeyError(f"unknown interactive session: {session_id}")
+        runs = self._store.list_runs_for_session(session.id)
+        return [entry for entry in transcript_for_runs(self._store, runs)]
+
+    def _select(
+        self, entries: list[TranscriptSource]
+    ) -> tuple[list[TranscriptSource], list[TranscriptSource]]:
+        selected: list[TranscriptSource] = []
+        remaining = self._max_chars
+        for entry in reversed(entries):
+            if len(selected) >= self._max_entries or remaining <= 0:
+                break
+            text = redact_text(entry.text)[:remaining]
+            if not text:
+                continue
+            selected.append(entry)
+            remaining -= len(text)
+        selected.reverse()
+        selected_ids = {id(entry) for entry in selected}
+        return selected, [entry for entry in entries if id(entry) not in selected_ids]
+
+    @staticmethod
+    def _render(entries: Sequence[TranscriptSource]) -> str:
+        return "\n".join(f"{entry.role}: {redact_text(entry.text)}" for entry in entries)
+
+    def _persist(
+        self,
+        session_id: UUID,
+        text: str,
+        included: Sequence[TranscriptSource],
+        omitted: Sequence[TranscriptSource],
+    ) -> ContextSummary:
+        safe_text = redact_text(text)
+        included_sources = tuple(self._source(entry) for entry in included)
+        omitted_sources = tuple(self._source(entry) for entry in omitted)
+        revision = hashlib.sha256(
+            (safe_text + "\0" + "\0".join(included_sources + omitted_sources)).encode(
+                "utf-8"
+            )
+        ).hexdigest()
+        self._store.save_context_summary(
+            session_id, revision, safe_text, datetime.now(UTC)
+        )
+        return ContextSummary(
+            summary_revision=revision,
+            included_sources=included_sources,
+            omitted_sources=omitted_sources,
+            estimated_tokens=(len(safe_text) + 3) // 4,
+            max_tokens=max(1, self._max_chars // 4),
+        )
+
+    @staticmethod
+    def _source(entry: TranscriptSource) -> str:
+        return f"{entry.role}:{entry.run_id}"
 
 
 class BaseContextBuilder(Protocol):
@@ -141,8 +248,13 @@ class SessionContextBuilder:
     ) -> ModelContext:
         context = self._base.build(run_id, task, recent_events)
         run = self._store.get_run(run_id)
-        if run is None or run.session_id is None:
+        if run is None:
             return context
+        if run.session_id is None:
+            metadata, messages = self._apply_options(
+                dict(context.metadata), list(context.messages), run.options
+            )
+            return context.model_copy(update={"messages": tuple(messages), "metadata": metadata})
         runs = self._store.list_runs_for_session(run.session_id)
         prior_runs = list(runs[: next((i for i, item in enumerate(runs) if item.id == run_id), len(runs))])
         entries = list(transcript_for_runs(self._store, prior_runs))
@@ -176,4 +288,31 @@ class SessionContextBuilder:
         messages[insert_at:insert_at] = history
         metadata = dict(context.metadata)
         metadata["omitted_transcript_entries"] = omitted
+        options = run.options
+        metadata, messages = self._apply_options(metadata, messages, options)
         return context.model_copy(update={"messages": tuple(messages), "metadata": metadata})
+
+    @staticmethod
+    def _apply_options(
+        metadata: dict[str, object],
+        messages: list[ModelMessage],
+        options: RunOptions,
+    ) -> tuple[dict[str, object], list[ModelMessage]]:
+        if options.model is not None:
+            metadata["model"] = options.model
+        prompt_messages: list[ModelMessage] = []
+        if options.system_prompt:
+            safe = redact_text(options.system_prompt)
+            metadata["system_prompt"] = safe
+            prompt_messages.append(ModelMessage(role="system", content=safe))
+        if options.append_system_prompt:
+            safe = redact_text(options.append_system_prompt)
+            metadata["append_system_prompt"] = safe
+            prompt_messages.append(ModelMessage(role="system", content=safe))
+        if prompt_messages:
+            insert_at = next(
+                (index for index, message in enumerate(messages) if message.role != "system"),
+                len(messages),
+            )
+            messages[insert_at:insert_at] = prompt_messages
+        return metadata, messages

@@ -69,7 +69,13 @@ class CodingApp(App[None]):
         self.services = services
         self.controller = controller
         if self.controller is None and services is not None:
-            self.controller = TuiController(services.interactive, services.run_service)
+            self.controller = TuiController(
+                services.interactive,
+                services.run_service,
+                context=getattr(services, "context", None),
+                diagnostics=getattr(services, "diagnostics", None),
+                project_id=services.run_service.project.id,
+            )
         self.initial_task = initial_task
         self.resume = resume
         self.permission_mode = permission_mode

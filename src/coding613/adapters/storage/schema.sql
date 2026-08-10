@@ -109,6 +109,13 @@ CREATE TABLE IF NOT EXISTS permission_rules (
 CREATE INDEX IF NOT EXISTS idx_permission_rules_project_scope
     ON permission_rules(project_id, scope, pattern);
 
+CREATE TABLE IF NOT EXISTS context_summaries (
+    session_id TEXT PRIMARY KEY REFERENCES interactive_sessions(id) ON DELETE CASCADE,
+    revision TEXT NOT NULL,
+    summary_text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS embedding_status (
     memory_id TEXT PRIMARY KEY REFERENCES memory_entries(id) ON DELETE CASCADE,
     status TEXT NOT NULL,
