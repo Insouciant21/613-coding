@@ -79,16 +79,22 @@ class CredentialedOpenAICompatibleLLM:
         return delegate
 
     def _build_delegate(self) -> OpenAICompatibleLLM:
+        client: SDKClient | None = None
         try:
             secret = self._read_secret(self._provider)
             if not secret:
                 raise ValueError("empty credential")
             client = self._client_factory(secret, self._base_url, self._timeout_seconds)
-        except Exception as error:
-            raise ProviderCredentialError("provider credential is unavailable") from error
-        return OpenAICompatibleLLM(
-            self._base_url,
-            self._model,
-            client,
-            timeout_seconds=self._timeout_seconds,
-        )
+            return OpenAICompatibleLLM(
+                self._base_url,
+                self._model,
+                client,
+                timeout_seconds=self._timeout_seconds,
+            )
+        except Exception:  # noqa: BLE001 - hide reader/factory details at the credential boundary
+            if client is not None:
+                try:
+                    client.close()
+                except Exception:  # noqa: BLE001 - cleanup cannot replace the generic error
+                    client = None
+            raise ProviderCredentialError("provider credential is unavailable") from None

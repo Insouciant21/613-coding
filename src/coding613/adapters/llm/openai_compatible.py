@@ -16,6 +16,7 @@ from openai import (
     APITimeoutError,
     AuthenticationError,
     OpenAIError,
+    PermissionDeniedError,
     RateLimitError,
 )
 
@@ -98,6 +99,8 @@ class OpenAICompatibleLLM:
         started_at = self._clock()
         stream: Any = None
         primary_error: BaseException | None = None
+        cleanup_errors: list[Exception] = []
+        stream_closed = [False]
         try:
             if cancelled():
                 raise ProviderCancelledError("provider stream was cancelled")
@@ -110,7 +113,9 @@ class OpenAICompatibleLLM:
             content_parts: dict[int, list[str]] = {}
             tool_calls: dict[int, dict[str, str]] = {}
             saw_chunk = False
-            for chunk in self._stream_chunks(stream, started_at, cancelled):
+            for chunk in self._stream_chunks(
+                stream, started_at, cancelled, stream_closed, cleanup_errors
+            ):
                 saw_chunk = True
                 self._accumulate_stream_chunk(chunk, content_parts, tool_calls, on_text_delta)
             self._check_stream_limits(started_at, cancelled)
@@ -146,14 +151,13 @@ class OpenAICompatibleLLM:
             primary_error = mapped
             raise mapped from error
         finally:
-            if stream is not None:
-                try:
-                    close = getattr(stream, "close", None)
-                    if callable(close):
-                        close()
-                except Exception as cleanup_error:
-                    if primary_error is None:
-                        raise ProviderHTTPError("provider stream cleanup failed") from cleanup_error
+            if stream is not None and not stream_closed[0]:
+                cleanup_error = self._close_stream(stream)
+                stream_closed[0] = True
+                if cleanup_error is not None:
+                    cleanup_errors.append(cleanup_error)
+            if cleanup_errors and primary_error is None:
+                raise ProviderHTTPError("provider stream cleanup failed") from cleanup_errors[0]
 
     def close(self) -> None:
         self._client.close()
@@ -171,6 +175,8 @@ class OpenAICompatibleLLM:
         stream: Any,
         started_at: float,
         cancelled: Callable[[], bool],
+        stream_closed: list[bool],
+        cleanup_errors: list[Exception],
     ) -> Iterator[Any]:
         events: Queue[tuple[str, Any]] = Queue()
 
@@ -205,7 +211,24 @@ class OpenAICompatibleLLM:
                     raise ProviderHTTPError("provider stream failed")
                 return
         finally:
+            cleanup_error = self._close_stream(stream)
+            stream_closed[0] = True
+            if cleanup_error is not None:
+                cleanup_errors.append(cleanup_error)
             producer.join(timeout=0.1)
+            if producer.is_alive():
+                cleanup_errors.append(RuntimeError("provider stream reader did not stop"))
+
+    @staticmethod
+    def _close_stream(stream: Any) -> Exception | None:
+        close = getattr(stream, "close", None)
+        if not callable(close):
+            return None
+        try:
+            close()
+        except Exception as error:  # noqa: BLE001 - normalize SDK cleanup failures
+            return error
+        return None
 
     @staticmethod
     def _messages(context: ModelContext) -> list[dict[str, str]]:
@@ -331,7 +354,7 @@ class OpenAICompatibleLLM:
                     raise ProviderResponseError("provider stream tool call type must be function")
                 function = cls._field(call, "function")
                 if function is None:
-                    function = object()
+                    function = {}
                 if not cls._is_object(function):
                     raise ProviderResponseError("provider stream tool call function must be an object")
                 call_id = cls._field(call, "id")
@@ -365,12 +388,18 @@ class OpenAICompatibleLLM:
 
     @staticmethod
     def _map_sdk_error(error: Exception) -> ProviderError:
-        if isinstance(error, AuthenticationError):
+        if isinstance(error, (AuthenticationError, PermissionDeniedError)):
             return ProviderAuthenticationError("provider rejected authentication")
         if isinstance(error, RateLimitError):
             return ProviderRateLimitError("provider rate limit exceeded")
         if isinstance(error, APITimeoutError):
             return ProviderTimeoutError("provider request timed out")
+        if isinstance(error, APIStatusError):
+            status_code = getattr(error.response, "status_code", None)
+            if status_code in {401, 403}:
+                return ProviderAuthenticationError("provider rejected authentication")
+            if status_code == 429:
+                return ProviderRateLimitError("provider rate limit exceeded")
         if isinstance(error, (APIConnectionError, APIStatusError, APIError, OpenAIError)):
             return ProviderHTTPError("provider request failed")
         return ProviderHTTPError("provider transport failed")

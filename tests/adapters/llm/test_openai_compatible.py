@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from threading import Event
 from types import SimpleNamespace
 from uuid import uuid4
 
 import httpx
 import pytest
-from openai import APIConnectionError, APITimeoutError, AuthenticationError, RateLimitError
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AuthenticationError,
+    PermissionDeniedError,
+    RateLimitError,
+)
 from sdk_fakes import (
     FakeChunk,
     FakeCompletion,
@@ -28,6 +36,22 @@ from coding613.adapters.llm.openai_compatible import (
 from coding613.application.progress import ProviderCancelledError
 from coding613.domain.actions import FinishAction, ToolCall
 from coding613.ports.llm import ModelContext, ModelMessage, ToolDefinition
+
+
+class _CloseAwareStream:
+    def __init__(self) -> None:
+        self._release = Event()
+        self.iteration_finished = Event()
+        self.closed = False
+
+    def __iter__(self) -> Iterator[object]:
+        self._release.wait(timeout=1.0)
+        self.iteration_finished.set()
+        return iter(())
+
+    def close(self) -> None:
+        self.closed = True
+        self._release.set()
 
 
 def test_openai_adapter_maps_sdk_request_and_tool_response() -> None:
@@ -129,6 +153,12 @@ def _request() -> httpx.Request:
         (
             AuthenticationError(
                 "bad auth", response=httpx.Response(401, request=_request()), body=None
+            ),
+            ProviderAuthenticationError,
+        ),
+        (
+            PermissionDeniedError(
+                "forbidden", response=httpx.Response(403, request=_request()), body=None
             ),
             ProviderAuthenticationError,
         ),
@@ -251,6 +281,22 @@ def test_openai_adapter_enforces_absolute_stream_deadline() -> None:
     assert stream.closed is True
 
 
+def test_openai_adapter_closes_stream_before_waiting_for_reader_thread() -> None:
+    stream = _CloseAwareStream()
+    client = FakeSDKClient(stream=stream)  # type: ignore[arg-type]
+    provider = OpenAICompatibleLLM(
+        "https://provider.invalid", "model", client, timeout_seconds=0.01
+    )
+
+    with pytest.raises(ProviderTimeoutError):
+        provider.complete_stream(
+            ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False
+        )
+
+    assert stream.closed is True
+    assert stream.iteration_finished.is_set() is True
+
+
 @pytest.mark.parametrize(
     "tool_calls",
     [
@@ -294,4 +340,30 @@ def test_openai_adapter_rejects_stream_tool_call_without_provider_id() -> None:
         provider.complete_stream(
             ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False
         )
+    assert stream.closed is True
+
+
+def test_openai_adapter_accepts_stream_tool_call_without_function_fragment() -> None:
+    first = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                index=0,
+                delta=SimpleNamespace(
+                    content=None,
+                    tool_calls=[SimpleNamespace(index=0, id="call-1", type="function", function=None)],
+                ),
+            )
+        ]
+    )
+    second = FakeChunk(tool_call=FakeToolDelta(None, "read_file", "{}"))
+    stream = FakeStream((first, second))
+    client = FakeSDKClient(stream=stream)
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+
+    response = provider.complete_stream(
+        ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False
+    )
+
+    assert response.actions[0].action == ToolCall(name="read_file", arguments={})
+    assert response.provider_metadata["tool_call_ids"] == ["call-1"]
     assert stream.closed is True

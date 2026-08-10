@@ -80,6 +80,33 @@ def test_credentialed_provider_does_not_expose_missing_secret() -> None:
         provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
 
     assert "secret-value" not in str(error.value)
+    assert error.value.__cause__ is None
+
+
+def test_credentialed_provider_closes_client_when_delegate_creation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeSDKClient()
+
+    def fail_delegate(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise RuntimeError("sk-client-secret")
+
+    monkeypatch.setattr(credentialed_module, "OpenAICompatibleLLM", fail_delegate)
+    provider = CredentialedOpenAICompatibleLLM(
+        provider="openai",
+        base_url="https://api.example.test/v1",
+        model="coding-model",
+        read_secret=lambda _: "sk-client-secret",
+        client_factory=lambda *_: client,
+    )
+
+    with pytest.raises(ProviderCredentialError) as error:
+        provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+
+    assert "sk-client-secret" not in str(error.value)
+    assert error.value.__cause__ is None
+    assert client.closed is True
 
 
 def test_credentialed_provider_delegates_streaming_lazily() -> None:
