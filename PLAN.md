@@ -1054,4 +1054,15 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   tests`, `uv run mypy src`, and `git diff --check` passed. The full repository default includes
   untracked `tmp/cube` tests with separate FastAPI dependencies, so the maintained offline gate is
   the explicit `tests/` path.
-- Commit: `bc6b62d` (`feat: add governed shell and responses tools`).
+- Commit: `de72048` (`feat: add governed shell and responses tools`).
+
+## Repeated patch-conflict recovery — complete (2026-08-12 02:25 Asia/Shanghai)
+
+- Scope: stop identical stale `apply_patch` calls from producing an endless stream of TUI errors;
+  preserve actionable guidance for persisted conflict events.
+- Behavior: after the first conflict the next model context explicitly requires a fresh read and
+  different patch; a second identical conflict terminates the run with deterministic
+  `no_progress` feedback. A different patch or an intervening read is still allowed to continue.
+- Verification: `uv run pytest tests -q` -> 604 passed with 379 warnings; `uv run ruff check src
+  tests`, `uv run mypy src`, and `git diff --check` passed.
+- Commit: pending this follow-up commit.

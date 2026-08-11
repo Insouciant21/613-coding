@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -115,6 +116,10 @@ _MAX_NO_ACTION_STREAK = 2
 _MAX_PROVIDER_RETRIES = 5
 _TOOL_PROGRESS_OUTPUT_LIMIT = 10_000_000
 _MAX_PARALLEL_READ_TOOLS = 4
+# A stale patch must be regenerated from current file content.  Permit one
+# deterministic repair turn, then stop rather than rendering an endless stream
+# of identical failed tool calls (the failure pattern shown in the TUI report).
+_PATCH_CONFLICT_REPEAT_LIMIT = 2
 
 
 def _progress_text(value: str, limit: int = _TOOL_PROGRESS_OUTPUT_LIMIT) -> str:
@@ -963,6 +968,51 @@ class AgentLoop:
                     )
                     continue_model = True
                     break
+                patch_conflict_attempts = self._patch_conflict_attempts(
+                    action, run_id, dependencies
+                )
+                if patch_conflict_attempts >= _PATCH_CONFLICT_REPEAT_LIMIT:
+                    return self._terminal_without_action(
+                        run_id,
+                        task,
+                        session,
+                        dependencies,
+                        state_before,
+                        StopReason.NO_PROGRESS,
+                        "run.no_progress.repeated_patch_conflict",
+                        FeedbackKind.NO_PROGRESS,
+                        "the same apply_patch conflicted repeatedly; stopping until a fresh patch is generated",
+                        context=context,
+                        response=response,
+                    )
+                if patch_conflict_attempts == 1:
+                    feedback = Feedback(
+                        kind=FeedbackKind.INVALID_ACTION,
+                        message=(
+                            "the exact apply_patch already conflicted; re-read the affected file "
+                            "and generate a different patch before retrying"
+                        ),
+                        details={
+                            "tool": action.name,
+                            "require_fresh_patch": True,
+                            "patch_fingerprint": self._patch_fingerprint(action),
+                        },
+                    )
+                    self._block(session, feedback.kind)
+                    self._feedback_event(dependencies, run_id, feedback)
+                    self._record(
+                        run_id,
+                        session,
+                        dependencies,
+                        state_before=state_before,
+                        context=context,
+                        response=response,
+                        action=envelope,
+                        feedback=feedback,
+                        schema_validation=schema_evidence,
+                    )
+                    continue_model = True
+                    break
                 try:
                     decision = self._policy_decision(action, dependencies)
                 except Exception as error:
@@ -1301,6 +1351,57 @@ class AgentLoop:
             if payload.get("changed_files"):
                 return False
         return False
+
+    @classmethod
+    def _patch_conflict_attempts(
+        cls, action: ToolCall, run_id: UUID, dependencies: LoopDependencies
+    ) -> int:
+        """Count consecutive attempts of the same failed patch fingerprint."""
+
+        if action.name != "apply_patch":
+            return 0
+        fingerprint = cls._patch_fingerprint(action)
+        attempts = 0
+        for event in reversed(dependencies.events.list_for_run(run_id)):
+            if event.event_type == "tool.completed":
+                payload = event.payload
+                call = payload.get("call")
+                if not isinstance(call, dict) or call.get("name") != "apply_patch":
+                    break
+                arguments = call.get("arguments")
+                if not isinstance(arguments, dict):
+                    break
+                previous = ToolCall(name="apply_patch", arguments=arguments)
+                if cls._patch_fingerprint(previous) != fingerprint:
+                    break
+                error = payload.get("error")
+                if payload.get("success") is not False or not (
+                    isinstance(error, str) and error.startswith("PatchConflictError")
+                ):
+                    break
+                attempts += 1
+                continue
+            if event.event_type == "feedback.invalid_action":
+                details = event.payload.get("details")
+                if (
+                    isinstance(details, dict)
+                    and details.get("require_fresh_patch") is True
+                    and details.get("patch_fingerprint") == fingerprint
+                ):
+                    attempts += 1
+                    continue
+            # State, model, feedback.tool_error, and tool.started events do not
+            # change the consecutive patch evidence; another completed tool or
+            # a different attempted action does.
+        return attempts
+
+    @staticmethod
+    def _patch_fingerprint(action: ToolCall) -> str:
+        patch = action.arguments.get("patch")
+        value = patch if isinstance(patch, str) else json.dumps(
+            action.arguments, sort_keys=True, separators=(",", ":"), default=str
+        )
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
     def cancel(
         self,

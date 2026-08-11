@@ -162,6 +162,19 @@ def render_tool_result(result: ToolResult) -> DetailMessage:
     # Keep the terminal's expanded view separately bounded from the loop's
     # larger internal progress cap; only the default view is shortened here.
     full_output = _bounded(result.output, _TOOL_RESULT_LIMIT) if result.output else ""
+    if (
+        result.call.name == "apply_patch"
+        and result.error
+        and result.error.startswith("PatchConflictError")
+        and not full_output
+    ):
+        # Older persisted progress events may contain only the stable error
+        # type. Keep the TUI actionable even when they predate the executor's
+        # richer current-file excerpt.
+        full_output = (
+            "Patch rejected because repository context changed; re-read the affected files "
+            "with read_file and submit a fresh patch."
+        )
     preview_output, output_collapsed = _preview_tool_text(full_output)
     full_error = _bounded(result.error, _TOOL_RESULT_LIMIT) if result.error else ""
     preview_error, error_collapsed = _preview_tool_text(full_error)

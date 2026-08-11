@@ -974,3 +974,14 @@ Every completed plan task must link a commit and fresh verification output here.
   the Textual worker-context error.
 - Verification: `uv run pytest -q --ignore=tmp` -> 596 passed with 379 warnings; Ruff, mypy, and
   diff checks passed. Commit: `698e0c0`.
+
+### Repeated patch-conflict recovery — delivered (2026-08-12 02:25 Asia/Shanghai)
+
+- Status: verified locally; responsible actor: `/root`.
+- Fix: identical stale `apply_patch` calls now receive one deterministic fresh-read repair turn,
+  then stop with `NO_PROGRESS` rather than filling the TUI with repeated failures. Different
+  patches and intervening reads remain eligible to continue. Legacy conflict events without output
+  now show the same re-read guidance in the renderer.
+- Verification: `uv run pytest tests -q` -> 604 passed with 379 warnings; `uv run ruff check src
+  tests`, `uv run mypy src`, and `git diff --check` passed.
+- Commit: pending this follow-up commit.

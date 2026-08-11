@@ -2309,3 +2309,23 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Human intervention: no provider request, credential read/write, remote push, or target cube edit.
 - Lesson: Responses hosted tools and local shell must be modeled as different transports; blindly
   exposing hosted shell/apply-patch payloads would bypass the harness's governed client loop.
+
+## 2026-08-12 02:25:02 Asia/Shanghai - Bound repeated patch conflicts
+
+- Human report: the TUI still showed repeated `Tool apply_patch: failed` / `PatchConflictError`
+  entries for a stale hunk and did not provide a recovery path.
+- Triggered skill: none; the user explicitly requested that Superpowers skills not be invoked.
+- TDD evidence: focused regression tests first exercised the conflict fingerprint counter and the
+  legacy-renderer fallback; the integration test then verified that three identical model calls
+  produce one real tool execution, one fresh-patch feedback turn, and a deterministic `NO_PROGRESS`
+  stop instead of an endless error stream.
+- Implementation: loop events fingerprint `apply_patch` arguments. The first repeated conflict
+  injects a `require_fresh_patch` repair instruction; the configured second-repeat threshold stops
+  the run. TUI rendering supplies generic re-read guidance when older persisted events have no
+  executor output. Context assembly recognizes the new feedback as repair evidence.
+- Verification: `uv run pytest tests -q` -> 604 passed with 379 warnings; `uv run ruff check src
+  tests`, `uv run mypy src`, and `git diff --check` passed.
+- Human intervention: no provider request, credential access, target source edit, remote push, or
+  destructive Git operation.
+- Lesson: bounded, fingerprinted repair is safer than letting the model replay an unchanged patch;
+  renderer fallbacks keep old event logs actionable after an upgrade.

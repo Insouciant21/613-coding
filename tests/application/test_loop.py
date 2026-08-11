@@ -17,6 +17,7 @@ from coding613.adapters.llm.openai_compatible import (
     ProviderTimeoutError,
 )
 from coding613.adapters.storage.sqlite import SqliteEventStore
+from coding613.adapters.tools.repository import build_repository_tools
 from coding613.application.approvals import (
     ApprovalDecision,
     ApprovalService,
@@ -1074,6 +1075,74 @@ def test_no_progress_and_cancel_are_terminal(tmp_path: Path) -> None:
     cancelled = loop.cancel(cancelled_id, "cancelled", deps)
     assert cancelled.status is RunState.CANCELLED
     assert cancelled.stop_reason is StopReason.CANCELLED
+
+
+def test_identical_patch_conflicts_are_counted_for_loop_guard(tmp_path: Path) -> None:
+    deps, records, _, _ = dependencies(tmp_path, Provider(()), Validator(()))
+    run_id = uuid4()
+    action = ToolCall(
+        name="apply_patch",
+        arguments={"patch": "--- a/a.py\n+++ b/a.py\n@@ -1 +1 @@\n-old\n+new\n"},
+    )
+    records.append(
+        Event.new(
+            "tool.completed",
+            run_id,
+            {
+                "call": action.model_dump(mode="json"),
+                "success": False,
+                "error": "PatchConflictError: hunk context does not match",
+            },
+            datetime.now(UTC),
+        )
+    )
+
+    assert AgentLoop._patch_conflict_attempts(action, run_id, deps) == 1
+    fingerprint = AgentLoop._patch_fingerprint(action)
+    records.append(
+        Event.new(
+            "feedback.invalid_action",
+            run_id,
+            {
+                "details": {
+                    "require_fresh_patch": True,
+                    "patch_fingerprint": fingerprint,
+                }
+            },
+            datetime.now(UTC),
+        )
+    )
+    assert AgentLoop._patch_conflict_attempts(action, run_id, deps) == 2
+
+
+def test_repeated_stale_patch_stops_instead_of_rendering_endless_tool_errors(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "value.txt").write_text("current\n", encoding="utf-8")
+    action = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": (
+                "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n"
+                "-before\n+after\n"
+            )
+        },
+    )
+    provider = Provider((response(action), response(action), response(action)))
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    registry, repository_validator, _ = build_repository_tools(tmp_path, ())
+    deps = replace(deps, tools=registry, validator=repository_validator)
+
+    summary = AgentLoop().run(uuid4(), "update value", deps)
+
+    assert summary.stop_reason is StopReason.NO_PROGRESS
+    assert len(provider.contexts) == 3
+    assert sum(event.event_type == "tool.completed" for event in records.events) == 1
+    assert any(
+        event.event_type == "feedback.invalid_action"
+        and event.payload.get("details", {}).get("require_fresh_patch") is True
+        for event in records.events
+    )
 
 
 def test_repeated_text_only_model_responses_stop_before_budget_exhaustion(

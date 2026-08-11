@@ -504,6 +504,9 @@ def _needs_patch_conflict_repair(recent_events: Sequence[Event]) -> bool:
     """Give the next model call deterministic guidance after a stale patch."""
 
     for event in reversed(recent_events):
+        if event.event_type == "feedback.invalid_action":
+            details = event.payload.get("details")
+            return isinstance(details, dict) and details.get("require_fresh_patch") is True
         if event.event_type != "feedback.tool_error":
             if event.event_type in {
                 "tool.completed",

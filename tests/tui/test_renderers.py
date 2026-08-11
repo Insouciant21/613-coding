@@ -94,6 +94,18 @@ def test_large_tool_result_is_collapsed_and_can_be_expanded() -> None:
     assert "line-399" not in widget.display_text
 
 
+def test_patch_conflict_error_without_output_still_shows_repair_guidance() -> None:
+    widget = render_tool_result(
+        ToolResult(
+            call=ToolCall(name="apply_patch", arguments={"patch": "stale"}),
+            success=False,
+            error="PatchConflictError",
+        )
+    )
+
+    assert "re-read" in widget.display_text
+
+
 def test_diff_and_validation_render_command_status_and_capped_output() -> None:
     patch = "--- a/a.py\n+++ b/a.py\n@@ -1 +1 @@\n-old\n+new\n"
     validation = ValidationResult(
