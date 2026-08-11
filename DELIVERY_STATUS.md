@@ -937,3 +937,17 @@ Every completed plan task must link a commit and fresh verification output here.
 - Verification: 582 offline tests passed (334 warnings); Ruff, mypy, lock, and whitespace checks
   passed. Editable CLI installation, provider help, local defaults probe, and `tmp/cube` policy
   config check passed. No provider request or credential mutation was performed.
+
+### TUI provider management — delivered (2026-08-12 01:36 Asia/Shanghai)
+
+- Status: ready for commit; responsible actor: `/root`.
+- User-facing behavior: `/provider` opens Add/Use/Edit/Delete/Set key/Clear key actions; direct
+  slash forms support `/provider add`, `/provider edit NAME`, `/provider remove NAME`,
+  `/provider key NAME`, and `/provider clear-key NAME`. Add/edit use a modal form, API keys use
+  password inputs, and destructive actions require confirmation.
+- Scope/security: non-secret provider metadata is persisted through `UserConfigurationService`;
+  API keys remain in the OS keyring and are never rendered in conversation output. Removing a
+  profile does not silently erase its credential; the explicit clear-key action does that.
+- Verification: `uv run pytest -q --ignore=tmp` -> 595 passed with 370 warnings; `uv run ruff check .`,
+  `uv run mypy src`, `uv lock --check`, and `git diff --check` passed.
+- Latest verification timestamp: 2026-08-12 01:36 Asia/Shanghai. Commit: pending.

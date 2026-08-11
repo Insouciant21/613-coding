@@ -34,8 +34,12 @@ the full command catalog. Large tool results show a bounded preview; press `Ctrl
 collapse the latest result. Use `//` when a normal prompt should begin with a literal slash.
 
 `/permissions list` displays project rules; `/permissions allow TOOL`, `/permissions deny TOOL`,
-and `/permissions clear TOOL` update them through the application service. `/provider list`,
-`/provider show NAME`, and `/provider use NAME` inspect or switch user-wide provider profiles.
+and `/permissions clear TOOL` update them through the application service. `/provider` opens a
+management menu with Add, Use, Edit, Delete, Set API key, and Clear API key actions for every
+user-wide provider profile. The same operations are available directly as `/provider add`,
+`/provider edit NAME`, `/provider remove NAME`, `/provider key NAME`, and
+`/provider clear-key NAME`; `/provider list`, `/provider show NAME`, and `/provider use NAME`
+remain available for inspection and quick switching.
 `/context` reports bounded transcript accounting, `/compact` stores an additive redacted summary,
 `/cost` shows resource usage, and `/doctor` runs injected local diagnostics. `/config` opens a
 keyboard-selectable menu for policy toggles, safety-budget presets, providers, and the active

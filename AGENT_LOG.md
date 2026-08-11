@@ -2245,3 +2245,23 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   remote push, or destructive Git operation was performed.
 - Lesson: defaults apply only when a provider profile omits a value; existing explicit user
   overrides (for example a provider configured at 48000 context characters) remain intact.
+
+## TUI provider management (2026-08-12 01:36:13 Asia/Shanghai)
+
+- Human request: enrich `/provider` so the TUI can add, edit, delete, switch, and manage API keys
+  for user-wide provider profiles.
+- Triggered skills: none; the user explicitly requested that Superpowers skills not be invoked.
+- TDD evidence: parser, provider-menu, add-form, safe-default, service-removal, and delete-confirm
+  tests were added first. The safe-default test was observed failing because blank URL/model values
+  reached `LLMConfig`; the form then received OpenAI-compatible defaults and the focused tests passed.
+- Implementation: `/provider` now opens a management menu; `/provider add` and `/provider edit NAME`
+  use a modal metadata form with API-surface, endpoint, model, context/output, streaming, reasoning,
+  activation, and hidden key fields. `/provider remove NAME` requires confirmation, while key set and
+  clear operations use hidden input and explicit clear confirmation. Metadata reloads the runtime;
+  keys remain keyring-only and are never rendered in the log. README and development docs describe
+  the direct commands and menu behavior.
+- Verification: `uv run pytest -q --ignore=tmp` -> 595 passed with 370 warnings; `uv run ruff check .`,
+  `uv run mypy src`, `uv lock --check`, and `git diff --check` passed. No provider request,
+  credential mutation, target source edit, deployment, remote push, or destructive Git operation
+  occurred.
+- Commit: pending until the feature and delivery-record commits are created.

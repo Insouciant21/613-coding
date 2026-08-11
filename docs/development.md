@@ -41,6 +41,13 @@ history when no candidate is active). `/help` prints the complete catalog, and `
 slash at the beginning of a normal prompt. Large tool results use a bounded preview; `Ctrl+T`
 expands or collapses the latest result.
 
+`/provider` opens the user-wide provider manager. Its menu can add a profile, switch the active
+profile, edit endpoint/model/runtime metadata, delete a profile, set or clear its keyring key, and
+confirm destructive actions before persistence. Scriptable equivalents are `/provider add`,
+`/provider edit NAME`, `/provider remove NAME`, `/provider key NAME`, and
+`/provider clear-key NAME`; API keys are entered through a password field and are never rendered
+in the conversation log.
+
 The composer has no hover-only tooltip, so its focus outline does not cover the input area. The
 bottom usage and status rows remain visible in narrow terminals. If a provider emits text without
 an action, the loop allows one repair turn and then records deterministic `no_progress` instead of

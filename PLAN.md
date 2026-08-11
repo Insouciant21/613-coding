@@ -1016,3 +1016,18 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Verification: `uv run pytest -q --ignore=tmp` -> 582 passed with 334 warnings; Ruff, mypy,
   `uv lock --check`, and `git diff --check` passed. `uv tool install --force --editable .`, CLI
   help, and the `tmp/cube` config probe passed.
+
+## TUI provider management — complete (2026-08-12 01:36 Asia/Shanghai)
+
+- Scope: make `/provider` a user-wide provider manager with add/edit/delete/use operations and
+  keyring-backed API-key set/clear actions.
+- Evidence: `ProviderEditorScreen` and `ProviderKeyScreen` keep secrets out of the log; the menu
+  requires confirmation for profile deletion and key clearing; profile metadata is reloaded into
+  the runtime after saves/removals; service removal selects a deterministic replacement without
+  implicitly deleting a credential.
+- Tests: parser coverage includes add/edit/remove/delete/key/clear-key; TUI coverage includes the
+  management menu, hidden-key add form, safe defaults, and delete confirmation; user-service coverage
+  verifies active-provider replacement and explicit credential clearing.
+- Verification: `uv run pytest -q --ignore=tmp` -> 595 passed with 370 warnings; Ruff, mypy, lock,
+  and diff checks passed.
+- Commit: pending until the feature and delivery-record commits are created.

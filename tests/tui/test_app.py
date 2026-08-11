@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
-from textual.widgets import Static
+from textual.widgets import Input, Static
 
 from coding613.application.credentials import CredentialStatus
 from coding613.application.interactive import InteractiveSnapshot, TranscriptEntry
@@ -36,6 +36,7 @@ from coding613.tui.widgets import (
     CommandHints,
     ConfigMenu,
     ConversationLog,
+    ProviderEditorScreen,
     StatusFooter,
     TaskComposer,
     UsageHints,
@@ -863,6 +864,198 @@ async def test_tui_provider_command_switches_user_profile() -> None:
             "Active provider: deepseek" in str(widget.renderable)
             for widget in app.query_one(ConversationLog).query(Static)
         )
+
+
+@pytest.mark.asyncio
+async def test_tui_provider_command_opens_management_menu() -> None:
+    fake = FakeUiServices()
+
+    class FakeUserConfiguration:
+        def profiles(self) -> tuple[ProviderProfile, ...]:
+            return (
+                ProviderProfile(
+                    name="ai2",
+                    config=LLMConfig(model="gpt-test", credential="ai2-key"),
+                    active=True,
+                    credential=CredentialStatus(
+                        provider="ai2-key", configured=False, source="none"
+                    ),
+                ),
+            )
+
+    app = CodingApp(
+        controller=_controller(fake),
+        services=SimpleNamespace(user_configuration=FakeUserConfiguration()),
+    )
+    async with app.run_test(size=(100, 30)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("/provider")
+        await pilot.press("enter")
+        for _ in range(30):
+            await pilot.pause(0.01)
+            if app.query(ConfigMenu):
+                break
+
+        menu = app.query_one(ConfigMenu)
+        labels = [str(option.prompt) for option in menu.options]
+        assert labels[0] == "Add provider"
+        assert any("Edit provider: ai2" == label for label in labels)
+        assert any("Delete provider: ai2" == label for label in labels)
+        assert any("Set API key: ai2" == label for label in labels)
+
+
+@pytest.mark.asyncio
+async def test_tui_provider_add_form_persists_metadata_without_displaying_key() -> None:
+    fake = FakeUiServices()
+
+    class FakeUserConfiguration:
+        def __init__(self) -> None:
+            self.saved: tuple[str, LLMConfig, str | None, bool] | None = None
+
+        def profiles(self) -> tuple[ProviderProfile, ...]:
+            return ()
+
+        def upsert_provider(
+            self,
+            name: str,
+            provider: LLMConfig,
+            *,
+            api_key: str | None = None,
+            make_active: bool = False,
+        ) -> SimpleNamespace:
+            self.saved = (name, provider, api_key, make_active)
+            return SimpleNamespace(active_provider=name)
+
+    user = FakeUserConfiguration()
+    app = CodingApp(
+        controller=_controller(fake),
+        services=SimpleNamespace(user_configuration=user),
+    )
+    async with app.run_test(size=(100, 35)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("/provider add")
+        await pilot.press("enter")
+        for _ in range(30):
+            await pilot.pause(0.01)
+            if isinstance(app.screen, ProviderEditorScreen):
+                break
+        assert isinstance(app.screen, ProviderEditorScreen)
+        app.screen.query_one("#provider-name", Input).value = "anthropic"
+        app.screen.query_one("#provider-base-url", Input).value = "https://api.anthropic.com"
+        app.screen.query_one("#provider-model", Input).value = "claude-sonnet"
+        app.screen.query_one("#provider-credential", Input).value = "anthropic-key"
+        app.screen.query_one("#provider-api-key", Input).value = "sk-secret"
+        await pilot.click("#provider-save")
+        for _ in range(30):
+            await pilot.pause(0.01)
+            if user.saved is not None:
+                break
+
+        assert user.saved is not None
+        name, provider, api_key, make_active = user.saved
+        assert name == "anthropic"
+        assert provider.model == "claude-sonnet"
+        assert provider.api == "responses"
+        assert api_key == "sk-secret"
+        assert make_active is True
+        assert all("sk-secret" not in str(widget.renderable) for widget in app.query(Static))
+
+
+@pytest.mark.asyncio
+async def test_tui_provider_add_form_uses_safe_defaults() -> None:
+    fake = FakeUiServices()
+
+    class FakeUserConfiguration:
+        def __init__(self) -> None:
+            self.saved: tuple[str, LLMConfig, str | None, bool] | None = None
+
+        def profiles(self) -> tuple[ProviderProfile, ...]:
+            return ()
+
+        def upsert_provider(
+            self,
+            name: str,
+            provider: LLMConfig,
+            *,
+            api_key: str | None = None,
+            make_active: bool = False,
+        ) -> SimpleNamespace:
+            self.saved = (name, provider, api_key, make_active)
+            return SimpleNamespace(active_provider=name)
+
+    user = FakeUserConfiguration()
+    app = CodingApp(
+        controller=_controller(fake),
+        services=SimpleNamespace(user_configuration=user),
+    )
+    async with app.run_test(size=(100, 35)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("/provider add")
+        await pilot.press("enter")
+        for _ in range(30):
+            await pilot.pause(0.01)
+            if isinstance(app.screen, ProviderEditorScreen):
+                break
+        assert isinstance(app.screen, ProviderEditorScreen)
+        app.screen.query_one("#provider-name", Input).value = "openai"
+        await pilot.click("#provider-save")
+        for _ in range(30):
+            await pilot.pause(0.01)
+            if user.saved is not None:
+                break
+
+    assert user.saved is not None
+    name, provider, api_key, make_active = user.saved
+    assert name == "openai"
+    assert provider.base_url == "https://api.openai.com/v1"
+    assert provider.model == "gpt-4o-mini"
+    assert provider.credential == "openai"
+    assert provider.timeout_seconds == 120
+    assert api_key is None
+    assert make_active is True
+
+
+@pytest.mark.asyncio
+async def test_tui_provider_delete_requires_confirmation_and_removes_profile() -> None:
+    fake = FakeUiServices()
+
+    class FakeUserConfiguration:
+        def __init__(self) -> None:
+            self.removed: list[str] = []
+
+        def profiles(self) -> tuple[ProviderProfile, ...]:
+            return (
+                ProviderProfile(
+                    name="ai2",
+                    config=LLMConfig(model="gpt-test", credential="ai2-key"),
+                    active=True,
+                    credential=CredentialStatus(
+                        provider="ai2-key", configured=True, source="keyring"
+                    ),
+                ),
+            )
+
+        def remove_provider(self, name: str) -> SimpleNamespace:
+            self.removed.append(name)
+            return SimpleNamespace(active_provider=None)
+
+    user = FakeUserConfiguration()
+    app = CodingApp(
+        controller=_controller(fake),
+        services=SimpleNamespace(user_configuration=user),
+    )
+    async with app.run_test(size=(100, 30)) as pilot:
+        await app._handle_command("/provider remove ai2")
+        await pilot.pause()
+        menu = app.query_one(ConfigMenu)
+        assert [str(option.prompt) for option in menu.options] == [
+            "Confirm delete provider: ai2",
+            "Cancel",
+        ]
+        await app._apply_config_menu_action("provider:delete-confirm:ai2")
+        await pilot.pause()
+
+    assert user.removed == ["ai2"]
 
 
 @pytest.mark.asyncio

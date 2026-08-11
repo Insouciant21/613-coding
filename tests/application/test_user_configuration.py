@@ -125,3 +125,24 @@ def test_provider_metadata_update_preserves_existing_model_catalogue(tmp_path: P
 
     assert [item.alias for item in service.models("coding")] == ["fast"]
     assert service.active().selected.model == "coding-fast"  # type: ignore[union-attr]
+
+
+def test_provider_remove_selects_replacement_and_retains_key_for_explicit_clear(tmp_path: Path) -> None:
+    credentials = FakeCredentials()
+    service = UserConfigurationService(tmp_path / "config.toml", credential_store=credentials)  # type: ignore[arg-type]
+    service.upsert_provider(
+        "first",
+        LLMConfig(model="first-model", credential="first-key"),
+        make_active=True,
+    )
+    service.upsert_provider(
+        "second",
+        LLMConfig(model="second-model", credential="second-key"),
+    )
+    service.set_api_key("first", "secret")
+
+    updated = service.remove_provider("first")
+
+    assert updated.active_provider == "second"
+    assert "first" not in updated.providers
+    assert credentials.values == {"first-key": "secret"}

@@ -28,6 +28,60 @@ ConversationLog {
     padding: 0 1;
 }
 
+ProviderEditorScreen, ProviderKeyScreen {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.72);
+}
+
+#provider-editor {
+    width: 78;
+    max-height: 92%;
+    border: solid #d4c59a;
+    background: #17191b;
+    padding: 1 2;
+}
+
+#provider-key-editor {
+    width: 64;
+    height: auto;
+    border: solid #d4c59a;
+    background: #17191b;
+    padding: 1 2;
+}
+
+.provider-form-title {
+    height: auto;
+    color: #d4c59a;
+    text-style: bold;
+    padding: 0 0 1 0;
+}
+
+.provider-form-help {
+    height: auto;
+    color: #a9c7b0;
+    padding: 0 0 1 0;
+}
+
+#provider-editor VerticalScroll {
+    height: 1fr;
+    scrollbar-color: #6d8b74;
+    scrollbar-background: #1a1e21;
+}
+
+#provider-editor Input, #provider-editor Select, #provider-key-editor Input {
+    width: 100%;
+    margin: 0 0 1 0;
+}
+
+.provider-form-actions {
+    height: 3;
+    align: right middle;
+}
+
+.provider-form-actions Button {
+    margin-left: 1;
+}
+
 .user-message {
     color: #d4c59a;
 }

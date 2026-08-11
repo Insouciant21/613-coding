@@ -69,9 +69,18 @@ def _config_arguments(arguments: tuple[str, ...]) -> tuple[str, ...]:
 def _provider_arguments(arguments: tuple[str, ...]) -> tuple[str, ...]:
     if not arguments or arguments == ("list",):
         return arguments
-    if arguments[0] in {"use", "show"} and len(arguments) == 2 and arguments[1]:
+    if arguments[0] == "add" and len(arguments) == 1:
         return arguments
-    raise ValueError("/provider expects list, use NAME, or show NAME")
+    if (
+        arguments[0] in {"use", "show", "edit", "remove", "delete", "key", "clear-key"}
+        and len(arguments) == 2
+        and arguments[1]
+    ):
+        return arguments
+    raise ValueError(
+        "/provider expects list, add, use NAME, show NAME, edit NAME, remove NAME, "
+        "key NAME, or clear-key NAME"
+    )
 
 
 def _resume_arguments(arguments: tuple[str, ...]) -> tuple[str, ...]:
@@ -114,8 +123,8 @@ class CommandCatalog:
             ),
             "provider": CommandSpec(
                 "provider",
-                "/provider [list|use NAME|show NAME]",
-                "List or switch the user-wide LLM provider",
+                "/provider [list|add|use NAME|show NAME|edit NAME|remove NAME|key NAME|clear-key NAME]",
+                "Manage, inspect, or switch user-wide LLM providers",
                 _provider_arguments,
             ),
             "permissions": CommandSpec(

@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 from uuid import UUID
 
 from textual.app import App, ComposeResult
@@ -15,6 +15,7 @@ from textual.widgets import Static, TextArea
 from textual.widgets.option_list import Option
 
 from coding613.application.validation import ValidationResult
+from coding613.config import LLMConfig
 from coding613.domain.actions import ToolCall
 from coding613.domain.conversation import RunOptions
 from coding613.domain.models import PermissionMode, RunState
@@ -40,6 +41,8 @@ from .widgets import (
     CommandHints,
     ConfigMenu,
     ConversationLog,
+    ProviderEditorScreen,
+    ProviderKeyScreen,
     StatusFooter,
     TaskComposer,
     UsageHints,
@@ -53,6 +56,7 @@ def _reasoning_levels(current: str) -> tuple[str, ...]:
     """Return common provider levels while retaining any user-defined value."""
 
     return tuple(dict.fromkeys((*_REASONING_LEVEL_SUGGESTIONS, current)))
+
 
 if TYPE_CHECKING:
     from coding613.application.composition import LocalServices
@@ -254,6 +258,8 @@ class CodingApp(App[None]):
                 await log.mount(Static("User provider configuration is unavailable"))
             elif not command.arguments:
                 await self._show_provider_menu()
+            elif command.arguments[0] == "add":
+                await self._open_provider_editor()
             elif command.arguments[0] == "list":
                 profiles = await asyncio.to_thread(configuration.profiles)
                 lines = [
@@ -263,6 +269,14 @@ class CodingApp(App[None]):
                     for profile in profiles
                 ]
                 await log.mount(Static("\n".join(lines) or "No provider profiles configured"))
+            elif command.arguments[0] == "edit":
+                await self._open_provider_editor(command.arguments[1])
+            elif command.arguments[0] in {"remove", "delete"}:
+                await self._show_provider_delete_confirmation(command.arguments[1])
+            elif command.arguments[0] == "key":
+                await self._open_provider_key_editor(command.arguments[1])
+            elif command.arguments[0] == "clear-key":
+                await self._show_provider_key_clear_confirmation(command.arguments[1])
             elif command.arguments[0] == "show":
                 name = command.arguments[1]
                 profile = next(
@@ -425,6 +439,151 @@ class CodingApp(App[None]):
         elif command.name == "quit":
             await self.action_quit()
 
+    async def _provider_profile(self, name: str) -> Any | None:
+        configuration = self._user_configuration()
+        profiles = await asyncio.to_thread(configuration.profiles)
+        return next((profile for profile in profiles if profile.name == name), None)
+
+    def _user_configuration(self) -> Any:
+        services = self.services
+        if services is None or not hasattr(services, "user_configuration"):
+            raise ValueError("user provider configuration is unavailable")
+        return services.user_configuration
+
+    async def _reload_provider_runtime(self) -> None:
+        reload_configuration = getattr(self.services, "reload_configuration", None)
+        if callable(reload_configuration):
+            await asyncio.to_thread(reload_configuration)
+        self._update_footer()
+
+    @staticmethod
+    def _provider_form_values(profile: Any | None = None) -> dict[str, str]:
+        if profile is None:
+            return {
+                "api": "responses",
+                "provider": "openai-compatible",
+                "base_url": "https://api.openai.com/v1",
+                "model": "gpt-4o-mini",
+                "credential": "openai",
+                "timeout_seconds": "120",
+                "max_output_tokens": "128000",
+                "context_window_chars": "256000",
+                "streaming": "false",
+                "reasoning_effort": "low",
+                "make_active": "true",
+            }
+        selected = profile.selected
+        return {
+            "name": profile.name,
+            "provider": profile.config.provider,
+            "api": selected.api,
+            "base_url": selected.base_url,
+            "model": selected.model,
+            "credential": selected.credential,
+            "timeout_seconds": str(selected.timeout_seconds),
+            "max_output_tokens": str(selected.max_output_tokens),
+            "context_window_chars": str(selected.context_window_chars),
+            "streaming": str(selected.streaming).lower(),
+            "reasoning_effort": selected.reasoning_effort,
+            "make_active": str(profile.active).lower(),
+        }
+
+    async def _open_provider_editor(self, name: str | None = None) -> None:
+        try:
+            profile = await self._provider_profile(name) if name else None
+            if name is not None and profile is None:
+                raise ValueError(f"provider is not configured: {name}")
+            values = await self.push_screen_wait(
+                ProviderEditorScreen(
+                    self._provider_form_values(profile),
+                    editing=profile is not None,
+                )
+            )
+            if values is None:
+                return
+            provider_name = values.get("name", "").strip()
+            if not provider_name:
+                raise ValueError("provider name must not be blank")
+            api_value = values.get("api", "responses")
+            if api_value not in {"chat_completions", "responses", "anthropic", "messages"}:
+                raise ValueError(f"unsupported API surface: {api_value}")
+            provider = LLMConfig(
+                provider=values.get("provider", "openai-compatible"),
+                api=cast(Literal["chat_completions", "responses", "anthropic", "messages"], api_value),
+                base_url=values.get("base_url", ""),
+                model=values.get("model", ""),
+                credential=values.get("credential", "").strip() or provider_name,
+                timeout_seconds=float(values.get("timeout_seconds", "120")),
+                max_output_tokens=int(values.get("max_output_tokens", "128000")),
+                context_window_chars=int(values.get("context_window_chars", "256000")),
+                streaming=values.get("streaming", "false").lower() == "true",
+                reasoning_effort=values.get("reasoning_effort", "low"),
+            )
+            api_key = values.get("api_key", "").strip() or None
+            make_active = values.get("active", "false").lower() == "true"
+            configuration = self._user_configuration()
+            await asyncio.to_thread(
+                configuration.upsert_provider,
+                provider_name,
+                provider,
+                api_key=api_key,
+                make_active=make_active,
+            )
+            await self._reload_provider_runtime()
+            await self.query_one(ConversationLog).mount(
+                Static(f"Provider {'updated' if name else 'added'}: {provider_name}")
+            )
+        except Exception as error:
+            await self.query_one(ConversationLog).mount(render_error(error))
+
+    async def _open_provider_key_editor(self, name: str) -> None:
+        try:
+            profile = await self._provider_profile(name)
+            if profile is None:
+                raise ValueError(f"provider is not configured: {name}")
+            value = await self.push_screen_wait(ProviderKeyScreen(name))
+            if value is None:
+                return
+            configuration = self._user_configuration()
+            await asyncio.to_thread(configuration.set_api_key, name, value)
+            await self.query_one(ConversationLog).mount(Static(f"API key updated: {name}"))
+        except Exception as error:
+            await self.query_one(ConversationLog).mount(render_error(error))
+
+    async def _show_provider_delete_confirmation(self, name: str) -> None:
+        try:
+            profile = await self._provider_profile(name)
+            if profile is None:
+                raise ValueError(f"provider is not configured: {name}")
+            menu = ConfigMenu(
+                (
+                    (f"Confirm delete provider: {name}", f"provider:delete-confirm:{name}"),
+                    ("Cancel", "provider:cancel"),
+                )
+            )
+            await self.query_one(ConversationLog).mount(menu)
+            menu.focus()
+            self.query_one(StatusFooter).update("Confirm provider deletion · ↑/↓ · Enter · Esc")
+        except Exception as error:
+            await self.query_one(ConversationLog).mount(render_error(error))
+
+    async def _show_provider_key_clear_confirmation(self, name: str) -> None:
+        try:
+            profile = await self._provider_profile(name)
+            if profile is None:
+                raise ValueError(f"provider is not configured: {name}")
+            menu = ConfigMenu(
+                (
+                    (f"Confirm clear API key: {name}", f"provider:key-clear-confirm:{name}"),
+                    ("Cancel", "provider:cancel"),
+                )
+            )
+            await self.query_one(ConversationLog).mount(menu)
+            menu.focus()
+            self.query_one(StatusFooter).update("Confirm API-key removal · ↑/↓ · Enter · Esc")
+        except Exception as error:
+            await self.query_one(ConversationLog).mount(render_error(error))
+
     async def _show_config_menu(self) -> None:
         """Mount a keyboard menu for safe, frequently used configuration edits."""
 
@@ -460,7 +619,7 @@ class CodingApp(App[None]):
                 options.append(
                     (
                         f"Provider: {profile.name} ({profile.selected.model})",
-                        f"provider:{profile.name}",
+                        f"provider:use:{profile.name}",
                     )
                 )
                 if profile.active:
@@ -496,21 +655,24 @@ class CodingApp(App[None]):
         except Exception as error:
             await self.query_one(ConversationLog).mount(render_error(error))
             return
-        if not profiles:
-            await self.query_one(ConversationLog).mount(Static("No provider profiles configured"))
-            return
-        menu = ConfigMenu(
-            tuple(
+        options: list[tuple[str, str]] = [("Add provider", "provider:add")]
+        for profile in profiles:
+            marker = "* " if profile.active else ""
+            options.extend(
                 (
-                    f"{'* ' if profile.active else ''}{profile.name} · {profile.selected.model}",
-                    f"provider:{profile.name}",
+                    (f"{marker}Use provider: {profile.name} · {profile.selected.model}", f"provider:use:{profile.name}"),
+                    (f"Edit provider: {profile.name}", f"provider:edit:{profile.name}"),
+                    (f"Delete provider: {profile.name}", f"provider:remove:{profile.name}"),
+                    (f"Set API key: {profile.name}", f"provider:key:{profile.name}"),
+                    (f"Clear API key: {profile.name}", f"provider:clear-key:{profile.name}"),
                 )
-                for profile in profiles
             )
-        )
+        menu = ConfigMenu(tuple(options))
         await self.query_one(ConversationLog).mount(menu)
         menu.focus()
-        self.query_one(StatusFooter).update("Provider menu · ↑/↓ select · Enter apply · Esc close")
+        self.query_one(StatusFooter).update(
+            "Provider management · ↑/↓ select · Enter apply · Esc close"
+        )
 
     async def _show_model_menu(self) -> None:
         user_configuration = getattr(self.services, "user_configuration", None)
@@ -597,7 +759,46 @@ class CodingApp(App[None]):
                     Static(f"User budget updated: {key}={value}")
                 )
             elif action.startswith("provider:"):
-                name = action.split(":", 1)[1]
+                parts = action.split(":", 2)
+                if len(parts) == 2 and parts[1] in {"add", "cancel"}:
+                    operation, name = parts[1], ""
+                else:
+                    operation = parts[1] if len(parts) == 3 else "use"
+                    name = parts[2] if len(parts) == 3 else parts[1]
+                if operation == "cancel":
+                    return
+                if operation == "add":
+                    await self._open_provider_editor()
+                    return
+                if operation == "edit":
+                    await self._open_provider_editor(name)
+                    return
+                if operation == "remove":
+                    await self._show_provider_delete_confirmation(name)
+                    return
+                if operation == "delete-confirm":
+                    configuration = self._user_configuration()
+                    await asyncio.to_thread(configuration.remove_provider, name)
+                    await self._reload_provider_runtime()
+                    await self.query_one(ConversationLog).mount(
+                        Static(f"Provider deleted: {name}")
+                    )
+                    return
+                if operation == "key":
+                    await self._open_provider_key_editor(name)
+                    return
+                if operation == "clear-key":
+                    await self._show_provider_key_clear_confirmation(name)
+                    return
+                if operation == "key-clear-confirm":
+                    configuration = self._user_configuration()
+                    await asyncio.to_thread(configuration.clear_api_key, name)
+                    await self.query_one(ConversationLog).mount(
+                        Static(f"API key cleared: {name}")
+                    )
+                    return
+                if operation != "use":
+                    raise ValueError(f"unknown provider menu action: {operation}")
                 switch_provider = getattr(self.services, "switch_provider", None)
                 if not callable(switch_provider):
                     raise ValueError("provider switching is unavailable")

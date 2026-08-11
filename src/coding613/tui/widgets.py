@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from textual.containers import VerticalScroll
+from collections.abc import Mapping
+
+from textual.app import ComposeResult
+from textual.containers import Container, Horizontal, VerticalScroll
 from textual.message import Message
-from textual.widgets import OptionList, Static, TextArea
+from textual.screen import ModalScreen
+from textual.widgets import Button, Input, OptionList, Select, Static, TextArea
 from textual.widgets.option_list import Option
 
 
@@ -22,6 +26,146 @@ class ConfigMenu(OptionList):
             classes="conversation-entry config-menu",
             markup=False,
         )
+
+
+class ProviderEditorScreen(ModalScreen[dict[str, str] | None]):
+    """Modal form for adding or editing provider metadata.
+
+    The screen only collects strings.  Validation, persistence, and keyring
+    writes stay in the application service that owns provider configuration.
+    A blank API-key field deliberately means "leave the current key alone".
+    """
+
+    def __init__(
+        self,
+        initial: Mapping[str, str] | None = None,
+        *,
+        editing: bool = False,
+    ) -> None:
+        super().__init__()
+        self._initial = dict(initial or {})
+        self._editing = editing
+
+    def compose(self) -> ComposeResult:
+        values = self._initial
+        yield Container(
+            Static("Edit provider" if self._editing else "Add provider", classes="provider-form-title"),
+            Static(
+                "API keys are stored in the OS keyring. Leave API key blank to keep the current key.",
+                classes="provider-form-help",
+            ),
+            VerticalScroll(
+                Input(
+                    values.get("name", ""),
+                    placeholder="Provider name",
+                    id="provider-name",
+                    disabled=self._editing,
+                ),
+                Input(values.get("provider", "openai-compatible"), placeholder="Provider kind", id="provider-kind"),
+                Select(
+                    (("Responses", "responses"), ("Chat Completions", "chat_completions"), ("Anthropic Messages", "anthropic"), ("Messages alias", "messages")),
+                    value=values.get("api", "responses"),
+                    prompt="API surface",
+                    allow_blank=False,
+                    id="provider-api",
+                ),
+                Input(values.get("base_url", ""), placeholder="Base URL", id="provider-base-url"),
+                Input(values.get("model", ""), placeholder="Default model", id="provider-model"),
+                Input(values.get("credential", ""), placeholder="Keyring credential name", id="provider-credential"),
+                Input(values.get("timeout_seconds", "120"), placeholder="Timeout seconds", id="provider-timeout"),
+                Input(values.get("max_output_tokens", "128000"), placeholder="Max output tokens", id="provider-max-output"),
+                Input(values.get("context_window_chars", "256000"), placeholder="Context window characters", id="provider-context"),
+                Select(
+                    (("Streaming off", "false"), ("Streaming on", "true")),
+                    value=values.get("streaming", "false"),
+                    prompt="Streaming",
+                    allow_blank=False,
+                    id="provider-streaming",
+                ),
+                Input(values.get("reasoning_effort", "low"), placeholder="Reasoning level", id="provider-reasoning"),
+                Input("", placeholder="API key (optional)", password=True, id="provider-api-key"),
+                Select(
+                    (("Keep inactive", "false"), ("Make active", "true")),
+                    value=values.get("make_active", "false"),
+                    prompt="Activation",
+                    allow_blank=False,
+                    id="provider-active",
+                ),
+            ),
+            Horizontal(
+                Button("Save", variant="success", id="provider-save"),
+                Button("Cancel", variant="default", id="provider-cancel"),
+                classes="provider-form-actions",
+            ),
+            id="provider-editor",
+        )
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "provider-cancel":
+            self.dismiss(None)
+            return
+        if event.button.id != "provider-save":
+            return
+        values: dict[str, str] = {}
+        input_fields = {
+            "name": "name",
+            "provider": "kind",
+            "base_url": "base-url",
+            "model": "model",
+            "credential": "credential",
+            "timeout_seconds": "timeout",
+            "max_output_tokens": "max-output",
+            "context_window_chars": "context",
+            "reasoning_effort": "reasoning",
+            "api_key": "api-key",
+        }
+        for field, selector in input_fields.items():
+            values[field] = self.query_one(f"#provider-{selector}", Input).value
+        for field in ("api", "streaming", "active"):
+            selected = self.query_one(f"#provider-{field}", Select).value
+            values[field] = "" if selected is Select.BLANK else str(selected)
+        self.dismiss(values)
+
+    def on_key(self, event: object) -> None:
+        if getattr(event, "key", None) == "escape":
+            stop = getattr(event, "stop", None)
+            if callable(stop):
+                stop()
+            self.dismiss(None)
+
+
+class ProviderKeyScreen(ModalScreen[str | None]):
+    """Hidden-input modal for setting one provider's API key."""
+
+    def __init__(self, provider: str) -> None:
+        super().__init__()
+        self.provider = provider
+
+    def compose(self) -> ComposeResult:
+        yield Container(
+            Static(f"Set API key: {self.provider}", classes="provider-form-title"),
+            Static("The key is written directly to the OS keyring and never shown in the log.", classes="provider-form-help"),
+            Input(placeholder="API key", password=True, id="provider-key-value"),
+            Horizontal(
+                Button("Save key", variant="success", id="provider-key-save"),
+                Button("Cancel", id="provider-key-cancel"),
+                classes="provider-form-actions",
+            ),
+            id="provider-key-editor",
+        )
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "provider-key-cancel":
+            self.dismiss(None)
+        elif event.button.id == "provider-key-save":
+            self.dismiss(self.query_one("#provider-key-value", Input).value)
+
+    def on_key(self, event: object) -> None:
+        if getattr(event, "key", None) == "escape":
+            stop = getattr(event, "stop", None)
+            if callable(stop):
+                stop()
+            self.dismiss(None)
 
 
 class UserMessage(Static):
