@@ -1031,3 +1031,14 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Verification: `uv run pytest -q --ignore=tmp` -> 595 passed with 370 warnings; Ruff, mypy, lock,
   and diff checks passed.
 - Commit: `280817f` (`feat: add tui provider management`).
+
+## TUI provider menu worker fix — complete (2026-08-12 01:49 Asia/Shanghai)
+
+- Scope: make provider management actions launched from `ConfigMenu` execute in a Textual worker so
+  modal add/edit/key screens can safely await dismissal.
+- Root cause/evidence: direct message-pump dispatch caused `push_screen_wait` to raise after pushing
+  an unawaited screen; the new menu-selection regression failed to persist a provider before the
+  handler was moved to `run_worker(..., group="config-menu")`.
+- Verification: `uv run pytest -q --ignore=tmp` -> 596 passed with 379 warnings; Ruff, mypy, and
+  diff checks passed.
+- Commit: pending until this bug-fix commit is created.

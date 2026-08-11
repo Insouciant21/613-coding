@@ -951,3 +951,13 @@ Every completed plan task must link a commit and fresh verification output here.
 - Verification: `uv run pytest -q --ignore=tmp` -> 595 passed with 370 warnings; `uv run ruff check .`,
   `uv run mypy src`, `uv lock --check`, and `git diff --check` passed.
 - Latest verification timestamp: 2026-08-12 01:36 Asia/Shanghai. Commit: `280817f`.
+
+### TUI provider menu worker fix — delivered (2026-08-12 01:49 Asia/Shanghai)
+
+- Status: verified; responsible actor: `/root`.
+- Fix: provider menu selections now run through a `config-menu` worker. This covers add/edit/set-key
+  actions that await modal dismissal and preserves ordered cleanup for switch/delete/clear actions.
+- Regression: selecting Add provider from the menu and saving now persists metadata without rendering
+  the Textual worker-context error.
+- Verification: `uv run pytest -q --ignore=tmp` -> 596 passed with 379 warnings; Ruff, mypy, and
+  diff checks passed. Commit: pending.

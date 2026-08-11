@@ -2265,3 +2265,18 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   credential mutation, target source edit, deployment, remote push, or destructive Git operation
   occurred.
 - Commit: `280817f` (`feat: add tui provider management`).
+
+## TUI provider menu worker fix (2026-08-12 01:49:21 Asia/Shanghai)
+
+- Human report: selecting the provider menu's add/save flow displayed repeated
+  `push_screen must be run from a worker when wait_for_dismiss is True` errors and did not save.
+- Root cause: `on_option_list_option_selected` dispatched `_apply_config_menu_action` directly from
+  Textual's message pump. Provider add/edit/key actions wait for modal dismissal, which Textual
+  only supports in an active worker.
+- TDD evidence: a regression that selected the Add provider menu item and pressed Save failed with
+  no persisted profile before the fix; the handler now starts a `config-menu` worker for every menu
+  action, and the same test passes without the error text.
+- Verification: `uv run pytest -q --ignore=tmp` -> 596 passed with 379 warnings; `uv run ruff check
+  src/coding613/tui tests/tui/test_app.py`, `uv run mypy src`, and `git diff --check` passed.
+- Commit: pending until this bug-fix commit is created. No provider request or credential mutation
+  was performed.

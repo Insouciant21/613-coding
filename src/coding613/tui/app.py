@@ -731,7 +731,11 @@ class CodingApp(App[None]):
         option = getattr(message, "option", None)
         action = getattr(option, "id", None)
         if isinstance(action, str):
-            await self._apply_config_menu_action(action)
+            # Menu messages are dispatched by Textual's message pump rather than
+            # a worker. Provider add/edit/key actions wait for a modal result, and
+            # Textual only permits that wait from an active worker. Running every
+            # menu action here also keeps persistence and menu cleanup ordered.
+            self.run_worker(self._apply_config_menu_action(action), group="config-menu")
 
     async def _apply_config_menu_action(self, action: str) -> None:
         menu = self.query_one(ConfigMenu)

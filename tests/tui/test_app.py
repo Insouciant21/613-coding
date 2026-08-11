@@ -962,6 +962,52 @@ async def test_tui_provider_add_form_persists_metadata_without_displaying_key() 
 
 
 @pytest.mark.asyncio
+async def test_tui_provider_menu_add_opens_editor_from_a_worker() -> None:
+    fake = FakeUiServices()
+
+    class FakeUserConfiguration:
+        def __init__(self) -> None:
+            self.saved: tuple[str, LLMConfig, str | None, bool] | None = None
+
+        def profiles(self) -> tuple[ProviderProfile, ...]:
+            return ()
+
+        def upsert_provider(
+            self,
+            name: str,
+            provider: LLMConfig,
+            *,
+            api_key: str | None = None,
+            make_active: bool = False,
+        ) -> SimpleNamespace:
+            self.saved = (name, provider, api_key, make_active)
+            return SimpleNamespace(active_provider=name)
+
+    user = FakeUserConfiguration()
+    app = CodingApp(controller=_controller(fake), services=SimpleNamespace(user_configuration=user))
+    async with app.run_test(size=(100, 35)) as pilot:
+        await app._show_provider_menu()
+        menu = app.query_one(ConfigMenu)
+        menu.focus()
+        menu.action_select()
+        for _ in range(30):
+            await pilot.pause(0.01)
+            if isinstance(app.screen, ProviderEditorScreen) and app.screen.query("#provider-save"):
+                break
+
+        assert isinstance(app.screen, ProviderEditorScreen)
+        app.screen.query_one("#provider-name", Input).value = "openai"
+        app.screen.query_one("#provider-save").press()
+        for _ in range(30):
+            await pilot.pause(0.01)
+            if user.saved is not None:
+                break
+
+        assert user.saved is not None
+        assert all("push_screen must be run from a worker" not in str(widget.renderable) for widget in app.query(Static))
+
+
+@pytest.mark.asyncio
 async def test_tui_provider_add_form_uses_safe_defaults() -> None:
     fake = FakeUiServices()
 
