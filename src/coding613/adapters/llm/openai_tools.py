@@ -1,10 +1,10 @@
 """Responses API hosted-tool definitions.
 
-The harness still owns the agent loop and local tool dispatch.  This module
-only builds the low-level payloads accepted by ``responses.create`` for tools
-that OpenAI executes on the provider side.  Client-side shell and patch work
-remain local tools so policy, approvals, and repository boundaries cannot be
-bypassed by a hosted runner.
+The harness still owns the agent loop and local tool dispatch. This module
+builds the low-level payloads accepted by ``responses.create`` for both
+provider-hosted tools and client-side Responses protocols. Client-side shell
+and patch calls are translated back into governed local actions by the adapter;
+policy, approvals, and repository boundaries remain authoritative.
 """
 
 from __future__ import annotations
@@ -23,6 +23,12 @@ _ALIASES = {
     "code-interpreter": "code_interpreter",
     "file-search": "file_search",
     "image-generation": "image_generation",
+    "computer-use": "computer_use_preview",
+    "computer-use-preview": "computer_use_preview",
+    "local-shell": "local_shell",
+    "apply-patch": "apply_patch",
+    "programmatic-tool-calling": "programmatic_tool_calling",
+    "custom-tool": "custom",
 }
 
 _SUPPORTED = frozenset(
@@ -34,11 +40,15 @@ _SUPPORTED = frozenset(
         "image_generation",
         "mcp",
         "tool_search",
+        "computer_use_preview",
+        "computer",
+        "shell",
+        "local_shell",
+        "apply_patch",
+        "custom",
+        "namespace",
+        "programmatic_tool_calling",
     }
-)
-
-_CLIENT_SIDE_ONLY = frozenset(
-    {"shell", "local_shell", "apply_patch", "computer_use_preview"}
 )
 _EMPTY_SCHEMA = {
     "type": "object",
@@ -60,11 +70,6 @@ def build_responses_tools(config: LLMConfig) -> tuple[ToolDefinition, ...]:
     definitions: list[ToolDefinition] = []
     for requested in config.responses_tools:
         name = _ALIASES.get(requested, requested)
-        if name in _CLIENT_SIDE_ONLY:
-            raise ValueError(
-                f"Responses hosted tool {name!r} requires client-side output handling; "
-                "use the local run_command/apply_patch tools"
-            )
         if name not in _SUPPORTED:
             supported = ", ".join(sorted(_SUPPORTED))
             raise ValueError(f"unsupported Responses tool {requested!r}; use: {supported}")
@@ -110,15 +115,22 @@ def _build_one(name: str, options: Mapping[str, Any]) -> ToolDefinition:
         container = options.get("container", {"type": "auto"})
         if not isinstance(container, (str, dict)):
             raise ValueError("code_interpreter container must be a string or table")
+        allowed_callers = options.get("allowed_callers")
+        if allowed_callers is not None:
+            _callers(allowed_callers)
+        code_payload: dict[str, Any] = {"type": "code_interpreter", "container": container}
+        if allowed_callers is not None:
+            code_payload["allowed_callers"] = list(allowed_callers)
         return _hosted(
             name,
             "Execute bounded Python code in the provider-hosted interpreter",
-            {"type": "code_interpreter", "container": container},
+            code_payload,
         )
     if name == "image_generation":
         payload = _pick({"type": "image_generation"}, options, {
             "action", "background", "input_fidelity", "model", "moderation",
-            "output_compression", "output_format", "partial_images", "quality", "size",
+            "input_image_mask", "output_compression", "output_format", "partial_images",
+            "quality", "size",
         })
         return _hosted(name, "Generate or edit an image with OpenAI", payload)
     if name == "mcp":
@@ -126,20 +138,122 @@ def _build_one(name: str, options: Mapping[str, Any]) -> ToolDefinition:
         url = options.get("server_url")
         if not isinstance(label, str) or not label.strip():
             raise ValueError("mcp requires server_label")
-        if not isinstance(url, str) or not url.startswith(("https://", "http://")):
-            raise ValueError("mcp requires an HTTP(S) server_url")
+        connector = options.get("connector_id")
+        if url is not None and (
+            not isinstance(url, str) or not url.startswith(("https://", "http://"))
+        ):
+            raise ValueError("mcp server_url must be an HTTP(S) URL")
+        if url is None and not isinstance(connector, str):
+            raise ValueError("mcp requires server_url or connector_id")
+        base: dict[str, Any] = {"type": "mcp", "server_label": label}
+        if url is not None:
+            base["server_url"] = url
+        if connector is not None:
+            base["connector_id"] = connector
         payload = _pick(
-            {"type": "mcp", "server_label": label, "server_url": url},
+            base,
             options,
-            {"authorization", "headers", "allowed_tools", "require_approval", "server_description"},
+            {
+                "authorization",
+                "headers",
+                "allowed_tools",
+                "allowed_callers",
+                "require_approval",
+                "server_description",
+                "defer_loading",
+                "tunnel_id",
+            },
         )
         return _hosted(name, "Call a configured remote Model Context Protocol server", payload)
     if name == "tool_search":
-        payload = _pick({"type": "tool_search", "execution": "server"}, options, {"description", "parameters"})
+        payload = _pick(
+            {"type": "tool_search", "execution": "server"},
+            options,
+            {"description", "parameters"},
+        )
         _choice(payload, "execution", {"server", "client"})
-        if payload["execution"] == "client":
-            raise ValueError("client tool_search requires a client-side search protocol")
         return _hosted(name, "Search the provider's deferred tool catalogue", payload)
+    if name == "shell":
+        environment = options.get("environment", {"type": "local"})
+        if not isinstance(environment, dict):
+            raise ValueError("shell environment must be a table")
+        payload = _pick(
+            {"type": "shell", "environment": dict(environment)},
+            options,
+            {"allowed_callers"},
+        )
+        _callers(payload.get("allowed_callers"))
+        return _hosted(name, "Execute governed shell commands through Responses", payload)
+    if name == "local_shell":
+        payload = _pick({"type": "local_shell"}, options, {"allowed_callers"})
+        _callers(payload.get("allowed_callers"))
+        return _hosted(name, "Execute a governed command in the local repository", payload)
+    if name == "apply_patch":
+        payload = _pick({"type": "apply_patch"}, options, {"allowed_callers"})
+        _callers(payload.get("allowed_callers"))
+        return _hosted(name, "Apply a governed repository patch through Responses", payload)
+    if name == "computer_use_preview":
+        payload = _pick(
+            {
+                "type": "computer_use_preview",
+                "display_width": 1280,
+                "display_height": 720,
+                "environment": "linux",
+            },
+            options,
+            {"display_width", "display_height", "environment"},
+        )
+        _positive_int(payload, "display_width")
+        _positive_int(payload, "display_height")
+        _choice(payload, "environment", {"windows", "mac", "linux", "ubuntu", "browser"})
+        return _hosted(name, "Control a configured computer with screenshot feedback", payload)
+    if name == "computer":
+        return _hosted(name, "Control a configured computer with screenshot feedback", {"type": "computer"})
+    if name == "programmatic_tool_calling":
+        return _hosted(
+            name,
+            "Compose and execute multiple configured tools programmatically",
+            {"type": "programmatic_tool_calling"},
+        )
+    if name == "custom":
+        custom_name = options.get("name")
+        description = options.get("description", "")
+        custom_format = options.get("format", {"type": "text"})
+        if not isinstance(custom_name, str) or not custom_name.strip():
+            raise ValueError("custom requires a non-empty name")
+        if not isinstance(description, str):
+            raise ValueError("custom description must be a string")
+        if not isinstance(custom_format, dict):
+            raise ValueError("custom format must be a table")
+        payload = _pick(
+            {
+                "type": "custom",
+                "name": custom_name,
+                "description": description,
+                "format": dict(custom_format),
+            },
+            options,
+            {"allowed_callers", "defer_loading"},
+        )
+        _callers(payload.get("allowed_callers"))
+        return _hosted(custom_name, "Invoke a configured custom Responses tool", payload)
+    if name == "namespace":
+        namespace_name = options.get("name")
+        description = options.get("description")
+        tools = options.get("tools")
+        if not isinstance(namespace_name, str) or not namespace_name.strip():
+            raise ValueError("namespace requires a non-empty name")
+        if not isinstance(description, str) or not description.strip():
+            raise ValueError("namespace requires a non-empty description")
+        if not isinstance(tools, list) or not tools or not all(isinstance(item, dict) for item in tools):
+            raise ValueError("namespace requires a non-empty tools array")
+        payload = {
+            "type": "namespace",
+            "name": namespace_name,
+            "description": description,
+            "tools": [dict(item) for item in tools],
+        }
+        return _hosted(namespace_name, "Expose a configured Responses tool namespace", payload)
     raise AssertionError(f"unhandled Responses tool: {name}")
 
 
@@ -168,6 +282,22 @@ def _choice(payload: Mapping[str, Any], key: str, values: set[str]) -> None:
     value = payload.get(key)
     if value not in values:
         raise ValueError(f"{key} must be one of: {', '.join(sorted(values))}")
+
+
+def _callers(value: Any) -> None:
+    if value is None:
+        return
+    if not isinstance(value, (list, tuple)) or not all(
+        isinstance(item, str) and item in {"direct", "programmatic"}
+        for item in value
+    ):
+        raise ValueError("allowed_callers must contain only direct or programmatic")
+
+
+def _positive_int(payload: Mapping[str, Any], key: str) -> None:
+    value = payload.get(key)
+    if type(value) is not int or value <= 0:
+        raise ValueError(f"{key} must be a positive integer")
 
 
 __all__ = ["build_responses_tools"]

@@ -77,8 +77,8 @@ class LLMConfig(DomainModel):
     )
     streaming: bool = False
     reasoning_effort: str = Field(default="low", min_length=1, max_length=64)
-    # Responses hosted tools are opt-in per user provider.  Local shell and
-    # patch execution remain harness-owned tools and are not listed here.
+    # Responses hosted and client-side protocol tools are opt-in per user
+    # provider. Local function tools remain registered by the harness.
     responses_tools: tuple[str, ...] = ()
     responses_tool_options: dict[str, dict[str, Any]] = Field(default_factory=dict)
 

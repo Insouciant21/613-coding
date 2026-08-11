@@ -144,6 +144,77 @@ def test_responses_adapter_forwards_hosted_tool_payload_and_records_call() -> No
     ]
 
 
+def test_responses_adapter_maps_shell_call_to_governed_action_and_preserves_item() -> None:
+    response = SimpleNamespace(
+        output=[
+            SimpleNamespace(
+                type="shell_call",
+                id="shell-item",
+                call_id="shell-call",
+                status="completed",
+                action=SimpleNamespace(
+                    commands=["printf ok"],
+                    timeout_ms=1500,
+                    max_output_length=200,
+                ),
+            )
+        ]
+    )
+
+    result = ResponsesLLM("https://api.openai.com/v1", "gpt-5.6", _Client(response)).complete(
+        _context(), ()
+    )
+
+    assert result.actions[0].action == ToolCall(
+        name="run_shell",
+        arguments={
+            "commands": [
+                {
+                    "argv": ["printf", "ok"],
+                    "timeout_seconds": 1.5,
+                    "max_output_bytes": 200,
+                }
+            ]
+        },
+        provider_metadata={
+            "provider": "responses",
+            "call_id": "shell-call",
+            "item_type": "shell_call",
+        },
+    )
+    assert result.provider_metadata["output_items"][0]["type"] == "shell_call"
+
+
+def test_responses_messages_append_hosted_tool_continuation_items() -> None:
+    context = _context().model_copy(
+        update={
+            "metadata": {
+                "responses_input_items": [
+                    {"type": "shell_call", "call_id": "shell-call"},
+                    {
+                        "type": "shell_call_output",
+                        "call_id": "shell-call",
+                        "output": [],
+                    },
+                ]
+            }
+        }
+    )
+    response = SimpleNamespace(output=[])
+    client = _Client(response)
+
+    ResponsesLLM("https://api.openai.com/v1", "gpt-5.6", client).complete(context, ())
+
+    assert client.responses.calls[0]["input"][-2:] == [
+        {"type": "shell_call", "call_id": "shell-call"},
+        {
+            "type": "shell_call_output",
+            "call_id": "shell-call",
+            "output": [],
+        },
+    ]
+
+
 def test_responses_adapter_sends_configured_reasoning_effort() -> None:
     response = SimpleNamespace(output=[], output_text="")
     client = _Client(response)

@@ -240,6 +240,12 @@ class ContextAssembler:
                 ).encode("utf-8")
             ).hexdigest(),
         }
+        responses_input_items = _responses_continuation_items(
+            recent_events,
+            max_chars=self._max_context_chars,
+        )
+        if responses_input_items:
+            metadata["responses_input_items"] = responses_input_items
         return ModelContext(
             run_id=run_id,
             task=safe_task,
@@ -524,6 +530,169 @@ def _needs_patch_conflict_repair(recent_events: Sequence[Event]) -> bool:
             and details["error"].startswith("PatchConflictError")
         )
     return False
+
+
+def _responses_continuation_items(
+    recent_events: Sequence[Event], *, max_chars: int = _DEFAULT_MAX_CONTEXT_CHARS
+) -> list[dict[str, Any]]:
+    """Reconstruct client-side Responses call outputs for the next request.
+
+    Built-in hosted tools complete entirely on OpenAI. Shell and apply-patch
+    calls instead require the original output item plus a typed output item on
+    the next ``responses.create`` call. Interactive calls without an injected
+    adapter are omitted after their deterministic local failure. Only the latest
+    provider response is eligible, preventing stale call items from leaking
+    into later turns.
+    """
+
+    latest_index = -1
+    raw_items: list[dict[str, Any]] = []
+    for index, event in enumerate(recent_events):
+        if event.event_type != "provider.response":
+            continue
+        values = event.payload.get("output_items")
+        if not isinstance(values, list):
+            continue
+        raw_items = [dict(item) for item in values if isinstance(item, dict)]
+        latest_index = index
+    if latest_index < 0:
+        return []
+    # Only include calls for which this installation can produce a valid typed
+    # output item. Unsupported interactive calls are intentionally omitted from
+    # the next stateless request; their deterministic adapter failure remains in
+    # the run ledger instead of sending an incomplete Responses conversation.
+    client_types = {
+        "shell_call",
+        "local_shell_call",
+        "apply_patch_call",
+    }
+    continuation = [
+        item
+        for item in raw_items
+        if item.get("type") in client_types
+    ]
+    output_ids = {
+        item.get("call_id"): f"{item.get('id') or item.get('call_id')}_output"
+        for item in continuation
+        if isinstance(item.get("call_id"), str) and item.get("call_id")
+    }
+    outputs: list[dict[str, Any]] = []
+    for event in recent_events[latest_index + 1 :]:
+        if event.event_type != "tool.completed":
+            continue
+        call = event.payload.get("call")
+        if not isinstance(call, dict):
+            continue
+        provider_metadata = call.get("provider_metadata")
+        if not isinstance(provider_metadata, dict) or provider_metadata.get("provider") != "responses":
+            continue
+        call_id = provider_metadata.get("call_id")
+        item_type = provider_metadata.get("item_type")
+        if not isinstance(call_id, str) or not call_id or not isinstance(item_type, str):
+            continue
+        output = event.payload.get("output", "")
+        success = event.payload.get("success") is True
+        if item_type == "shell_call":
+            chunks = _responses_shell_chunks(output)
+            outputs.append(
+                {
+                    "type": "shell_call_output",
+                    "call_id": call_id,
+                    "id": output_ids.get(call_id, f"{call_id}_output"),
+                    "output": chunks,
+                }
+            )
+        elif item_type == "local_shell_call":
+            chunks = _responses_shell_chunks(output)
+            local_output: Any = chunks[0] if len(chunks) == 1 else chunks
+            outputs.append(
+                {
+                    "type": "local_shell_call_output",
+                    "call_id": call_id,
+                    "id": output_ids.get(call_id, f"{call_id}_output"),
+                    "status": "completed" if success else "incomplete",
+                    "output": json.dumps(local_output, ensure_ascii=False, sort_keys=True),
+                }
+            )
+        elif item_type == "apply_patch_call":
+            outputs.append(
+                {
+                    "type": "apply_patch_call_output",
+                    "call_id": call_id,
+                    "id": output_ids.get(call_id, f"{call_id}_output"),
+                    "status": "completed" if success else "failed",
+                    "output": str(output or event.payload.get("error") or ""),
+                }
+            )
+    return _bound_responses_items(continuation + outputs, max_chars)
+
+
+def _bound_responses_items(
+    items: list[dict[str, Any]], max_chars: int
+) -> list[dict[str, Any]]:
+    """Bound provider continuation output without changing its item shape."""
+
+    if max_chars < 1:
+        return []
+    limit = max(32, max_chars // max(1, len(items) * 4))
+    while True:
+        bounded = [_bound_response_value(item, limit) for item in items]
+        encoded = json.dumps(bounded, ensure_ascii=False, separators=(",", ":"))
+        if len(encoded) <= max_chars or limit <= 32:
+            return bounded
+        limit = max(32, limit // 2)
+
+
+def _bound_response_value(value: Any, string_limit: int) -> Any:
+    if isinstance(value, dict):
+        return {key: _bound_response_value(item, string_limit) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_bound_response_value(item, string_limit) for item in value]
+    if isinstance(value, str) and len(value) > string_limit:
+        return _bounded_text(value, string_limit)
+    return value
+
+
+def _responses_shell_chunks(output: object) -> list[dict[str, Any]]:
+    try:
+        parsed: Any = json.loads(output) if isinstance(output, str) else output
+    except (TypeError, ValueError):
+        parsed = None
+    values = parsed if isinstance(parsed, list) else [parsed]
+    chunks: list[dict[str, Any]] = []
+    for value in values:
+        if not isinstance(value, dict):
+            continue
+        nested = value.get("output")
+        if isinstance(nested, str):
+            try:
+                nested = json.loads(nested)
+            except (TypeError, ValueError):
+                nested = None
+        if isinstance(nested, dict):
+            value = nested
+        stdout = value.get("stdout", "")
+        stderr = value.get("stderr", "")
+        if not isinstance(stdout, str):
+            stdout = str(stdout)
+        if not isinstance(stderr, str):
+            stderr = str(stderr)
+        timed_out = value.get("timed_out") is True
+        exit_code = value.get("exit_code", 0)
+        if type(exit_code) is not int:
+            exit_code = 1
+        chunks.append(
+            {
+                "stdout": stdout,
+                "stderr": stderr,
+                "outcome": (
+                    {"type": "timeout"}
+                    if timed_out
+                    else {"type": "exit", "exit_code": exit_code}
+                ),
+            }
+        )
+    return chunks
 
 
 def _needs_action_repair(recent_events: Sequence[Event]) -> bool:

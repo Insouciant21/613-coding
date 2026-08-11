@@ -92,6 +92,42 @@ def _patch_error_path(message: str) -> str | None:
     return path or None
 
 
+def _responses_operation_patch(operation: object) -> str:
+    """Translate an OpenAI Responses apply-patch operation to Codex syntax."""
+
+    if not isinstance(operation, dict):
+        raise TypeError("apply_patch operation must be an object")
+    operation_type = operation.get("type")
+    path = operation.get("path")
+    if operation_type not in {"create_file", "update_file", "delete_file"}:
+        raise ValueError("apply_patch operation type is unsupported")
+    if not isinstance(path, str) or not path.strip():
+        raise ValueError("apply_patch operation path must be a non-empty string")
+    diff = operation.get("diff", "")
+    if diff is None:
+        diff = ""
+    if not isinstance(diff, str):
+        raise TypeError("apply_patch operation diff must be a string")
+    if diff.startswith("--- "):
+        return diff
+    if operation_type == "delete_file":
+        return f"*** Begin Patch\n*** Delete File: {path}\n*** End Patch\n"
+    if not diff.strip():
+        raise ValueError("apply_patch operation requires a diff")
+    if operation_type == "update_file":
+        return f"*** Begin Patch\n*** Update File: {path}\n{diff.rstrip(chr(10))}\n*** End Patch\n"
+    lines = diff.splitlines()
+    if lines and lines[0].startswith("@@"):
+        lines = [line for line in lines[1:] if line.startswith("+")]
+    else:
+        lines = [line if line.startswith("+") else f"+{line}" for line in lines]
+    return (
+        f"*** Begin Patch\n*** Add File: {path}\n"
+        + "\n".join(lines)
+        + "\n*** End Patch\n"
+    )
+
+
 class _ListFilesExecutor:
     def __init__(self, tools: FilesystemTools) -> None:
         self._tools = tools
@@ -183,7 +219,10 @@ class _ApplyPatchExecutor:
     def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
         del context
         try:
-            result = self._tools.apply_patch(str(call.arguments["patch"]))
+            patch = call.arguments.get("patch")
+            if not isinstance(patch, str):
+                patch = _responses_operation_patch(call.arguments.get("operation"))
+            result = self._tools.apply_patch(patch)
         except PatchCommitError as error:
             self._merge_changed(error.changed_files)
             return ToolResult(
@@ -359,6 +398,54 @@ class _RunCommandExecutor:
         return {name: os.environ[name] for name in cls._ENVIRONMENT_NAMES if name in os.environ}
 
 
+class _RunShellExecutor:
+    """Execute a Responses shell call as ordered, argv-only commands."""
+
+    def __init__(self, root: Path) -> None:
+        self._single = _RunCommandExecutor(root)
+
+    def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
+        commands = call.arguments.get("commands")
+        if not isinstance(commands, list):
+            return _failure(call, ValueError("commands must be an array"))
+        results: list[dict[str, object]] = []
+        for command in commands:
+            if not isinstance(command, dict):
+                return _failure(call, ValueError("each shell command must be an object"))
+            nested = ToolCall(
+                name="run_command",
+                arguments=dict(command),
+                provider_metadata=call.provider_metadata,
+            )
+            result = self._single.execute(nested, context)
+            results.append(result.model_dump(mode="json"))
+            if not result.success:
+                return ToolResult(
+                    call=call,
+                    success=False,
+                    output=_json(results),
+                    error=result.error or "shell_command_failed",
+                )
+        return _result(call, output=_json(results))
+
+
+class _UnsupportedClientToolExecutor:
+    def __init__(self, tool_name: str) -> None:
+        self._tool_name = tool_name
+
+    def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
+        del context
+        return ToolResult(
+            call=call,
+            success=False,
+            error=f"{self._tool_name}_executor_not_configured",
+            output=(
+                f"Responses client tool {self._tool_name} was received, but this installation "
+                "has no interactive client adapter configured."
+            ),
+        )
+
+
 class RepositoryValidator:
     """Run declared validation commands and expose the latest result to the loop."""
 
@@ -510,18 +597,88 @@ def build_repository_tools(
             input_schema={
                 "$id": "coding613.tool.apply_patch.v1",
                 "type": "object",
-                "properties": {
-                    "patch": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 1_000_000,
-                    }
-                },
-                "required": ["patch"],
-                "additionalProperties": False,
+                "oneOf": [
+                    {
+                        "properties": {
+                            "patch": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1_000_000,
+                            }
+                        },
+                        "required": ["patch"],
+                        "additionalProperties": False,
+                    },
+                    {
+                        "properties": {
+                            "operation": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": ["create_file", "update_file", "delete_file"],
+                                    },
+                                    "path": {"type": "string", "minLength": 1},
+                                    "diff": {"type": "string", "maxLength": 1_000_000},
+                                },
+                                "required": ["type", "path"],
+                                "additionalProperties": False,
+                            }
+                        },
+                        "required": ["operation"],
+                        "additionalProperties": False,
+                    },
+                ],
             },
         ),
         _ApplyPatchExecutor(filesystem, changed_files),
+    )
+    registry.register(
+        ToolDefinition(
+            name="run_shell",
+            description=(
+                "Execute an ordered Responses shell command batch as argv arrays; no shell "
+                "interpolation or caller-provided environment is allowed"
+            ),
+            input_schema={
+                "$id": "coding613.tool.run_shell.v1",
+                "type": "object",
+                "properties": {
+                    "commands": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 64,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "argv": {
+                                    "type": "array",
+                                    "items": {"type": "string", "minLength": 1},
+                                    "minItems": 1,
+                                    "maxItems": 128,
+                                },
+                                "cwd": {"type": "string", "minLength": 1},
+                                "timeout_seconds": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 300,
+                                },
+                                "max_output_bytes": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 10_000_000,
+                                },
+                            },
+                            "required": ["argv"],
+                            "additionalProperties": False,
+                        },
+                    }
+                },
+                "required": ["commands"],
+                "additionalProperties": False,
+            },
+        ),
+        _RunShellExecutor(root),
     )
     registry.register(
         ToolDefinition(
@@ -619,6 +776,45 @@ def build_repository_tools(
             },
         ),
         _RunCommandExecutor(root),
+    )
+    registry.register(
+        ToolDefinition(
+            name="computer_use",
+            description="Execute a Responses computer action through an injected interactive adapter",
+            input_schema={
+                "type": "object",
+                "properties": {"action": {"type": "object"}},
+                "required": ["action"],
+                "additionalProperties": False,
+            },
+        ),
+        _UnsupportedClientToolExecutor("computer_use"),
+    )
+    registry.register(
+        ToolDefinition(
+            name="custom_tool",
+            description="Execute a configured Responses custom tool through an injected adapter",
+            input_schema={
+                "type": "object",
+                "properties": {"input": {}},
+                "required": ["input"],
+                "additionalProperties": False,
+            },
+        ),
+        _UnsupportedClientToolExecutor("custom_tool"),
+    )
+    registry.register(
+        ToolDefinition(
+            name="tool_search_client",
+            description="Resolve a client-side Responses tool-search request",
+            input_schema={
+                "type": "object",
+                "properties": {"arguments": {}},
+                "required": ["arguments"],
+                "additionalProperties": False,
+            },
+        ),
+        _UnsupportedClientToolExecutor("tool_search_client"),
     )
     return registry, validator, changed_files
 

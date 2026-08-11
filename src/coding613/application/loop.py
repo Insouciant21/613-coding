@@ -516,6 +516,14 @@ class AgentLoop:
                 )
             self._transition(run_id, session, dependencies, RunState.RUNNING)
             self._resolve_blocker(session, FeedbackKind.INVALID_ACTION)
+            output_items = response.provider_metadata.get("output_items")
+            if isinstance(output_items, list) and output_items:
+                self._event(
+                    dependencies,
+                    run_id,
+                    "provider.response",
+                    {"output_items": output_items},
+                )
 
             if session.resource_profile is None:
                 selected = next(

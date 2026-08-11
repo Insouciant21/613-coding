@@ -62,6 +62,9 @@ class PolicyEngine:
     )
     _NETWORK_TOOLS: ClassVar[frozenset[str]] = frozenset({"network_request"})
     _VALIDATION_TOOLS: ClassVar[frozenset[str]] = frozenset({"run_validation"})
+    _CLIENT_TOOLS: ClassVar[frozenset[str]] = frozenset(
+        {"computer_use", "custom_tool", "tool_search_client"}
+    )
     _INSTALL_TOOLS: ClassVar[frozenset[str]] = frozenset({"install_dependency"})
     _GIT_WRITE_TOOLS: ClassVar[frozenset[str]] = frozenset(
         {"git_add", "git_commit", "git_push"}
@@ -118,8 +121,15 @@ class PolicyEngine:
                 )
             effect = PolicyEffect.ASK if mode is PermissionMode.STRICT else PolicyEffect.ALLOW
             return self._decision(effect, f"mode.{mode.value}.write", "repository write", call)
-        if call.name == "run_command":
+        if call.name in {"run_command", "run_shell"}:
             return self._command_decision(call, config, mode)
+        if call.name in self._CLIENT_TOOLS:
+            return self._decision(
+                PolicyEffect.ASK,
+                f"mode.{mode.value}.client_tool",
+                "client-side provider tool requires explicit adapter approval",
+                call,
+            )
         if call.name in self._VALIDATION_TOOLS:
             return self._command_decision(call, config, mode)
         if call.name in self._INSTALL_TOOLS:
@@ -166,6 +176,11 @@ class PolicyEngine:
                         path = line[4:].split("\t", 1)[0].strip()
                         if path != "/dev/null":
                             values.append(path[2:] if path[:2] in {"a/", "b/"} else path)
+            operation = call.arguments.get("operation")
+            if isinstance(operation, dict):
+                operation_path = operation.get("path")
+                if isinstance(operation_path, str):
+                    values.append(operation_path)
         return tuple(values)
 
     @staticmethod
@@ -184,6 +199,39 @@ class PolicyEngine:
         config: RepositoryPolicyConfig,
         mode: PermissionMode,
     ) -> PolicyDecision:
+        if call.name == "run_shell":
+            commands = call.arguments.get("commands")
+            if not isinstance(commands, list) or not commands:
+                return self._decision(
+                    PolicyEffect.DENY,
+                    "hard.invalid_commands",
+                    "shell requires a non-empty commands array",
+                    call,
+                )
+            argv_values = [item.get("argv") for item in commands if isinstance(item, dict)]
+            if len(argv_values) != len(commands):
+                return self._decision(
+                    PolicyEffect.DENY,
+                    "hard.invalid_argv",
+                    "every shell command requires an argv array",
+                    call,
+                )
+            if not all(isinstance(argv, list) and all(isinstance(item, str) for item in argv) for argv in argv_values):
+                return self._decision(
+                    PolicyEffect.DENY,
+                    "hard.invalid_argv",
+                    "every shell command requires an argv array",
+                    call,
+                )
+            if len(argv_values) == 1:
+                call = call.model_copy(update={"arguments": {"argv": argv_values[0]}})
+            else:
+                return self._decision(
+                    PolicyEffect.ASK,
+                    f"mode.{mode.value}.command_batch",
+                    "ordered shell command batch",
+                    call,
+                )
         argv = call.arguments.get("argv")
         if not isinstance(argv, list) or not all(isinstance(item, str) for item in argv):
             return self._decision(
@@ -239,6 +287,13 @@ class PolicyEngine:
                     path_rule = self._path_rule(value, root)
                     if path_rule is not None:
                         return path_rule
+            operation = call.arguments.get("operation")
+            if isinstance(operation, dict):
+                path = operation.get("path")
+                if isinstance(path, str):
+                    path_rule = self._path_rule(path, root)
+                    if path_rule is not None:
+                        return path_rule
         argv = call.arguments.get("argv")
         if isinstance(argv, list) and all(isinstance(item, str) for item in argv):
             lowered = tuple(item.lower() for item in argv)
@@ -255,6 +310,15 @@ class PolicyEngine:
                     for fragment in ("rm -rf /", "rm -rf ~", "mkfs", "shutdown", "reboot")
                 ):
                     return "hard.destructive_command"
+        commands = call.arguments.get("commands")
+        if isinstance(commands, list):
+            for command in commands:
+                if not isinstance(command, dict):
+                    continue
+                nested = ToolCall(name="run_command", arguments=command)
+                nested_rule = self._hard_denial(nested, root)
+                if nested_rule is not None:
+                    return nested_rule
         return None
 
     def _path_rule(self, value: str, root: Path) -> str | None:

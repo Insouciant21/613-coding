@@ -89,15 +89,9 @@ def test_repository_registry_exposes_versioned_apply_patch_and_dispatches(
     target.write_text("old\n", encoding="utf-8")
     registry, _, changed_files = build_repository_tools(tmp_path, ())
     definition = next(item for item in registry.definitions() if item.name == "apply_patch")
-    assert definition.input_schema == {
-        "$id": "coding613.tool.apply_patch.v1",
-        "type": "object",
-        "properties": {
-            "patch": {"type": "string", "minLength": 1, "maxLength": 1_000_000}
-        },
-        "required": ["patch"],
-        "additionalProperties": False,
-    }
+    assert definition.input_schema["$id"] == "coding613.tool.apply_patch.v1"
+    assert definition.input_schema["type"] == "object"
+    assert len(definition.input_schema["oneOf"]) == 2
     patch = """--- a/value.txt
 +++ b/value.txt
 @@ -1 +1 @@

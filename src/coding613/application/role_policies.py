@@ -16,7 +16,7 @@ _READ_TOOLS = frozenset({"read_file", "search_files", "list_files", "git_diff"})
 _WRITE_TOOLS = frozenset(
     {"delete_file", "edit_file", "write_file", "apply_patch", "install_dependency"}
 )
-_COMMAND_TOOLS = frozenset({"run_command"})
+_COMMAND_TOOLS = frozenset({"run_command", "run_shell"})
 
 
 def role_policy(role: WorkerRole) -> ToolPolicy:

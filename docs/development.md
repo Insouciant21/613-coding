@@ -123,8 +123,11 @@ GitHub Actions uploads these files on successful push and publishes them for `v*
 retains the same verified `dist/` artifact. Docker Engine is separately required when the agent
 starts isolated worker sandboxes.
 
-Responses-hosted web search, file search, code interpreter, image generation, remote MCP, and
-server-side tool search are opt-in provider definitions. Local `run_command` is argv-only and
-bounded; shell, patch, and computer-use hosted calls remain unavailable until their client-side
-output protocols can be routed through the governed loop. New tools must remain behind the
-versioned registry, deterministic policy, approvals, and redaction interfaces.
+Responses-hosted web search, file search, code interpreter, image generation, remote MCP, tool
+search, programmatic calling, shell/local-shell, apply-patch, computer, custom, and namespace
+tools are opt-in provider definitions. Local `run_command` and Responses shell calls are argv-only
+and bounded; apply-patch operations pass through the same repository policy and conflict recovery.
+The Responses adapter reconstructs typed shell/patch output items for the next model request.
+Computer, custom, and client-side tool-search calls remain explicit adapter-not-configured results
+until an interactive adapter is injected. New tools must remain behind the versioned registry,
+deterministic policy, approvals, and redaction interfaces.

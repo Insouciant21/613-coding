@@ -170,3 +170,56 @@ def test_run_command_executes_argv_without_shell_interpolation(tmp_path: Path) -
     assert result.success
     assert "$613_CODING_LITERAL" in result.output
     assert "command" in result.output
+
+
+def test_run_shell_executes_each_argv_command_without_shell_interpolation(tmp_path: Path) -> None:
+    registry, _, _ = build_repository_tools(tmp_path, ())
+
+    result = registry.dispatch(
+        ToolCall(
+            name="run_shell",
+            arguments={
+                "commands": [
+                    {"argv": [sys.executable, "-c", "print('one')"]},
+                    {"argv": [sys.executable, "-c", "print('two')"]},
+                ]
+            },
+        ),
+        ToolContext(
+            run_id=uuid4(),
+            repository_root=tmp_path,
+            permission_mode=PermissionMode.BALANCED,
+        ),
+    )
+
+    assert result.success
+    assert "one" in result.output
+    assert "two" in result.output
+
+
+def test_apply_patch_accepts_responses_operation_shape(tmp_path: Path) -> None:
+    target = tmp_path / "value.txt"
+    target.write_text("old\n", encoding="utf-8")
+    registry, _, changed_files = build_repository_tools(tmp_path, ())
+
+    result = registry.dispatch(
+        ToolCall(
+            name="apply_patch",
+            arguments={
+                "operation": {
+                    "type": "update_file",
+                    "path": "value.txt",
+                    "diff": "@@ -1 +1 @@\n-old\n+new\n",
+                }
+            },
+        ),
+        ToolContext(
+            run_id=uuid4(),
+            repository_root=tmp_path,
+            permission_mode=PermissionMode.BALANCED,
+        ),
+    )
+
+    assert result.success
+    assert target.read_text(encoding="utf-8") == "new\n"
+    assert changed_files == ["value.txt"]

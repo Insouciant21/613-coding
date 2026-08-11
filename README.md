@@ -173,7 +173,7 @@ max_output_tokens = 128000
 context_window_chars = 256000
 streaming = false
 # Optional Responses-hosted tools (omit for a provider that does not implement them).
-responses_tools = ["web_search", "code_interpreter"]
+responses_tools = ["web_search", "code_interpreter", "shell", "apply_patch"]
 
 [providers.ai2.models.fast]
 model = "gpt-5.6-flash"
@@ -215,12 +215,16 @@ The repository registry also exposes a local `run_command` shell tool. It accept
 never interpolates a shell, runs only inside the repository with an allowlisted environment, and
 is bounded by a 300-second timeout and 10 MB captured output. Undeclared commands are governed
 by the policy/approval engine. For a Responses provider, `responses_tools` can opt into OpenAI's
-provider-hosted tools: `web_search`, `web_search_preview`, `file_search` (requires
+tool catalog: `web_search`, `web_search_preview`, `file_search` (requires
 `responses_tool_options.file_search.vector_store_ids`), `code_interpreter`, `image_generation`,
-`mcp`, and server-side `tool_search`. Hosted tools are forwarded only by the Responses adapter;
-Chat Completions and Anthropic continue to receive harness-owned function tools. Shell, patch, and
-computer-use calls stay local or are rejected until their client-side output protocol is wired
-through the governed loop.
+`mcp`, `tool_search`, `programmatic_tool_calling`, `shell`, `local_shell`, `apply_patch`,
+`computer_use_preview`, `computer`, `custom`, and `namespace`. Hosted tools are forwarded only
+by the Responses adapter; Chat Completions and Anthropic continue to receive harness-owned
+function tools. Responses `shell`/`local_shell` calls are converted to governed argv execution,
+and `apply_patch` operations are converted to the repository's validated patch executor. Their
+typed output items are sent back on the next Responses request. Computer, custom, and client-side
+tool-search calls are surfaced with an explicit adapter-not-configured result until an interactive
+adapter is injected; they are never executed implicitly.
 
 Store the key in the operating-system keyring:
 

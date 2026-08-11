@@ -85,7 +85,9 @@ class ProviderEditorScreen(ModalScreen[dict[str, str] | None]):
                 Input(values.get("reasoning_effort", "low"), placeholder="Reasoning level", id="provider-reasoning"),
                 Input(
                     values.get("responses_tools", ""),
-                    placeholder="Responses tools (comma-separated; e.g. web_search,code_interpreter)",
+                    placeholder=(
+                        "Responses tools (comma-separated; e.g. web_search,shell,apply_patch)"
+                    ),
                     id="provider-responses-tools",
                 ),
                 Input("", placeholder="API key (optional)", password=True, id="provider-api-key"),

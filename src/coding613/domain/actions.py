@@ -13,6 +13,11 @@ class ToolCall(DomainModel):
     kind: Literal["tool"] = "tool"
     name: str = Field(min_length=1, max_length=128)
     arguments: dict[str, Any]
+    # Provider-specific continuation metadata is kept outside ``arguments`` so
+    # local tool schemas stay strict. Responses client-side tools (shell,
+    # apply_patch, computer) use this to correlate a governed result with the
+    # provider's call id without exposing transport fields to the model.
+    provider_metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("name")
     @classmethod

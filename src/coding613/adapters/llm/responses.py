@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import time
 from collections.abc import Callable, Iterator, Sequence
 from queue import Empty, Queue
@@ -19,6 +20,17 @@ from .openai_compatible import (
     ProviderHTTPError,
     ProviderResponseError,
     ProviderTimeoutError,
+)
+
+_CLIENT_SIDE_OUTPUT_TYPES = frozenset(
+    {
+        "shell_call",
+        "local_shell_call",
+        "apply_patch_call",
+        "computer_call",
+        "custom_tool_call",
+        "tool_search_call",
+    }
 )
 
 
@@ -63,7 +75,7 @@ class ResponsesLLM:
         try:
             response = self._client.responses.create(
                 model=self._model_for(context),
-                input=OpenAICompatibleLLM._messages(context),
+                input=self._input(context),
                 tools=[self._tool_payload(tool) for tool in tools],
                 max_output_tokens=self._max_output_tokens_for(context),
                 reasoning={"effort": self._reasoning_effort},
@@ -92,7 +104,7 @@ class ResponsesLLM:
                 raise ProviderCancelledError("provider stream was cancelled")
             stream = self._client.responses.create(
                 model=self._model_for(context),
-                input=OpenAICompatibleLLM._messages(context),
+                input=self._input(context),
                 tools=[self._tool_payload(tool) for tool in tools],
                 max_output_tokens=self._max_output_tokens_for(context),
                 reasoning={"effort": self._reasoning_effort},
@@ -103,6 +115,8 @@ class ResponsesLLM:
             text_parts: list[str] = []
             calls: dict[str, dict[str, Any]] = {}
             call_order: dict[str, int] = {}
+            hosted_items: dict[str, dict[str, Any]] = {}
+            hosted_order: dict[str, int] = {}
             usage: Any = None
             saw_event = False
             for event in self._stream_events(
@@ -120,6 +134,9 @@ class ResponsesLLM:
                     "response.output_item.added",
                     "response.output_item.done",
                 }:
+                    self._remember_hosted_item(
+                        self._field(event, "item"), hosted_items, hosted_order
+                    )
                     self._remember_function_item(
                         self._field(event, "item"), calls, call_order
                     )
@@ -178,6 +195,8 @@ class ResponsesLLM:
                 elif event_type == "response.completed":
                     completed = self._field(event, "response")
                     usage = self._field(completed, "usage")
+                    for item in self._field(completed, "output") or ():
+                        self._remember_hosted_item(item, hosted_items, hosted_order)
                 elif event_type in {"response.failed", "error"}:
                     raise ProviderHTTPError("provider stream failed")
             self._check_stream_limits(started_at, cancelled)
@@ -207,6 +226,8 @@ class ResponsesLLM:
                         "arguments": value["arguments"],
                     }
                 )
+            for key in sorted(hosted_order, key=hosted_order.__getitem__):
+                output.append(hosted_items[key])
             return self._parse_response(
                 {"output": output, "usage": usage}
             )
@@ -344,6 +365,19 @@ class ResponsesLLM:
         return self._max_output_tokens
 
     @staticmethod
+    def _input(context: ModelContext) -> list[dict[str, Any]]:
+        messages = [
+            {"role": message.role, "content": message.content}
+            for message in context.messages
+        ] or [{"role": "user", "content": context.task}]
+        continuation = context.metadata.get("responses_input_items")
+        if not isinstance(continuation, list):
+            return messages
+        return messages + [
+            dict(item) for item in continuation if isinstance(item, dict)
+        ]
+
+    @staticmethod
     def _tool_payload(tool: ToolDefinition) -> dict[str, Any]:
         if tool.transport == "responses_hosted":
             # Copy the payload so a provider/client cannot mutate the domain
@@ -364,6 +398,123 @@ class ResponsesLLM:
         }
 
     @classmethod
+    def _remember_hosted_item(
+        cls,
+        item: Any,
+        items: dict[str, dict[str, Any]],
+        order: dict[str, int],
+    ) -> None:
+        item_type = cls._field(item, "type")
+        if item_type not in _CLIENT_SIDE_OUTPUT_TYPES:
+            return
+        item_id = cls._field(item, "id") or cls._field(item, "call_id")
+        if not isinstance(item_id, str) or not item_id:
+            return
+        if item_id not in items:
+            order[item_id] = len(order)
+        value = cls._jsonable(item)
+        if isinstance(value, dict):
+            items[item_id] = value
+
+    @classmethod
+    def _client_action(cls, item_type: str, item: Any) -> ToolCall:
+        call_id = cls._field(item, "call_id")
+        if not isinstance(call_id, str) or not call_id:
+            call_id = cls._field(item, "id")
+        if not isinstance(call_id, str) or not call_id:
+            raise ProviderResponseError(f"{item_type} has no call id")
+        metadata = {
+            "provider": "responses",
+            "call_id": call_id,
+            "item_type": item_type,
+        }
+        if item_type == "local_shell_call":
+            action = cls._field(item, "action")
+            command = cls._field(action, "command")
+            if not isinstance(command, (list, tuple)) or not command:
+                raise ProviderResponseError("local shell call command must be a non-empty argv")
+            arguments: dict[str, Any] = {"argv": [str(value) for value in command]}
+            timeout_ms = cls._field(action, "timeout_ms")
+            if type(timeout_ms) is int and timeout_ms > 0:
+                arguments["timeout_seconds"] = timeout_ms / 1000
+            working_directory = cls._field(action, "working_directory")
+            if isinstance(working_directory, str) and working_directory:
+                arguments["cwd"] = working_directory
+            return ToolCall(
+                name="run_command",
+                arguments=arguments,
+                provider_metadata=metadata,
+            )
+        if item_type == "shell_call":
+            action = cls._field(item, "action")
+            commands = cls._field(action, "commands")
+            if not isinstance(commands, (list, tuple)) or not commands:
+                raise ProviderResponseError("shell call commands must be a non-empty array")
+            normalized: list[dict[str, Any]] = []
+            for command in commands:
+                if isinstance(command, str):
+                    try:
+                        argv_values: Sequence[Any] = shlex.split(command)
+                    except ValueError as error:
+                        raise ProviderResponseError(
+                            "shell call command has invalid quoting"
+                        ) from error
+                else:
+                    argv_values = (
+                        command if isinstance(command, (list, tuple)) else [command]
+                    )
+                if not argv_values or not all(
+                    isinstance(value, str) and value for value in argv_values
+                ):
+                    raise ProviderResponseError("shell call command must be a non-empty argv")
+                normalized.append({"argv": list(argv_values)})
+            timeout_ms = cls._field(action, "timeout_ms")
+            max_output_length = cls._field(action, "max_output_length")
+            if type(timeout_ms) is int and timeout_ms > 0:
+                for command in normalized:
+                    command["timeout_seconds"] = timeout_ms / 1000
+            if type(max_output_length) is int and max_output_length > 0:
+                for command in normalized:
+                    command["max_output_bytes"] = max_output_length
+            return ToolCall(
+                name="run_shell",
+                arguments={"commands": normalized},
+                provider_metadata=metadata,
+            )
+        if item_type == "apply_patch_call":
+            operation = cls._jsonable(cls._field(item, "operation"))
+            if not isinstance(operation, dict):
+                raise ProviderResponseError("apply patch call operation must be an object")
+            return ToolCall(
+                name="apply_patch",
+                arguments={"operation": operation},
+                provider_metadata=metadata,
+            )
+        if item_type == "computer_call":
+            action = cls._jsonable(cls._field(item, "action"))
+            return ToolCall(
+                name="computer_use",
+                arguments={"action": action if isinstance(action, dict) else {}},
+                provider_metadata=metadata,
+            )
+        if item_type == "custom_tool_call":
+            value = cls._field(item, "input")
+            if value is None:
+                value = cls._field(item, "arguments")
+            return ToolCall(
+                name="custom_tool",
+                arguments={"input": cls._jsonable(value)},
+                provider_metadata=metadata,
+            )
+        if item_type == "tool_search_call":
+            return ToolCall(
+                name="tool_search_client",
+                arguments={"arguments": cls._jsonable(cls._field(item, "arguments"))},
+                provider_metadata=metadata,
+            )
+        raise ProviderResponseError(f"unsupported client-side Responses item: {item_type}")
+
+    @classmethod
     def _parse_response(cls, response: Any) -> LLMResponse:
         output = cls._field(response, "output")
         if not isinstance(output, (list, tuple)):
@@ -373,12 +524,20 @@ class ResponsesLLM:
         actions: list[ActionEnvelope] = []
         call_ids: list[str] = []
         hosted_calls: list[dict[str, str]] = []
+        output_items: list[dict[str, Any]] = []
         for item in output:
             item_type = cls._field(item, "type")
             if item_type == "message":
                 content_parts.extend(cls._message_text(item))
                 continue
             if item_type != "function_call":
+                if isinstance(item_type, str) and item_type in _CLIENT_SIDE_OUTPUT_TYPES:
+                    action = cls._client_action(item_type, item)
+                    actions.append(ActionEnvelope(action=action))
+                    call_ids.append(str(action.provider_metadata["call_id"]))
+                    value = cls._jsonable(item)
+                    if isinstance(value, dict):
+                        output_items.append(value)
                 if isinstance(item_type, str) and item_type.endswith("_call"):
                     hosted: dict[str, str] = {"type": item_type}
                     for field in ("id", "call_id", "status"):
@@ -400,12 +559,12 @@ class ResponsesLLM:
                 arguments = json.loads(arguments_text)
                 if not isinstance(arguments, dict):
                     raise TypeError("function call arguments must be an object")
-                action = (
+                function_action: FinishAction | ToolCall = (
                     FinishAction.model_validate(arguments)
                     if name == "finish"
                     else ToolCall(name=name, arguments=arguments)
                 )
-                actions.append(ActionEnvelope(action=action))
+                actions.append(ActionEnvelope(action=function_action))
                 call_ids.append(call_id)
             except (TypeError, ValueError, json.JSONDecodeError) as error:
                 raise ProviderResponseError(
@@ -419,6 +578,8 @@ class ResponsesLLM:
         metadata: dict[str, Any] = {"tool_call_ids": call_ids}
         if hosted_calls:
             metadata["hosted_tool_calls"] = hosted_calls
+        if output_items:
+            metadata["output_items"] = output_items
         response_id = cls._field(response, "id")
         if isinstance(response_id, str) and response_id:
             metadata["response_id"] = response_id
@@ -451,3 +612,21 @@ class ResponsesLLM:
         if isinstance(value, dict):
             return value.get(name)
         return getattr(value, name, None)
+
+    @classmethod
+    def _jsonable(cls, value: Any) -> Any:
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        if isinstance(value, dict):
+            return {str(key): cls._jsonable(nested) for key, nested in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [cls._jsonable(item) for item in value]
+        dump = getattr(value, "model_dump", None)
+        if callable(dump):
+            try:
+                return cls._jsonable(dump(mode="json"))
+            except TypeError:
+                return cls._jsonable(dump())
+        if hasattr(value, "__dict__"):
+            return cls._jsonable(vars(value))
+        return str(value)

@@ -1115,6 +1115,38 @@ def test_identical_patch_conflicts_are_counted_for_loop_guard(tmp_path: Path) ->
     assert AgentLoop._patch_conflict_attempts(action, run_id, deps) == 2
 
 
+def test_loop_persists_responses_client_output_items_for_continuation(
+    tmp_path: Path,
+) -> None:
+    provider = Provider(
+        (
+            LLMResponse(
+                content="done",
+                actions=(ActionEnvelope(action=FinishAction(summary="done")),),
+                provider_metadata={
+                    "output_items": [
+                        {
+                            "type": "shell_call",
+                            "id": "shell-item",
+                            "call_id": "shell-call",
+                            "action": {"commands": [["printf", "ok"]]},
+                        }
+                    ]
+                },
+            ),
+        )
+    )
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+
+    summary = AgentLoop().run(uuid4(), "report status", deps)
+
+    assert summary.stop_reason is StopReason.SUCCESS
+    provider_events = [
+        event for event in records.events if event.event_type == "provider.response"
+    ]
+    assert provider_events[0].payload["output_items"][0]["call_id"] == "shell-call"
+
+
 def test_repeated_stale_patch_stops_instead_of_rendering_endless_tool_errors(
     tmp_path: Path,
 ) -> None:

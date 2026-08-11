@@ -360,6 +360,110 @@ def test_context_gives_fresh_patch_guidance_after_patch_conflict(tmp_path: Path)
     )
 
 
+def test_context_builds_responses_shell_continuation_from_provider_and_tool_events(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    events = (
+        Event.new(
+            "provider.response",
+            run.id,
+            {
+                "output_items": [
+                    {
+                        "type": "shell_call",
+                        "id": "shell-item",
+                        "call_id": "shell-call",
+                        "action": {"commands": [["printf", "ok"]]},
+                    }
+                ]
+            },
+            datetime.now(UTC),
+        ),
+        Event.new(
+            "tool.completed",
+            run.id,
+            {
+                "success": True,
+                "call": {
+                    "name": "run_shell",
+                    "arguments": {"commands": [{"argv": ["printf", "ok"]}]},
+                    "provider_metadata": {
+                        "provider": "responses",
+                        "call_id": "shell-call",
+                        "item_type": "shell_call",
+                    },
+                },
+                "output": "[{\"stdout\":\"ok\\n\",\"stderr\":\"\"}]",
+                "changed_files": [],
+            },
+            datetime.now(UTC),
+        ),
+    )
+
+    context = assembler.build(run.id, "run the command", events)
+
+    continuation = context.metadata["responses_input_items"]
+    assert continuation[0]["type"] == "shell_call"
+    assert continuation[-1] == {
+        "type": "shell_call_output",
+        "call_id": "shell-call",
+        "id": "shell-item_output",
+        "output": [
+            {
+                "stdout": "ok\n",
+                "stderr": "",
+                "outcome": {"type": "exit", "exit_code": 0},
+            }
+        ],
+    }
+
+
+def test_context_omits_unsupported_interactive_responses_calls(tmp_path: Path) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    events = (
+        Event.new(
+            "provider.response",
+            run.id,
+            {
+                "output_items": [
+                    {
+                        "type": "computer_call",
+                        "id": "computer-item",
+                        "call_id": "computer-call",
+                        "action": {"type": "screenshot"},
+                    }
+                ]
+            },
+            datetime.now(UTC),
+        ),
+        Event.new(
+            "tool.completed",
+            run.id,
+            {
+                "success": False,
+                "call": {
+                    "name": "computer_use",
+                    "arguments": {"action": {"type": "screenshot"}},
+                    "provider_metadata": {
+                        "provider": "responses",
+                        "call_id": "computer-call",
+                        "item_type": "computer_call",
+                    },
+                },
+                "output": "adapter unavailable",
+            },
+            datetime.now(UTC),
+        ),
+    )
+
+    context = assembler.build(run.id, "inspect the screen", events)
+
+    assert "responses_input_items" not in context.metadata
+
+
 def test_context_adds_explicit_repair_prompt_after_actionless_response(
     tmp_path: Path,
 ) -> None:
