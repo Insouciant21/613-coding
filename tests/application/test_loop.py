@@ -5,11 +5,17 @@ from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from threading import Lock
+from time import sleep
 from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
 
+from coding613.adapters.llm.openai_compatible import (
+    ProviderResponseError,
+    ProviderTimeoutError,
+)
 from coding613.adapters.storage.sqlite import SqliteEventStore
 from coding613.application.approvals import (
     ApprovalDecision,
@@ -18,7 +24,7 @@ from coding613.application.approvals import (
 )
 from coding613.application.budgets import BudgetLimits
 from coding613.application.feedback import FeedbackClassifier
-from coding613.application.loop import AgentLoop, LoopDependencies
+from coding613.application.loop import AgentLoop, LoopDependencies, _progress_text
 from coding613.application.policy import PolicyEngine, RepositoryPolicyConfig
 from coding613.application.progress import CancellationToken, ProviderCancelledError
 from coding613.application.run_service import RunRequest, RunService
@@ -64,6 +70,40 @@ class Provider:
 class RaisingProvider:
     def complete(self, context: ModelContext, tools: Sequence[ToolDefinition]) -> Any:
         raise RuntimeError("provider unavailable")
+
+
+class TimeoutOnceProvider(Provider):
+    def __init__(self, responses: Sequence[Any]) -> None:
+        super().__init__(responses)
+        self.attempts = 0
+
+    def complete(self, context: ModelContext, tools: Sequence[ToolDefinition]) -> Any:
+        self.attempts += 1
+        if self.attempts == 1:
+            raise ProviderTimeoutError("temporary provider timeout")
+        return super().complete(context, tools)
+
+
+class ResponseErrorOnceProvider(Provider):
+    def __init__(self, responses: Sequence[Any]) -> None:
+        super().__init__(responses)
+        self.attempts = 0
+
+    def complete(self, context: ModelContext, tools: Sequence[ToolDefinition]) -> Any:
+        self.attempts += 1
+        if self.attempts == 1:
+            raise ProviderResponseError("temporary malformed provider response")
+        return super().complete(context, tools)
+
+
+class RepeatedResponseErrorProvider:
+    def __init__(self) -> None:
+        self.attempts = 0
+
+    def complete(self, context: ModelContext, tools: Sequence[ToolDefinition]) -> Any:
+        del context, tools
+        self.attempts += 1
+        raise ProviderResponseError("repeated malformed provider response")
 
 
 class StreamingProvider(Provider):
@@ -255,9 +295,34 @@ class Executor:
 
 
 class ReadExecutor:
+    def __init__(self) -> None:
+        self.calls: list[ToolCall] = []
+
     def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
         del context
+        self.calls.append(call)
         return ToolResult(call=call, success=True, output="read")
+
+
+class OverlapReadExecutor(ReadExecutor):
+    def __init__(self) -> None:
+        super().__init__()
+        self._lock = Lock()
+        self.active = 0
+        self.max_active = 0
+
+    def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
+        del context
+        with self._lock:
+            self.active += 1
+            self.max_active = max(self.max_active, self.active)
+        try:
+            sleep(0.03)
+            self.calls.append(call)
+            return ToolResult(call=call, success=True, output="read")
+        finally:
+            with self._lock:
+                self.active -= 1
 
 
 class Validator:
@@ -335,6 +400,36 @@ def dependencies(
     return deps, records, executor, approvals
 
 
+def enable_validation_tool(
+    deps: LoopDependencies,
+    root: Path,
+    executor: Executor | None = None,
+) -> LoopDependencies:
+    deps.tools.register(
+        ToolDefinition(
+            name="run_validation",
+            description="Run the declared validation command",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "argv": {"type": "array", "items": {"type": "string"}}
+                },
+                "required": ["argv"],
+                "additionalProperties": False,
+            },
+        ),
+        executor or Executor([]),
+    )
+    return replace(
+        deps,
+        permission_mode=PermissionMode.AUTONOMOUS,
+        policy_config=RepositoryPolicyConfig(
+            repository_root=root,
+            validation_commands=(("pytest",),),
+        ),
+    )
+
+
 def test_bare_run_service_defaults_unspecified_mode_to_balanced(tmp_path: Path) -> None:
     deps, _, _, _ = dependencies(tmp_path, Provider(()), Validator(()))
     records = RunRecords()
@@ -368,22 +463,60 @@ def test_invocation_filter_blocks_tool_before_execution(tmp_path: Path) -> None:
     )
 
 
+def test_invocation_allowlist_filters_model_tool_definitions(tmp_path: Path) -> None:
+    provider = Provider(
+        (response(ToolCall(name="edit_file", arguments={"path": "a.py", "content": "x"})),)
+    )
+    deps, _, _, _ = dependencies(tmp_path, provider, Validator(()))
+    deps.tools.register(
+        ToolDefinition(
+            name="read_file",
+            description="Read file",
+            input_schema={
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        ),
+        ReadExecutor(),
+    )
+    deps = replace(
+        deps,
+        tool_filter=ToolFilter(allowed=frozenset({"edit_file"})),
+    )
+
+    AgentLoop().run(uuid4(), "edit", deps)
+
+    assert {tool.name for tool in provider.tool_batches[0]} == {
+        "edit_file",
+        "finish",
+        "set_task_budget",
+    }
+
+
 def test_failure_feedback_drives_repair_and_fresh_finish(tmp_path: Path) -> None:
     provider = Provider(
         (
             response(ToolCall(name="edit_file", arguments={"path": "a.py", "content": "bad"})),
+            response(ToolCall(name="run_validation", arguments={"argv": ["pytest"]})),
             response(ToolCall(name="edit_file", arguments={"path": "a.py", "content": "good"})),
+            response(ToolCall(name="run_validation", arguments={"argv": ["pytest"]})),
             response(FinishAction(summary="done")),
         )
     )
     deps, records, executor, _ = dependencies(
         tmp_path, provider, Validator((validation(1, "1 failed"), validation(0)))
     )
+    deps = enable_validation_tool(deps, tmp_path)
     summary = AgentLoop().run(uuid4(), "fix test", deps)
     assert summary.status is RunState.COMPLETED
     assert summary.stop_reason is StopReason.SUCCESS
     assert len(executor.calls) == 2
-    assert "feedback.test_failure" in provider.contexts[1].metadata["event_types"]
+    assert any(
+        "feedback.test_failure" in context.metadata["event_types"]
+        for context in provider.contexts
+    )
     assert records.iterations[-1].state_after is RunState.COMPLETED
 
 
@@ -420,7 +553,25 @@ def test_loop_publishes_streamed_progress_at_owned_boundaries(tmp_path: Path) ->
     assert [update.text for update in progress.updates if update.kind is ProgressKind.TEXT_DELTA] == [
         "working",
         "working",
+        "done",
     ]
+
+
+def test_tool_progress_keeps_expandable_output_until_ui_cap() -> None:
+    output = "<button>" * 3_000
+
+    rendered = _progress_text(output)
+
+    assert rendered == output
+    assert "output truncated" not in rendered
+
+
+def test_tool_progress_internal_cap_is_ten_megabytes() -> None:
+    output = "x" * 1_500_000
+
+    rendered = _progress_text(output)
+
+    assert rendered == output
 
 
 def test_provider_cancellation_pauses_without_persisting_token_deltas(tmp_path: Path) -> None:
@@ -491,11 +642,20 @@ def test_model_tool_batch_runs_objective_validation_once(tmp_path: Path) -> None
                     arguments={"path": "answer.txt", "content": "done"},
                 )
             ),
+            response(ToolCall(name="run_validation", arguments={"argv": ["pytest"]})),
+            response(
+                ToolCall(
+                    name="edit_file",
+                    arguments={"path": "answer.txt", "content": "verified"},
+                )
+            ),
+            response(ToolCall(name="run_validation", arguments={"argv": ["pytest"]})),
             response(FinishAction(summary="done")),
         )
     )
     validator = Validator((validation(1, "foundation missing"), validation(0)))
     deps, _, _, _ = dependencies(tmp_path, provider, validator)
+    deps = enable_validation_tool(deps, tmp_path)
     read_executor = ReadExecutor()
     for name, schema in (
         ("list_files", {"type": "object", "properties": {}}),
@@ -517,6 +677,285 @@ def test_model_tool_batch_runs_objective_validation_once(tmp_path: Path) -> None
 
     assert summary.status is RunState.COMPLETED
     assert validator.calls == 2
+    assert "read_file" in {tool.name for tool in provider.tool_batches[1]}
+    assert "edit_file" in {tool.name for tool in provider.tool_batches[1]}
+
+
+def test_write_batch_defers_validation_until_explicit_validation_action(tmp_path: Path) -> None:
+    provider = Provider(
+        (
+            LLMResponse(
+                actions=(
+                    ActionEnvelope(
+                        action=ToolCall(
+                            name="edit_file", arguments={"path": "a.py", "content": "one"}
+                        )
+                    ),
+                    ActionEnvelope(
+                        action=ToolCall(
+                            name="edit_file", arguments={"path": "b.py", "content": "two"}
+                        )
+                    ),
+                )
+            ),
+            response(ToolCall(name="run_validation", arguments={"argv": ["pytest"]})),
+            response(FinishAction(summary="done")),
+        )
+    )
+    validator = Validator((validation(0, "all passed"),))
+    deps, _, _, _ = dependencies(tmp_path, provider, validator)
+    deps = replace(deps, permission_mode=PermissionMode.AUTONOMOUS)
+    deps = replace(
+        deps,
+        policy_config=RepositoryPolicyConfig(
+            repository_root=tmp_path,
+            validation_commands=(("pytest",),),
+        ),
+    )
+    deps.tools.register(
+        ToolDefinition(
+            name="run_validation",
+            description="run the declared validation command",
+            input_schema={
+                "type": "object",
+                "properties": {"argv": {"type": "array", "items": {"type": "string"}}},
+                "required": ["argv"],
+                "additionalProperties": False,
+            },
+        ),
+        Executor([]),
+    )
+
+    summary = AgentLoop().run(uuid4(), "edit two files", deps)
+
+    assert summary.status is RunState.COMPLETED
+    assert validator.calls == 1
+
+
+def test_model_selected_resource_profile_updates_next_request_budget(tmp_path: Path) -> None:
+    provider = Provider(
+        (
+            response(
+                ToolCall(
+                    name="set_task_budget",
+                    arguments={"difficulty": "complex"},
+                )
+            ),
+            response(FinishAction(summary="inspected")),
+        )
+    )
+    deps, _, _, _ = dependencies(
+        tmp_path,
+        provider,
+        Validator(()),
+        budget=BudgetLimits(per_agent_turns=40, total_model_calls=3),
+    )
+    run_id = uuid4()
+
+    summary = AgentLoop().run(run_id, "design a large migration", deps)
+
+    assert summary.status is RunState.COMPLETED
+    assert "set_task_budget" in {tool.name for tool in provider.tool_batches[0]}
+    assert "set_task_budget" not in {tool.name for tool in provider.tool_batches[1]}
+    assert provider.contexts[1].metadata["resource_profile"] == "complex"
+    assert provider.contexts[1].metadata["max_output_tokens"] == 128_000
+
+
+def test_independent_read_only_tools_run_concurrently_but_preserve_result_order(
+    tmp_path: Path,
+) -> None:
+    provider = Provider(
+        (
+            LLMResponse(
+                actions=(
+                    ActionEnvelope(action=ToolCall(name="list_files", arguments={})),
+                    ActionEnvelope(
+                        action=ToolCall(name="read_file", arguments={"path": "state.ts"})
+                    ),
+                )
+            ),
+            response(FinishAction(summary="inspected")),
+        )
+    )
+    reader = OverlapReadExecutor()
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    for name, schema in (
+        ("list_files", {"type": "object", "properties": {}}),
+        (
+            "read_file",
+            {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        ),
+    ):
+        deps.tools.register(ToolDefinition(name=name, description=name, input_schema=schema), reader)
+
+    summary = AgentLoop().run(uuid4(), "inspect the cube state", deps)
+
+    assert summary.status is RunState.COMPLETED
+    assert reader.max_active == 2
+    completed = [
+        event.payload["call"]["name"]
+        for event in records.events
+        if event.event_type == "tool.completed"
+    ]
+    assert completed == ["list_files", "read_file"]
+
+
+def test_read_only_action_does_not_trigger_objective_validation(
+    tmp_path: Path,
+) -> None:
+    provider = Provider(
+        (response(ToolCall(name="read_file", arguments={"path": "state.ts"})),)
+    )
+    validator = Validator(())
+    deps, _, _, _ = dependencies(
+        tmp_path,
+        provider,
+        validator,
+        budget=BudgetLimits(total_model_calls=1),
+    )
+    deps.tools.register(
+        ToolDefinition(
+            name="read_file",
+            description="read file",
+            input_schema={
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        ),
+        ReadExecutor(),
+    )
+
+    _summary = AgentLoop().run(uuid4(), "inspect the cube state", deps)
+
+    assert validator.calls == 0
+
+
+def test_read_only_task_can_finish_without_objective_validation(tmp_path: Path) -> None:
+    provider = Provider(
+        (
+            response(ToolCall(name="read_file", arguments={"path": "state.ts"})),
+            response(FinishAction(summary="inspected")),
+        )
+    )
+    validator = Validator(())
+    deps, _, _, _ = dependencies(tmp_path, provider, validator)
+    deps.tools.register(
+        ToolDefinition(
+            name="read_file",
+            description="read file",
+            input_schema={
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+        ),
+        ReadExecutor(),
+    )
+
+    summary = AgentLoop().run(uuid4(), "inspect the cube state", deps)
+
+    assert summary.status is RunState.COMPLETED
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert validator.calls == 0
+
+
+def test_repeated_read_action_is_rejected_and_worker_can_write(tmp_path: Path) -> None:
+    repeated_read = response(ToolCall(name="read_file", arguments={"path": "state.ts"}))
+    provider = Provider(
+        (
+            repeated_read,
+            repeated_read,
+            response(ToolCall(name="edit_file", arguments={"path": "state.ts", "content": "fixed"})),
+            response(FinishAction(summary="done")),
+        )
+    )
+    validator = Validator((validation(0), validation(0), validation(0)))
+    deps, records, executor, _ = dependencies(tmp_path, provider, validator)
+    reader = ReadExecutor()
+    for name, schema in (
+        ("read_file", {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}),
+        ("list_files", {"type": "object", "properties": {}}),
+    ):
+        deps.tools.register(ToolDefinition(name=name, description=name, input_schema=schema), reader)
+
+    summary = AgentLoop().run(uuid4(), "repair state", deps)
+
+    assert summary.status is RunState.COMPLETED
+    assert [call.name for call in reader.calls] == ["read_file"]
+    assert [call.name for call in executor.calls] == ["edit_file"]
+    assert any(
+        event.event_type == "feedback.invalid_action"
+        and "repeat" in event.payload["message"].lower()
+        for event in records.events
+    )
+    assert "feedback.invalid_action" in provider.contexts[2].metadata["event_types"]
+    assert "read_file" not in {tool.name for tool in provider.tool_batches[2]}
+    assert "edit_file" in {tool.name for tool in provider.tool_batches[2]}
+
+
+def test_repeated_successful_write_action_is_rejected(tmp_path: Path) -> None:
+    repeated_write = ToolCall(
+        name="edit_file", arguments={"path": "state.ts", "content": "fixed"}
+    )
+    provider = Provider(
+        (
+            response(repeated_write),
+            response(ToolCall(name="run_validation", arguments={"argv": ["pytest"]})),
+            response(repeated_write),
+            response(
+                ToolCall(
+                    name="edit_file",
+                    arguments={"path": "state.ts", "content": "fixed again"},
+                )
+            ),
+            response(ToolCall(name="run_validation", arguments={"argv": ["pytest"]})),
+            response(FinishAction(summary="done")),
+        )
+    )
+    validator = Validator((validation(1, "needs change"), validation(0)))
+    deps, records, executor, _ = dependencies(tmp_path, provider, validator)
+    deps = enable_validation_tool(deps, tmp_path)
+
+    summary = AgentLoop().run(uuid4(), "repair state", deps)
+
+    assert summary.status is RunState.COMPLETED
+    assert [call.arguments["content"] for call in executor.calls] == [
+        "fixed",
+        "fixed again",
+    ]
+    assert any(
+        event.event_type == "feedback.invalid_action"
+        and "repeated write" in event.payload["message"].lower()
+        for event in records.events
+    )
+
+
+def test_repeated_write_after_fresh_passing_validation_completes_without_replay(
+    tmp_path: Path,
+) -> None:
+    repeated_write = ToolCall(
+        name="edit_file", arguments={"path": "state.ts", "content": "fixed"}
+    )
+    provider = Provider(
+        (
+            response(repeated_write),
+            response(ToolCall(name="run_validation", arguments={"argv": ["pytest"]})),
+            response(repeated_write),
+        )
+    )
+    deps, _, executor, _ = dependencies(tmp_path, provider, Validator((validation(0),)))
+    deps = enable_validation_tool(deps, tmp_path)
+
+    summary = AgentLoop().run(uuid4(), "repair state", deps)
+
+    assert summary.status is RunState.COMPLETED
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert [call.arguments["content"] for call in executor.calls] == ["fixed"]
 
 
 def test_invalid_response_and_premature_finish_are_repaired(tmp_path: Path) -> None:
@@ -531,7 +970,7 @@ def test_invalid_response_and_premature_finish_are_repaired(tmp_path: Path) -> N
     deps, records, _, _ = dependencies(tmp_path, provider, Validator((validation(0),)))
     summary = AgentLoop().run(uuid4(), "fix", deps)
     assert summary.status is RunState.COMPLETED
-    assert [event.event_type for event in records.events].count("feedback.invalid_action") == 2
+    assert [event.event_type for event in records.events].count("feedback.invalid_action") == 1
     assert records.iterations[0].schema_validation is not None
     assert not records.iterations[0].schema_validation.valid
     assert records.iterations[0].policy_decision is None
@@ -635,6 +1074,32 @@ def test_no_progress_and_cancel_are_terminal(tmp_path: Path) -> None:
     cancelled = loop.cancel(cancelled_id, "cancelled", deps)
     assert cancelled.status is RunState.CANCELLED
     assert cancelled.stop_reason is StopReason.CANCELLED
+
+
+def test_repeated_text_only_model_responses_stop_before_budget_exhaustion(
+    tmp_path: Path,
+) -> None:
+    provider = Provider(
+        (
+            LLMResponse(content="I'll investigate the project structure."),
+            LLMResponse(content="I'll investigate the project structure."),
+            LLMResponse(content="I'll investigate the project structure."),
+        )
+    )
+    deps, records, _, _ = dependencies(
+        tmp_path,
+        provider,
+        Validator(()),
+        budget=BudgetLimits(total_model_calls=10),
+    )
+
+    summary = AgentLoop().run(uuid4(), "explain whether this uses React", deps)
+
+    assert summary.stop_reason is StopReason.NO_PROGRESS
+    assert summary.resource_usage.model_calls == 2
+    assert len(provider.contexts) == 2
+    assert records.iterations[-1].feedback is not None
+    assert records.iterations[-1].feedback.kind is FeedbackKind.NO_PROGRESS
 
 
 def test_run_service_creates_approves_resumes_and_cancels(tmp_path: Path) -> None:
@@ -1175,7 +1640,7 @@ def test_dependency_exceptions_become_terminal_summaries(
     tmp_path: Path, boundary: str, expected_stop: str
 ) -> None:
     action = ToolCall(name="edit_file", arguments={"path": "a.py", "content": "ok"})
-    provider: Any = Provider((response(action),))
+    provider: Any = Provider((response(action), response(FinishAction(summary="done"))))
     deps, records, _, _ = dependencies(
         tmp_path, provider, Validator((validation(0),))
     )
@@ -1233,6 +1698,75 @@ def test_dependency_exceptions_become_terminal_summaries(
     }
 
 
+def test_retryable_provider_timeout_is_retried_inside_same_run(tmp_path: Path) -> None:
+    action = ToolCall(name="edit_file", arguments={"path": "a.py", "content": "ok"})
+    provider = TimeoutOnceProvider((response(action), response(FinishAction(summary="done"))))
+    deps, records, _, _ = dependencies(
+        tmp_path,
+        provider,
+        Validator((validation(0),)),
+        budget=BudgetLimits(total_model_calls=4),
+    )
+
+    summary = AgentLoop().run(uuid4(), "repair", deps)
+
+    assert summary.status is RunState.COMPLETED
+    assert provider.attempts == 3
+    assert len(provider.contexts) == 2
+    assert "feedback.environment_failure" in provider.contexts[0].metadata["event_types"]
+    retry_events = [
+        event for event in records.events if event.event_type == "feedback.environment_failure"
+    ]
+    assert len(retry_events) == 1
+    assert retry_events[0].payload["retryable"] is True
+
+
+def test_retryable_provider_response_error_is_retried_inside_same_run(tmp_path: Path) -> None:
+    action = ToolCall(name="edit_file", arguments={"path": "a.py", "content": "ok"})
+    provider = ResponseErrorOnceProvider(
+        (response(action), response(FinishAction(summary="done")))
+    )
+    deps, _, _, _ = dependencies(
+        tmp_path,
+        provider,
+        Validator((validation(0),)),
+        budget=BudgetLimits(total_model_calls=4),
+    )
+
+    summary = AgentLoop().run(uuid4(), "repair", deps)
+
+    assert summary.status is RunState.COMPLETED
+    assert provider.attempts == 3
+
+
+def test_repeated_retryable_provider_errors_stop_before_model_budget(tmp_path: Path) -> None:
+    provider = RepeatedResponseErrorProvider()
+    deps, records, _, _ = dependencies(
+        tmp_path,
+        provider,  # type: ignore[arg-type]
+        Validator(()),
+        budget=BudgetLimits(total_model_calls=10),
+    )
+
+    summary = AgentLoop().run(uuid4(), "inspect", deps)
+
+    assert summary.stop_reason is StopReason.PROVIDER_ERROR
+    # Codex's stream_max_retries is five retries after the initial request
+    # (1/5 ... 5/5), so the sixth failure is terminal.
+    assert summary.resource_usage.model_calls == 6
+    assert provider.attempts == 6
+    assert records.iterations[-1].feedback is not None
+    assert records.iterations[-1].feedback.kind is FeedbackKind.ENVIRONMENT_FAILURE
+    retry_events = [
+        event
+        for event in records.events
+        if event.event_type == "feedback.environment_failure"
+        and event.payload.get("retryable") is True
+    ]
+    assert [event.payload["details"]["retry_count"] for event in retry_events] == [1, 2, 3, 4, 5]
+    assert all(event.payload["details"]["max_retries"] == 5 for event in retry_events)
+
+
 @pytest.mark.parametrize(
     "boundary",
     ("context", "policy", "tool", "validator", "classifier"),
@@ -1242,7 +1776,9 @@ def test_malformed_dependency_results_become_terminal_summaries(
 ) -> None:
     action = ToolCall(name="edit_file", arguments={"path": "a.py", "content": "ok"})
     deps, records, _, _ = dependencies(
-        tmp_path, Provider((response(action),)), Validator((validation(0),))
+        tmp_path,
+        Provider((response(action), response(FinishAction(summary="done")))),
+        Validator((validation(0),)),
     )
 
     class MalformedContext:

@@ -1,4 +1,9 @@
-"""Separate, visible budgets for interactive and unattended runs."""
+"""Visible safety budgets for interactive and unattended runs.
+
+Per-agent turns remain in persisted configuration for backward compatibility,
+but are informational only. Context compaction, rather than a turn ceiling,
+controls the length of an agent conversation.
+"""
 
 from __future__ import annotations
 
@@ -66,7 +71,6 @@ class BudgetTracker:
         exceeded = tuple(
             name
             for name, used, limit in (
-                ("per_agent_turns", projected[0], self.limits.per_agent_turns),
                 ("total_model_calls", projected[1], self.limits.total_model_calls),
                 ("wall_time_seconds", projected[2], self.limits.wall_time_seconds),
                 ("provider_cost", projected[3], self.limits.provider_cost),

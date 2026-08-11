@@ -19,11 +19,25 @@ ConversationLog {
     padding: 0 1;
 }
 
+.config-menu {
+    height: auto;
+    max-height: 12;
+    border: solid #6d8b74;
+    background: #17191b;
+    color: #e8e8e2;
+    padding: 0 1;
+}
+
 .user-message {
     color: #d4c59a;
 }
 
 .assistant-message {
+    color: #e8e8e2;
+}
+
+.tool-result, .validation-result {
+    background: #101214;
     color: #e8e8e2;
 }
 
@@ -57,6 +71,24 @@ TaskComposer {
     background: #17191b;
     color: #f2f1eb;
     border-top: solid #5f6f65;
+}
+
+CommandHints {
+    width: 100%;
+    height: auto;
+    max-height: 4;
+    padding: 0 1;
+    background: #1a1e21;
+    color: #a9c7b0;
+}
+
+UsageHints {
+    width: 100%;
+    height: auto;
+    max-height: 2;
+    padding: 0 1;
+    background: #17191b;
+    color: #87958a;
 }
 
 StatusFooter {

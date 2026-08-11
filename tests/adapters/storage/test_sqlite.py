@@ -442,6 +442,40 @@ def test_run_compare_and_set_rejects_a_stale_snapshot(tmp_path: Path) -> None:
     assert store.get_run(original.id) == paused
 
 
+def test_run_compare_and_set_accepts_equivalent_tool_set_order(
+    tmp_path: Path,
+) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+    original = Run(
+        task="cross-process status",
+        options=RunOptions(allowed_tools=frozenset({"apply_patch", "finish"})),
+    )
+    store.create_run(original)
+
+    with sqlite3.connect(store.path) as connection:
+        options = json.loads(
+            connection.execute(
+                "SELECT options_json FROM runs WHERE id = ?", (str(original.id),)
+            ).fetchone()[0]
+        )
+        options["allowed_tools"] = list(reversed(options["allowed_tools"]))
+        connection.execute(
+            "UPDATE runs SET options_json = ? WHERE id = ?",
+            (json.dumps(options, sort_keys=True, separators=(",", ":")), str(original.id)),
+        )
+
+    replacement = original.model_copy(
+        update={
+            "state": RunState.CANCELLED,
+            "stop_reason": StopReason.CANCELLED,
+            "updated_at": original.updated_at + timedelta(seconds=1),
+        }
+    )
+
+    assert store.compare_and_set_run(original, replacement)
+    assert store.get_run(original.id) == replacement
+
+
 def test_run_and_events_round_trip_in_append_order(tmp_path: Path) -> None:
     store = SqliteEventStore(tmp_path / "state.db")
     run = Run(task="fix parser", permission_mode=PermissionMode.BALANCED)

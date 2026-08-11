@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from rich.text import Text
 from textual.containers import VerticalScroll
 from textual.widgets import Markdown
 
@@ -61,8 +62,36 @@ def test_tool_call_and_result_render_structured_bounded_details() -> None:
     assert "[REDACTED]" in call_text
     assert "failed" in result_text
     assert "password=hunter2" not in result_text
-    assert "output truncated" in result_text
     assert len(result_text) < 12_000
+    assert "output truncated" not in result_text
+    assert "characters hidden; press Ctrl+T to expand" in result_text
+    expanded_widget = render_tool_result(result)
+    assert expanded_widget.expandable
+    assert expanded_widget.toggle_expanded()
+    assert "output truncated" not in expanded_widget.display_text
+    assert "x" * 200 in expanded_widget.display_text
+
+
+def test_large_tool_result_is_collapsed_and_can_be_expanded() -> None:
+    output = "\n".join(f"line-{index}" for index in range(400))
+    widget = render_tool_result(
+        ToolResult(
+            call=ToolCall(name="read_file", arguments={"path": "src/app.py"}),
+            success=True,
+            output=output,
+        )
+    )
+
+    assert widget.expandable
+    assert "line-0" in widget.display_text
+    assert "line-399" not in widget.display_text
+    assert "Ctrl+T" in widget.display_text
+
+    assert widget.toggle_expanded()
+    assert "line-399" in widget.display_text
+    assert "Ctrl+T" not in widget.display_text
+    assert not widget.toggle_expanded()
+    assert "line-399" not in widget.display_text
 
 
 def test_diff_and_validation_render_command_status_and_capped_output() -> None:
@@ -83,6 +112,27 @@ def test_diff_and_validation_render_command_status_and_capped_output() -> None:
     assert "1.25s" in validation_text
     assert "output truncated" in validation_text
     assert len(validation_text) < 12_000
+
+
+def test_validation_render_caps_lines_and_avoids_syntax_background_blocks() -> None:
+    validation = ValidationResult(
+        command=("npm", "test"),
+        kind=ValidationKind.TEST,
+        exit_code=1,
+        stdout="\n".join(f"line-{index}" for index in range(400)),
+        duration_seconds=0.2,
+    )
+
+    widget = render_validation(validation)
+
+    assert "line-0" in widget.display_text
+    assert "line-9" in widget.display_text
+    assert "line-10" not in widget.display_text
+    assert "lines omitted" in widget.display_text
+    assert isinstance(widget.renderable.renderables[1], Text)
+    assert widget.expandable
+    assert widget.toggle_expanded()
+    assert "line-399" in widget.display_text
 
 
 def test_approval_contains_exact_fingerprint_reason_paths_and_long_diff() -> None:

@@ -10,8 +10,11 @@ from uuid import UUID, uuid4
 import pytest
 from textual.widgets import Static
 
+from coding613.application.credentials import CredentialStatus
 from coding613.application.interactive import InteractiveSnapshot, TranscriptEntry
 from coding613.application.progress import CancellationToken
+from coding613.application.user_configuration import ProviderProfile
+from coding613.config import LLMConfig
 from coding613.domain.actions import ToolCall
 from coding613.domain.interactive import InteractiveSession
 from coding613.domain.models import (
@@ -28,7 +31,15 @@ from coding613.ports.progress import ProgressKind, ProgressSink, RunProgress
 from coding613.tui.app import CodingApp
 from coding613.tui.controller import TuiController
 from coding613.tui.renderers import ApprovalView, AssistantMessage, DetailMessage
-from coding613.tui.widgets import ActiveOperation, ConversationLog, StatusFooter, TaskComposer
+from coding613.tui.widgets import (
+    ActiveOperation,
+    CommandHints,
+    ConfigMenu,
+    ConversationLog,
+    StatusFooter,
+    TaskComposer,
+    UsageHints,
+)
 
 
 class FakeUiServices:
@@ -250,6 +261,60 @@ async def test_tui_shell_focuses_composer_and_inserts_initial_task() -> None:
 
 
 @pytest.mark.asyncio
+async def test_tui_shows_slash_command_hints_and_cycles_with_tab_and_arrows() -> None:
+    app = CodingApp()
+    async with app.run_test(size=(80, 24)) as pilot:
+        composer = app.query_one(TaskComposer)
+        hints = app.query_one(CommandHints)
+
+        composer.load_text("/co")
+        await pilot.pause()
+        assert hints.display
+        assert "/config" in str(hints.renderable)
+        assert "/compact" in str(hints.renderable)
+
+        await pilot.press("tab")
+        assert composer.text == "/config"
+        await pilot.press("tab")
+        assert composer.text == "/compact"
+        await pilot.press("up")
+        assert composer.text == "/config"
+
+        composer.load_text("/config ")
+        await pilot.pause()
+        assert not hints.display
+
+
+@pytest.mark.asyncio
+async def test_tui_keeps_persistent_usage_hints_visible() -> None:
+    app = CodingApp()
+    async with app.run_test(size=(80, 24)):
+        usage = app.query_one(UsageHints)
+        text = str(usage.renderable)
+        assert "Enter send" in text
+        assert "Ctrl+J newline" in text
+        assert "Ctrl+Q exit" in text
+        assert "Ctrl+T expand tool" in text
+        assert "/help" in text
+
+
+@pytest.mark.asyncio
+async def test_tui_renders_markdown_links_without_corrupting_textual_style_metadata() -> None:
+    app = CodingApp()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await app._render_progress(
+            (
+                RunProgress(
+                    run_id=uuid4(),
+                    kind=ProgressKind.TEXT_DELTA,
+                    text="Read [README](https://example.com) and `config.py`.",
+                ),
+            )
+        )
+        await pilot.pause()
+
+
+@pytest.mark.asyncio
 async def test_tui_history_restores_previous_prompt_without_submitting() -> None:
     fake = FakeUiServices()
     app = CodingApp(controller=_controller(fake))
@@ -294,6 +359,58 @@ async def test_tui_shell_stays_stable_in_narrow_terminal() -> None:
         assert composer.region.width == footer.region.width == log.region.width == 60
         assert composer.region.height >= 3
         assert footer.region.y >= composer.region.bottom
+
+
+@pytest.mark.asyncio
+async def test_tui_composer_has_no_hover_tooltip_and_bottom_rows_fit() -> None:
+    app = CodingApp()
+    async with app.run_test(size=(80, 24)):
+        composer = app.query_one(TaskComposer)
+        usage = app.query_one(UsageHints)
+        footer = app.query_one(StatusFooter)
+
+        assert composer.tooltip is None
+        assert usage.region.bottom <= app.size.height
+        assert footer.region.bottom <= app.size.height
+        assert usage.region.y >= composer.region.bottom
+        assert footer.region.y >= usage.region.bottom
+
+
+@pytest.mark.asyncio
+async def test_tui_replaces_stale_text_only_turn_before_rendering_next_turn() -> None:
+    app = CodingApp()
+    run_id = uuid4()
+    async with app.run_test(size=(80, 24)):
+        await app._render_progress(
+            (
+                RunProgress(
+                    run_id=run_id,
+                    kind=ProgressKind.STATE,
+                    text=RunState.WAITING_MODEL.value,
+                    payload={"to": RunState.WAITING_MODEL.value},
+                ),
+                RunProgress(
+                    run_id=run_id,
+                    kind=ProgressKind.TEXT_DELTA,
+                    text="I will inspect the repository.",
+                ),
+                RunProgress(
+                    run_id=run_id,
+                    kind=ProgressKind.STATE,
+                    text=RunState.WAITING_MODEL.value,
+                    payload={"to": RunState.WAITING_MODEL.value},
+                ),
+                RunProgress(
+                    run_id=run_id,
+                    kind=ProgressKind.TEXT_DELTA,
+                    text="No action was produced.",
+                ),
+            )
+        )
+
+        assistants = list(app.query(AssistantMessage))
+        assert len(assistants) == 1
+        assert assistants[0].markdown_text == "No action was produced."
 
 
 @pytest.mark.asyncio
@@ -418,6 +535,45 @@ async def test_tui_tracks_repeated_tool_names_by_call_id() -> None:
         assert len(details) == 2
         assert any("one" in item for item in details)
         assert any("two" in item for item in details)
+
+
+@pytest.mark.asyncio
+async def test_tui_ctrl_t_expands_the_latest_large_tool_result() -> None:
+    app = CodingApp()
+    output = "\n".join(f"line-{index}" for index in range(400))
+    async with app.run_test(size=(80, 24)) as pilot:
+        await app._render_progress(
+            (
+                RunProgress(
+                    run_id=uuid4(),
+                    kind=ProgressKind.TOOL_STARTED,
+                    payload={
+                        "tool_call_id": "call-read",
+                        "tool": "read_file",
+                        "arguments": {"path": "src/app.py"},
+                    },
+                ),
+                RunProgress(
+                    run_id=uuid4(),
+                    kind=ProgressKind.TOOL_FINISHED,
+                    payload={
+                        "tool_call_id": "call-read",
+                        "tool": "read_file",
+                        "success": True,
+                        "output": output,
+                    },
+                ),
+            )
+        )
+        widget = app.query_one(DetailMessage)
+        assert widget.expandable
+        assert "line-399" not in widget.display_text
+
+        await pilot.press("ctrl+t")
+        assert "line-399" in widget.display_text
+
+        await pilot.press("ctrl+t")
+        assert "line-399" not in widget.display_text
 
 
 @pytest.mark.asyncio
@@ -654,6 +810,129 @@ async def test_tui_permissions_slash_command_changes_next_run_mode() -> None:
                 break
         assert app.permission_mode is PermissionMode.STRICT
         assert "strict" in str(app.query_one(StatusFooter).renderable)
+
+
+@pytest.mark.asyncio
+async def test_tui_provider_command_switches_user_profile() -> None:
+    fake = FakeUiServices()
+
+    class FakeUserConfiguration:
+        def __init__(self) -> None:
+            self.active = "openai"
+
+        def profiles(self) -> tuple[ProviderProfile, ...]:
+            return tuple(
+                ProviderProfile(
+                    name=name,
+                    config=LLMConfig(model=f"{name}-model", credential=f"{name}-key"),
+                    active=name == self.active,
+                    credential=CredentialStatus(
+                        provider=f"{name}-key", configured=False, source="none"
+                    ),
+                )
+                for name in ("deepseek", "openai")
+            )
+
+    user = FakeUserConfiguration()
+
+    def switch(name: str) -> SimpleNamespace:
+        user.active = name
+        return SimpleNamespace(active_provider=name)
+
+    app = CodingApp(
+        controller=_controller(fake),
+        services=SimpleNamespace(
+            user_configuration=user,
+            switch_provider=switch,
+            llm_metadata=LLMConfig(model="openai-model"),
+        ),
+    )
+    async with app.run_test(size=(80, 24)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("/provider use deepseek")
+        await pilot.press("enter")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if "Active provider: deepseek" in "\n".join(
+                str(widget.renderable) for widget in app.query_one(ConversationLog).query(Static)
+            ):
+                break
+
+        assert user.active == "deepseek"
+        assert any(
+            "Active provider: deepseek" in str(widget.renderable)
+            for widget in app.query_one(ConversationLog).query(Static)
+        )
+
+
+@pytest.mark.asyncio
+async def test_tui_config_slash_command_persists_and_refreshes_configuration() -> None:
+    fake = FakeUiServices()
+    calls: list[tuple[str, str]] = []
+
+    class FakeConfiguration:
+        def summary(self) -> str:
+            return "mode=balanced"
+
+        def set_value(self, key: str, value: str) -> SimpleNamespace:
+            calls.append((key, value))
+            return SimpleNamespace(permission_mode=PermissionMode.AUTONOMOUS)
+
+    app = CodingApp(
+        controller=_controller(fake),
+        services=SimpleNamespace(configuration=FakeConfiguration()),
+    )
+    async with app.run_test(size=(80, 24)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("/config set mode autonomous")
+        await pilot.press("enter")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if calls:
+                break
+
+        assert calls == [("mode", "autonomous")]
+        assert app.permission_mode is PermissionMode.AUTONOMOUS
+        assert any(
+            "Configuration updated: mode" in str(widget.renderable)
+            for widget in app.query_one(ConversationLog).query(Static)
+        )
+
+
+@pytest.mark.asyncio
+async def test_tui_config_without_arguments_opens_selectable_menu() -> None:
+    fake = FakeUiServices()
+
+    class FakeConfiguration:
+        def summary(self) -> str:
+            return "mode=balanced"
+
+        def set_value(self, key: str, value: str) -> SimpleNamespace:
+            del key
+            return SimpleNamespace(permission_mode=PermissionMode(value))
+
+    app = CodingApp(
+        controller=_controller(fake),
+        services=SimpleNamespace(
+            configuration=FakeConfiguration(),
+            reload_configuration=lambda: SimpleNamespace(
+                permission_mode=PermissionMode.BALANCED
+            ),
+        ),
+    )
+    async with app.run_test(size=(80, 24)) as pilot:
+        composer = app.query_one(TaskComposer)
+        composer.load_text("/config")
+        await pilot.press("enter")
+        for _ in range(30):
+            await pilot.pause(0.01)
+            if app.query(ConfigMenu):
+                break
+        menu = app.query_one(ConfigMenu)
+        assert menu.options[1].prompt == "Permission mode: strict"
+        await pilot.press("down", "enter")
+        await pilot.pause()
+        assert not app.query(ConfigMenu)
 
 
 @pytest.mark.asyncio

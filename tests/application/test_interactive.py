@@ -22,21 +22,28 @@ def _configured_repo(path: Path) -> None:
         """
 [validation]
 commands = [["python", "-c", "print('ok')"]]
-
-[budgets]
-total_model_calls = 8
 """,
         encoding="utf-8",
     )
 
 
-def _turn(final_text: str) -> tuple[LLMResponse, LLMResponse]:
+def _turn(final_text: str) -> tuple[LLMResponse, LLMResponse, LLMResponse]:
     return (
         LLMResponse(
             content="working",
             actions=(
                 ActionEnvelope(
                     action=ToolCall(name="read_file", arguments={"path": "answer.txt"})
+                ),
+            ),
+        ),
+        LLMResponse(
+            actions=(
+                ActionEnvelope(
+                    action=ToolCall(
+                        name="run_validation",
+                        arguments={"argv": ["python", "-c", "print('ok')"]},
+                    )
                 ),
             ),
         ),
@@ -89,6 +96,36 @@ def test_interactive_snapshot_returns_latest_paused_run_as_active(tmp_path: Path
     assert snapshot.active_run is not None
     assert snapshot.active_run.id == run.id
     assert snapshot.active_run.state is RunState.PAUSED
+
+
+def test_finish_summary_is_used_when_final_model_content_is_empty(tmp_path: Path) -> None:
+    _configured_repo(tmp_path)
+    provider = ScriptedLLM(
+        (
+            LLMResponse(content="I will inspect the project first."),
+            LLMResponse(
+                actions=(
+                    ActionEnvelope(
+                        action=FinishAction(summary="docker compose up -d")
+                    ),
+                )
+            ),
+        )
+    )
+    services = build_services(tmp_path, provider=provider)
+    session = services.interactive.create("Startup command")
+    run = services.interactive.submit(session.id, "give me the startup command")
+
+    summary = services.interactive.execute(
+        run.id, NullProgressSink(), CancellationToken()
+    )
+    snapshot = services.interactive.resume_session(session.id)
+
+    assert summary.status is RunState.COMPLETED
+    assert [(entry.role, entry.text) for entry in snapshot.transcript] == [
+        ("user", "give me the startup command"),
+        ("assistant", "docker compose up -d"),
+    ]
 
 
 @pytest.mark.parametrize("message", ["", "   ", "x" * 100_001])

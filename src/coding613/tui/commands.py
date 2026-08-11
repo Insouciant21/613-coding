@@ -56,6 +56,24 @@ def _permission_arguments(arguments: tuple[str, ...]) -> tuple[str, ...]:
     raise ValueError("/permissions expects a mode, list, allow, deny, or clear")
 
 
+def _config_arguments(arguments: tuple[str, ...]) -> tuple[str, ...]:
+    if not arguments or arguments == ("show",):
+        return arguments
+    if arguments[0] == "set":
+        if len(arguments) != 3 or not arguments[1] or not arguments[2]:
+            raise ValueError("/config set expects KEY and VALUE")
+        return arguments
+    raise ValueError("/config expects show or set KEY VALUE")
+
+
+def _provider_arguments(arguments: tuple[str, ...]) -> tuple[str, ...]:
+    if not arguments or arguments == ("list",):
+        return arguments
+    if arguments[0] in {"use", "show"} and len(arguments) == 2 and arguments[1]:
+        return arguments
+    raise ValueError("/provider expects list, use NAME, or show NAME")
+
+
 def _resume_arguments(arguments: tuple[str, ...]) -> tuple[str, ...]:
     if not arguments:
         return ("latest",)
@@ -88,6 +106,18 @@ class CommandCatalog:
         specs = {
             "help": CommandSpec("help", "/help [COMMAND]", "Show command help", _help_arguments),
             "model": CommandSpec("model", "/model [NAME]", "Show or choose a model", _model_arguments),
+            "config": CommandSpec(
+                "config",
+                "/config [show|set KEY VALUE]",
+                "Show or change project policy settings",
+                _config_arguments,
+            ),
+            "provider": CommandSpec(
+                "provider",
+                "/provider [list|use NAME|show NAME]",
+                "List or switch the user-wide LLM provider",
+                _provider_arguments,
+            ),
             "permissions": CommandSpec(
                 "permissions",
                 "/permissions [MODE|list|allow|deny|clear]",
@@ -106,6 +136,18 @@ class CommandCatalog:
 
     def names(self) -> tuple[str, ...]:
         return tuple(self._specs)
+
+    def complete(self, text: str) -> tuple[str, ...]:
+        """Return top-level command names matching a slash prefix.
+
+        Completion intentionally stops at the first whitespace so command
+        arguments remain ordinary editor text and are never guessed here.
+        """
+
+        if not text.startswith("/") or any(character.isspace() for character in text):
+            return ()
+        prefix = text[1:]
+        return tuple(f"/{name}" for name in self._specs if name.startswith(prefix))
 
     def parse(self, text: str) -> ParsedCommand:
         if not text.startswith("/"):
@@ -135,8 +177,12 @@ class CommandCatalog:
             if spec is None:
                 raise ValueError(f"unknown slash command: /{name}")
             return f"{spec.usage} — {spec.description}"
-        return "\n".join(
-            f"{spec.usage} — {spec.description}" for spec in self._specs.values()
+        return (
+            "Type / then Tab to complete commands; use // to send a prompt "
+            "that starts with a slash.\n\n"
+            + "\n".join(
+                f"{spec.usage} — {spec.description}" for spec in self._specs.values()
+            )
         )
 
 

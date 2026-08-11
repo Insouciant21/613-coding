@@ -32,10 +32,16 @@ class KeyringCredentialStore:
         return f"CODING_HARNESS_{normalized.upper()}_API_KEY"
 
     def _keyring_value(self, provider: str) -> str | None:
-        return cast(str | None, self._keyring.get_password(self._service_name, provider))
+        try:
+            return cast(str | None, self._keyring.get_password(self._service_name, provider))
+        except Exception as error:
+            raise CredentialError("could not access the operating-system keyring") from error
 
     def set(self, provider: str, value: str) -> None:
-        self._keyring.set_password(self._service_name, provider, value)
+        try:
+            self._keyring.set_password(self._service_name, provider, value)
+        except Exception as error:
+            raise CredentialError("could not store provider credential") from error
 
     def update(self, provider: str, value: str) -> None:
         self.set(provider, value)

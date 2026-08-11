@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from coding613.adapters.tools.dependencies import DependencyInstallResult
 from coding613.adapters.tools.filesystem import FilesystemTools
 from coding613.adapters.tools.patch import PatchCommitError
 from coding613.adapters.tools.repository import build_repository_tools
@@ -27,6 +28,19 @@ class RecordingExecutor:
     def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
         self.calls.append(call)
         return ToolResult(call=call, success=True, output=str(context.repository_root))
+
+
+class RecordingInstaller:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def install(self, **kwargs: object) -> DependencyInstallResult:
+        self.calls.append(kwargs)
+        return DependencyInstallResult(
+            success=True,
+            output="installed",
+            changed_files=("package.json", "package-lock.json"),
+        )
 
 
 def definition() -> ToolDefinition:
@@ -101,6 +115,52 @@ def test_repository_registry_exposes_versioned_apply_patch_and_dispatches(
     assert changed_files == ["value.txt"]
     assert target.read_text(encoding="utf-8") == "new\n"
     assert result.output == '{"added": 0, "changed_files": ["value.txt"], "deleted": 0, "updated": 1}'
+
+
+def test_repository_registry_dispatches_dependency_install_with_validated_arguments(
+    tmp_path: Path,
+) -> None:
+    installer = RecordingInstaller()
+    registry, _, changed_files = build_repository_tools(
+        tmp_path, (), dependency_installer=installer
+    )
+    definition = next(item for item in registry.definitions() if item.name == "install_dependency")
+    assert definition.input_schema["properties"] == {
+        "manager": {"type": "string", "enum": ["npm"]},
+        "packages": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1, "maxLength": 128},
+            "minItems": 1,
+            "maxItems": 32,
+        },
+        "workspace": {"type": "string", "minLength": 1, "maxLength": 128},
+        "dev": {"type": "boolean"},
+    }
+
+    result = registry.dispatch(
+        ToolCall(
+            name="install_dependency",
+            arguments={
+                "manager": "npm",
+                "packages": ["three"],
+                "workspace": "@613-cube-solver/web",
+                "dev": True,
+            },
+        ),
+        context(tmp_path),
+    )
+
+    assert result.success is True
+    assert result.changed_files == ("package.json", "package-lock.json")
+    assert changed_files == ["package.json", "package-lock.json"]
+    assert installer.calls == [
+        {
+            "manager": "npm",
+            "packages": ("three",),
+            "workspace": "@613-cube-solver/web",
+            "dev": True,
+        }
+    ]
 
 
 def test_apply_patch_schema_rejects_malformed_arguments_before_executor(

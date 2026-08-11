@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from contextlib import closing, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 from coding613.domain.conversation import RunOptions
@@ -363,6 +364,16 @@ class SqliteEventStore:
         if expected.id != replacement.id:
             raise ValueError("replacement run id does not match expected run id")
         with self._transaction() as connection:
+            expected_options = self._redacted_json(
+                expected.options.model_dump(mode="json")
+            )
+            current = connection.execute(
+                "SELECT options_json FROM runs WHERE id = ?", (str(expected.id),)
+            ).fetchone()
+            if current is None or not self._equivalent_options_json(
+                current["options_json"], expected_options
+            ):
+                return False
             cursor = connection.execute(
                 """
                 UPDATE runs
@@ -395,7 +406,7 @@ class SqliteEventStore:
                     expected.permission_mode.value,
                     expected.state.value,
                     expected.stop_reason.value if expected.stop_reason else None,
-                    self._redacted_json(expected.options.model_dump(mode="json")),
+                    current["options_json"],
                     self._serialize_datetime(expected.created_at),
                     self._serialize_datetime(expected.updated_at),
                 ),
@@ -646,6 +657,22 @@ class SqliteEventStore:
                 str(replacement.id),
             ),
         )
+
+    @staticmethod
+    def _equivalent_options_json(actual: str | None, expected: str) -> bool:
+        try:
+            actual_value: Any = json.loads(actual or "{}")
+            expected_value: Any = json.loads(expected)
+        except (TypeError, ValueError):
+            return False
+        if not isinstance(actual_value, dict) or not isinstance(expected_value, dict):
+            return False
+        for value in (actual_value, expected_value):
+            for key in ("allowed_tools", "disallowed_tools"):
+                items = value.get(key)
+                if isinstance(items, list):
+                    value[key] = sorted(str(item) for item in items)
+        return actual_value == expected_value
 
     @staticmethod
     def _redacted_json(value: object) -> str:

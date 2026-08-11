@@ -7,13 +7,13 @@ from collections.abc import Sequence
 
 import click
 
-from coding613.domain.models import PermissionMode
-
 from .main import app
 from .prompt import parse_root_args, run_print
 from .tui import TuiLaunchRequest, launch_tui
 
-_MANAGEMENT_COMMANDS = frozenset({"credentials", "config", "run", "runs", "demo"})
+_MANAGEMENT_COMMANDS = frozenset(
+    {"credentials", "providers", "config", "run", "runs", "demo"}
+)
 _ROOT_VALUE_OPTIONS = frozenset(
     {
         "--repo",
@@ -80,7 +80,7 @@ def dispatch(argv: Sequence[str]) -> int:
             initial_task=request.prompt,
             resume=request.resume or ("latest" if request.continue_latest else None),
             continue_latest=request.continue_latest,
-            permission_mode=request.permission_mode or PermissionMode.BALANCED,
+            permission_mode=request.permission_mode,
             options=request.options,
         )
     )

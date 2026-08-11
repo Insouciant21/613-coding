@@ -21,7 +21,6 @@ def test_unattended_budget_requires_call_or_cost_limit() -> None:
 @pytest.mark.parametrize(
     "limits",
     [
-        BudgetLimits(per_agent_turns=1),
         BudgetLimits(total_model_calls=1),
         BudgetLimits(wall_time_seconds=1),
         BudgetLimits(provider_cost=1),
@@ -32,6 +31,17 @@ def test_each_budget_stops_after_exhaustion(limits: BudgetLimits) -> None:
     decision = tracker.consume(turns=2, calls=2, seconds=2, cost=2)
     assert not decision.allowed
     assert decision.stop_reason is StopReason.BUDGET_EXHAUSTED
+
+
+def test_per_agent_turn_limit_is_informational_only() -> None:
+    tracker = BudgetTracker(
+        BudgetLimits(per_agent_turns=1, total_model_calls=3)
+    )
+
+    decision = tracker.consume(turns=2, calls=1, seconds=0, cost=0)
+
+    assert decision.allowed
+    assert tracker.usage.agent_turns == 2
 
 
 def test_negative_consumption_is_rejected() -> None:

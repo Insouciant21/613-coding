@@ -191,3 +191,52 @@ The strongest brainstorming outcome was forcing explicit boundaries around objec
 - Plan revision: the detailed plan adds a versioned `SessionEnvelope` for multiple stream-JSON
   input messages so the output contract remains deterministic without dropping ordered follow-up
   runs. Plan: `docs/superpowers/plans/2026-08-10-613-coding-claude-code-parity.md`.
+
+### Iteration 13: Responses API support
+
+- Question: should the official SDK integration expose only Chat Completions, or also support the
+  Responses API used by current reasoning and coding-agent workflows?
+- User decision: add Responses API support while retaining Chat Completions compatibility; do not
+  use the SDK's hosted agent runner.
+- Selected boundary: add a separate `ResponsesLLM`/credentialed adapter, selected by `[llm].api`,
+  with project-owned request mapping, tool dispatch, validation, feedback, and stop logic.
+- Meaningful before/after: before, the SDK migration only called `chat.completions.create`; after,
+  `responses.create` supports synchronous output items and streamed text/function-call events,
+  normalized usage metadata, and a `store=false` state boundary. Existing configurations default
+  unchanged to `chat_completions`.
+- Uncertainty exposed: Responses uses flat function schemas and `output` items rather than nested
+  Chat messages; fake-client tests now lock both mappings and malformed-call behavior.
+- Evidence: `docs/superpowers/specs/2026-08-11-responses-api-llm-design.md`,
+  `docs/superpowers/plans/2026-08-11-responses-api-llm.md`, and current `PLAN.md`/`AGENT_LOG.md`.
+
+### Iteration 14: User-scoped provider and budget configuration
+
+- Question: which settings belong in a repository `harness.toml` when a user wants to switch
+  between several OpenAI-compatible APIs and retain one budget policy across repositories?
+- Decision: keep `harness.toml` project-policy-only. Store named provider profiles, active selection,
+  context-window/output/reasoning options, and budgets in a user-wide config file; store API keys
+  only in the OS keyring. Expose profile lifecycle through `613-coding providers` and switching
+  through TUI `/provider use NAME`.
+- Uncertainty exposed: a global active provider can affect offline tests. The test suite overrides
+  `CODING613_CONFIG_FILE` per test, while production composition uses the real default path. The
+  existing `tmp/cube` metadata was migrated without copying secrets.
+- Before/after: before, project config mixed policy, provider, and budget data and `/config` edited
+  provider fields; after, project files reject those sections, `/config` edits only policy/budgets
+  through the correct owner, provider profiles are switchable, and API-key output remains redacted.
+
+### Iteration 15: Provider model catalogs, Anthropic, and interactive slash menus
+
+- Question: how can one user provider expose several models and reasoning profiles while keeping
+  provider credentials/endpoint metadata shared, and how should common slash commands avoid a
+  brittle free-form key/value workflow?
+- Decision: store model aliases as nested user-config tables under each provider, resolve the active
+  alias into the existing `LLMConfig` boundary, and expose model lifecycle through `providers
+  models`. Add a low-level official Anthropic Messages adapter without adopting an SDK agent runner.
+  Use Textual `OptionList` menus for `/config`, `/provider`, and `/model`, with explicit keyboard
+  routing because the app's priority Enter/up/down bindings otherwise intercept menu navigation.
+- Uncertainty exposed: Textual's `OptionList` constructor is variadic rather than list-based, and
+  Anthropic's extended-thinking budget must remain below `max_tokens`; both constraints are now
+  encoded in implementation and offline regressions.
+- Before/after: before, a provider had one model and `/config` required manual arguments; after,
+  aliases can be switched persistently with per-model reasoning/resource overrides, Anthropic is a
+  supported SDK transport, and the TUI presents discoverable selectable menus.

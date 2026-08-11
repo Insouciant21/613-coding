@@ -40,6 +40,38 @@ DELETE = """--- a/old.txt
 -removed
 """
 
+CODEX_UPDATE = """*** Begin Patch
+*** Update File: src/value.py
+@@
+-VALUE = 1
++VALUE = 2
+*** End Patch
+"""
+
+CODEX_ADD = """*** Begin Patch
+*** Add File: new.txt
++created
++second line
+*** End Patch
+"""
+
+CODEX_DELETE = """*** Begin Patch
+*** Delete File: old.txt
+*** End Patch
+"""
+
+CODEX_MULTI_UPDATE = """*** Begin Patch
+*** Update File: src/value.py
+@@
+-VALUE = 1
++VALUE = 2
++inserted
+@@
+-NEXT = 1
++NEXT = 2
+*** End Patch
+"""
+
 
 def test_prepare_patch_updates_matching_text() -> None:
     plan = prepare_patch(UPDATE, lambda path: "VALUE = 1\n")
@@ -51,6 +83,74 @@ def test_prepare_patch_updates_matching_text() -> None:
             after="VALUE = 2\n",
         ),
     )
+
+
+def test_prepare_patch_accepts_codex_update_format() -> None:
+    plan = prepare_patch(CODEX_UPDATE, lambda path: "VALUE = 1\n")
+
+    assert plan.changes[0].path == "src/value.py"
+    assert plan.changes[0].after == "VALUE = 2\n"
+
+
+def test_prepare_patch_applies_codex_update_after_context_offset() -> None:
+    source = "header 1\nheader 2\nVALUE = 1\n"
+    plan = prepare_patch(CODEX_UPDATE, lambda path: source)
+
+    assert plan.changes[0].after == "header 1\nheader 2\nVALUE = 2\n"
+
+
+def test_prepare_patch_recovers_a_stale_standard_hunk_offset_by_unique_context() -> None:
+    patch = """--- a/src/value.py
++++ b/src/value.py
+@@ -1 +1 @@
+-VALUE = 1
++VALUE = 2
+"""
+
+    plan = prepare_patch(patch, lambda path: "header\nVALUE = 1\n")
+
+    assert plan.changes[0].after == "header\nVALUE = 2\n"
+
+
+def test_prepare_patch_accepts_codex_add_without_hunk_header() -> None:
+    plan = prepare_patch(CODEX_ADD, lambda path: (_ for _ in ()).throw(FileNotFoundError(path)))
+
+    assert plan.changes[0] == PreparedChange(
+        path="new.txt",
+        operation=PatchOperation.ADD,
+        before=None,
+        after="created\nsecond line\n",
+    )
+
+
+def test_prepare_patch_accepts_codex_delete_without_hunk_header() -> None:
+    plan = prepare_patch(CODEX_DELETE, lambda path: "removed\n")
+
+    assert plan.changes[0] == PreparedChange(
+        path="old.txt",
+        operation=PatchOperation.DELETE,
+        before="removed\n",
+        after=None,
+    )
+
+
+def test_prepare_patch_applies_multiple_codex_hunks_against_original_source() -> None:
+    source = "VALUE = 1\nNEXT = 1\n"
+    plan = prepare_patch(CODEX_MULTI_UPDATE, lambda path: source)
+
+    assert plan.changes[0].after == "VALUE = 2\ninserted\nNEXT = 2\n"
+
+
+def test_prepare_patch_rejects_repeated_codex_addition() -> None:
+    patch = """*** Begin Patch
+*** Update File: src/value.py
+@@
++VALUE = 1
+*** End Patch
+"""
+
+    with pytest.raises(PatchConflictError, match="addition already exists"):
+        prepare_patch(patch, lambda path: "VALUE = 1\n")
 
 
 def test_prepare_patch_supports_add_and_delete() -> None:
@@ -140,7 +240,7 @@ def test_prepare_patch_rejects_unsupported_or_malformed_patch(patch: str) -> Non
 
 
 def test_prepare_patch_rejects_hunk_conflict() -> None:
-    with pytest.raises(PatchConflictError):
+    with pytest.raises(PatchConflictError, match="expected 'VALUE = 1"):
         prepare_patch(UPDATE, lambda path: "VALUE = 9\n")
 
 
@@ -409,6 +509,25 @@ def test_apply_patch_pins_repository_root_descriptor(
     assert result.changed_files == ("a.txt", "b.txt")
     assert (tmp_path / "b.txt").read_text(encoding="utf-8") == "outside\n"
     assert (tmp_path.parent / "parked-original" / "b.txt").read_text(encoding="utf-8") == "new-b\n"
+
+
+def test_apply_patch_accepts_standard_git_metadata_wrapper(tmp_path: Path) -> None:
+    target = tmp_path / "a.txt"
+    target.write_text("old\n", encoding="utf-8")
+
+    patch = """diff --git a/a.txt b/a.txt
+index 3e75765..9daeafb 100644
+--- a/a.txt
++++ b/a.txt
+@@ -1 +1 @@
+-old
++new
+"""
+
+    result = FilesystemTools(tmp_path).apply_patch(patch)
+
+    assert result.changed_files == ("a.txt",)
+    assert target.read_text(encoding="utf-8") == "new\n"
 
 
 def test_apply_patch_reports_filesystem_errors_after_partial_commit(

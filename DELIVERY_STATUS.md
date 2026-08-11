@@ -1,13 +1,14 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-10 14:56:00 (Asia/Shanghai)
-Responsible actor: `/root` for the approved Claude-Code-like TUI/CLI parity plan; implementation is verified in isolated worktree branch `feature/claude-code-parity`. No provider, deployment, or pipeline operation was performed.
+Last updated: 2026-08-12 00:50:51 (Asia/Shanghai)
+Responsible actor: `/root` for provider model catalogs, Anthropic SDK support, slash-command menus, and local verification. No real provider request, deployment, or pipeline operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
 | Requirement | Status | Evidence | Next verification |
 | --- | --- | --- | --- |
 | Official OpenAI SDK chat adapter | implemented, review-repaired, offline verified, and integrated into `main` | design `b4b5a94`; plan `d3e34f6`; implementation `f7f2301`; repair `0fcd2af`; integrated tip `8e708e2`; `PLAN.md` OPENAI-SDK-LLM evidence | retain the offline regression gate; run a real provider smoke only with user-controlled credentials |
+| Official OpenAI SDK Responses adapter | implemented in current worktree; offline verified | `docs/superpowers/specs/2026-08-11-responses-api-llm-design.md`; `docs/superpowers/plans/2026-08-11-responses-api-llm.md`; `PLAN.md` Responses evidence; 495-test offline suite; target verifier 46 web/5 API | run an optional user-controlled `/v1/responses` smoke; keep Chat Completions as the default for compatible endpoints |
 | Claude-Code-like TUI/CLI parity | Tasks 1-7 implemented and offline verified in `feature/claude-code-parity`; handoff pending user integration choice | design `3a07f09`; plan; implementation `fd8871e`; evidence below and in `PLAN.md`/`AGENT_LOG.md` | merge or retain the isolated branch; configure a provider for a real coding run |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
@@ -29,6 +30,11 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Strict package rename documentation and artifacts | deployed and verified | `eefee2d`; Task 3 artifacts and Task 4 CI/deployment evidence below | retain as regression gate |
 | GitLab CI `unit-test` job | configured; local equivalent and artifact handoff verified | `.gitlab-ci.yml`; Docker export feeds dependent Python/uv `artifact-smoke`; current local pytest, Ruff, mypy, lock, and build gates pass | run the remote pipeline and record its final pass result |
 | Provider-backed LLM composition | implemented; offline verified | `LLMConfig`, lazy keyring-backed OpenAI-compatible adapter, composition MockTransport test; current task evidence below | run a provider-backed smoke with user-controlled credentials |
+| Codex/Claude-inspired prompt and loop controls | implemented; offline verified | `src/coding613/application/context.py`, `src/coding613/application/loop.py`, context/loop regressions; `PLAN.md` and `AGENT_LOG.md` 2026-08-11 21:13 evidence | retain offline gate; optionally run a user-controlled provider smoke |
+| Codex-aligned provider retry window | implemented; offline verified | `_MAX_PROVIDER_RETRIES = 5` (six total requests maximum), non-retryable `ProviderRequestError` for client 4xx, loop/adapter regressions; `PLAN.md` and `AGENT_LOG.md` 2026-08-11 21:32 evidence | restart installed TUI and start a fresh user-controlled provider run |
+| User-scoped provider and budget configuration | implemented; offline verified | `UserConfig`, `UserConfigurationService`, `613-coding providers ...`, TUI `/provider`, project `[llm]`/`[budgets]` rejection, migrated `tmp/cube` metadata, 562-test suite at 2026-08-12 00:12 | use `providers key-set/use` and run a fresh user-controlled provider smoke |
+| Provider model catalog and Anthropic SDK | implemented; offline verified | `ModelConfig`, `[providers.NAME.models.ALIAS]`, `613-coding providers models ...`, `AnthropicLLM`/`CredentialedAnthropicLLM`, injected composition tests, 568-test suite at 2026-08-12 00:40 | configure an Anthropic key and run an optional user-controlled smoke |
+| Selectable TUI configuration/provider/model menus | implemented; offline verified | `ConfigMenu`, `/config`, `/provider`, `/model`, keyboard-routing regression, TUI suite at 2026-08-12 00:40 | retain Pilot coverage and exercise interactively after restarting installed TUI |
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
 | Real-provider worker reliability | unblocked and integrated on `main` | descriptor-relative delete and patch mutation Tasks 1-4; merge `69caa09`; fresh main evidence below | retain regression gate |
 | GitHub source publication | complete | `git@github.com:Insouciant21/613-coding.git`; initial source snapshot `f4b9984`; CI repair `341d880`; publication evidence below | keep delivery records synchronized with pushed commits |
@@ -56,6 +62,20 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 - Integration: main fast-forwarded to `8e708e2` after a recoverable stash of tracked user changes;
   five unrelated user paths were restored, while overlapping adapter/test changes were carried
   into the SDK implementation. The stash remains as a user-change backup.
+
+## RESPONSES-API Evidence
+
+- Design/plan: `docs/superpowers/specs/2026-08-11-responses-api-llm-design.md` and
+  `docs/superpowers/plans/2026-08-11-responses-api-llm.md`.
+- TDD RED: the new adapter test initially failed during collection because the Responses adapter
+  module did not exist; the streaming contract then failed on the missing `complete_stream` method.
+- GREEN: Responses, credential, composition, and config focused tests passed 60; the full offline
+  suite passed 495 tests with 253 existing pytest-asyncio deprecation warnings.
+- Boundary: `[llm].api = "responses"` selects `client.responses.create`; flat function schemas,
+  output items, streamed deltas, tool-call IDs, finish actions, and input/output/cache/reasoning
+  usage are mapped to project values. Calls set `store=false` and never use an SDK agent runner.
+- Static gates: Ruff, mypy, `uv lock --check`, and `git diff --check` passed. Independent target
+  verification passed 46 Web tests, 5 API tests, lint, typecheck, build, Ruff, and mypy.
 
 ## DELIVERY-01 Evidence
 
@@ -575,3 +595,345 @@ Every completed plan task must link a commit and fresh verification output here.
 - Runtime: `edward@int21` runs `613-coding:71c281d` at `127.0.0.1:8613` with persistent state at `/home/edward/services/613-coding/data`. The root page and `/healthz` returned 200/healthy.
 - Persistence: pre-fix run `c0313a2c-7513-4a7b-a594-9afe0d31dc70` became readable after deployment. New run `b9bc83a2-dac2-48c3-a15a-8bae7568118b` returned 200 both immediately and after `docker restart`, with the same `running` state and empty evidence.
 - Boundary: no reverse proxy, ports 80/443, domain, or public URL was configured or claimed.
+
+## Same-run provider retry
+
+- Status: implemented and offline verified in the current dirty worktree.
+- Evidence: `AGENT_LOG.md` entry `2026-08-10 18:05:00 Asia/Shanghai`; RED focused timeout test,
+  GREEN loop/adapter tests (71), `uv run pytest tests -q` (472), Ruff, and mypy.
+- Behavior: typed transient provider timeouts become persisted retryable feedback and the same
+  `AgentLoop` resumes with event context; model-call and wall-clock budgets remain finite.
+- Boundary: no real provider request or credential operation was performed during verification.
+
+## 2026-08-10 21:19:31 Asia/Shanghai - Self-iteration target audit
+
+- Status: root same-run retry implementation is verified; `tmp/cube` remains an incomplete,
+  worker-authored RED artifact and is not a delivered product.
+- Run evidence: `5bdaef15-c288-429c-b3ac-5cd22d7dd1a6` stayed in one process for 16 model calls
+  and briefly reached 43/43 web tests before oscillating on lint. Follow-ups
+  `ae7c581b-e52f-4fc2-9d15-30fb7eedf4fb`, `54240807-d35b-4b76-863e-41836f2d3539`, and
+  `74a5ee84-f4f3-41b8-9dc4-bd5d8f47f1cc` were cancelled after repeated non-minimal rewrites.
+- Current verification: target `bash scripts/verify.sh` is RED; no completion, package, or
+  deployment evidence is claimed for the cube application. No provider credential or
+  `deepseek-chat` configuration was used.
+- Fresh target verifier at 21:22 failed 36/43 web tests (`cloneStickers is not a function` at
+  `apps/web/src/cube/moves.ts:212`).
+
+## 2026-08-10 21:37:42 Asia/Shanghai - Codex patch protocol
+
+- Status: harness compatibility slice verified; target delivery remains in progress.
+- Evidence: the new Codex marker-format parser test was RED before implementation and GREEN
+  afterward; focused tests passed 81 and the full root suite passed 475.
+- Quality gate: Ruff, mypy (102 files), `uv lock --check`, and `git diff --check` passed.
+- Boundary: no `tmp/cube` product source was controller-authored; the target verifier is still RED.
+- Next: resume a single patch-only 613 Coding run using the configured `deepseek-v4-flash` model,
+  then record the independent target verifier result here.
+
+## 2026-08-10 22:18:00 Asia/Shanghai - Repeated-write guard
+
+- Status: in progress; the harness now blocks exact replays of successful file mutations and the
+  target product is not yet delivered.
+- Evidence: TDD focused guard passed; `uv run pytest tests -q` passed 481, Ruff, mypy (102 files),
+  `uv lock --check`, and `git diff --check` passed.
+- Target: `559fb873-1725-464c-9289-6e573e2893a9` is failed by budget exhaustion after 30 calls;
+  target web tests were 43/43 at the last build run, but TypeScript build/API contract errors
+  remain and the final `bash scripts/verify.sh` is RED.
+- Responsible actor: root harness plus the next long-lived 613 Coding target run. No controller
+  authored or overwrote `tmp/cube` product source.
+
+## 2026-08-10 21:23:17 Asia/Shanghai - Root verification refresh
+
+- Root harness: `uv run pytest tests -q` passed 473 (253 existing warnings); retry-focused tests,
+  Ruff, mypy, `uv lock --check`, and `git diff --check` passed.
+- Target: `tmp/cube` remains a worker-authored RED artifact; its verifier failure is recorded in
+  the target `AGENT_LOG.md` and no delivery claim is made.
+
+## 2026-08-10 23:25:55 Asia/Shanghai - Target foundation/domain delivery
+
+- Status: foundation/domain slice complete; full target product acceptance remains in progress.
+  Source under `tmp/cube/apps/web/src/cube` was written by governed 613 Coding worker runs.
+- Fresh verification: `(cd tmp/cube && bash scripts/verify.sh)` passed 43 web tests, ESLint,
+  TypeScript, Vite build, API pytest, Ruff, and mypy. Existing Starlette deprecation warning only.
+- Security: worker-generated temporary provider-data file `tmp` was removed by governed
+  `delete_file`; credential-pattern scanning of target files returned no matches.
+- Responsible actor: 613 Coding worker for target source; controller for verification, safety
+  review, and delivery records. Root offline gate passed: 481 tests, Ruff, mypy, lock, and diff
+  checks are green.
+- Open scope: 3D editing, solver API/jobs, rich reachability diagnostics, playback, and browser
+  end-to-end acceptance are not yet delivered.
+
+## 613 Coding workbench/API vertical slice
+
+- Status: partial delivery complete; full cube-solver acceptance remains in progress.
+- Verification timestamp: 2026-08-11 00:21:06 Asia/Shanghai.
+- Target evidence: governed worker run `a9330e89-776d-4e1e-b9d1-8abdcd372b02` completed with
+  `(cd tmp/cube && bash scripts/verify.sh)` green: 45 web tests, ESLint, TypeScript, Vite build,
+  5 API tests, Ruff, and mypy. Existing Starlette TestClient deprecation warning only.
+- Delivered target surface: interactive responsive sticker workbench with order selection,
+  palette painting, moves, undo/redo/reset, plus synchronous `/api/validate` diagnostics.
+- Harness evidence: SQLite cross-process run-status CAS regression passed; root offline gate passed
+  482 tests (253 existing warnings), Ruff, mypy across 102 files, `uv lock --check`, and
+  `git diff --check`.
+- Responsible actor: 613 Coding workers authored target source; controller ran verification,
+  safety checks, and records. No `deepseek-chat`, credential value, remote push, or deployment was
+  used.
+- Remaining acceptance: Three.js 3D editor, rich reachability/solver integration, job events and
+  cancellation, formula explanation/playback, Docker Compose, and Playwright browser tests.
+- Documentation synchronization: target README and AGENT_LOG were updated by governed runs
+  `fa5a3510-ce43-4911-bf17-600835305951` and `5a23372a-fbe4-4ffc-bcd0-f87e0f50442c`; their target
+  verifiers passed with the same 45 web / 5 API test evidence.
+
+## 2026-08-11 04:02:00 Asia/Shanghai - Context and patch-tool audit
+
+- Status: harness compatibility improvements verified; Cube product delivery remains in progress.
+- Root evidence: default Responses `max_output_tokens` is 8192 after RED/GREEN testing; the
+  standard Git patch wrapper and unique stale-hunk recovery are covered by new RED/GREEN tests.
+  `uv run pytest tests -q` passed 500, Ruff, mypy, and diff checks passed.
+- Target evidence: worker persistence slice completed after bounded repairs; fresh
+  `tmp/cube/bash scripts/verify.sh` passed 61 Web tests, 8 API tests, ESLint, TypeScript, Vite
+  build, Ruff, and mypy at 04:01. One expected jsdom localStorage warning remains.
+- Forensic conclusion: persisted events show partial context, model tool actions, output-budget
+  truncation, and patch-format/offset errors. The run did not operate with zero context.
+- Remaining acceptance: full Three.js editor, authoritative reachability/solver replay, formula
+  playback, Compose/Nginx, Playwright coverage, and final target delivery evidence.
+
+## 2026-08-11 04:44 CST - Three.js viewport checkpoint
+
+- Status: partial target progress; not a final delivery.
+- Evidence: worker runs `d561ff22-0b76-4e16-8c6a-f9965017a3e7`,
+  `f35e5bf8-b67a-44d8-baac-f056872a7ce7`, and `624146d5-caf1-45e3-aa09-f6d9b90379b8`
+  installed/implemented/repaired the viewport. Independent `bash scripts/verify.sh` passed
+  62 Web tests and 8 API tests plus ESLint, TypeScript, Vite build, Ruff, and mypy at
+  2026-08-11 04:44 CST.
+- Harness evidence: root config RED/GREEN test now enforces default `max_output_tokens=32768`
+  after trace evidence showed 8192-token reasoning truncation. Root full-suite rerun is still
+  required after this change.
+- Remaining: authoritative solver/replay and reachability, formula explanation/playback, job
+  event streaming/cancellation, Docker Compose/Nginx, Playwright desktop/mobile, docs, and
+  final review.
+- Post-change root verification at 04:45 CST: 503 offline tests passed; Ruff, mypy, and
+  `git diff --check` passed. This checkpoint is not final delivery evidence.
+
+## Current Working-tree Repair (2026-08-11 19:00 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Change: `run_validation` now exposes a redacted actionable undeclared-command error and lists
+  declared argv guidance; CLI TUI mode inheritance respects repository config; TUI `/config`
+  supports validated show/set operations with atomic persistence and reload.
+- Fresh verification: `uv run pytest -q --ignore=tmp` → 517 passed; `uv run ruff check .` and
+  `uv run mypy src` → passed; `613-coding config check --repo tmp/cube` → configuration valid.
+- Delivery boundary: no remote CI, push, deployment, or credential-backed provider request was
+  performed. Changes are still uncommitted in the pre-existing working tree.
+
+## Current TUI Discoverability Slice (2026-08-11 19:09 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Change: the Textual TUI now displays persistent shortcut/approval guidance, live slash-command
+  candidates, Tab/↑/↓ completion cycling, and `/help` discovery instructions while retaining
+  prompt-history fallback and strict command parsing.
+- Fresh verification: `uv run pytest -q --ignore=tmp` → 521 passed; `uv run ruff check .`,
+  `uv run mypy src`, and `git diff --check` → passed.
+- Documentation evidence: README and `docs/development.md` describe the new interaction.
+- Delivery boundary: no remote CI, provider request, credential access, push, or deployment was
+  performed; changes remain in the existing uncommitted working tree.
+
+## Current TUI No-action and Composer Display Repair (2026-08-11 19:55 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Delivered: an explicit action-repair prompt plus a bounded no-action retry (one repair turn, then
+  `no_progress`), per-turn assistant draft replacement, tooltip-free focused composer, and
+  narrow-terminal layout regression checks.
+- Fresh evidence: `uv run pytest -q --ignore=tmp` passed 528 tests; Ruff, mypy, lock, and diff checks
+  passed. The global tool was rebuilt with `uv tool install --force --reinstall --no-cache .` and
+  `613-coding config check --repo tmp/cube` passed at 20:00 CST.
+- Boundary: no external model request, credential access, target source change, deployment, or
+  remote CI result; changes remain in the existing uncommitted working tree.
+- Distribution refresh at 19:45 CST: global `613-coding` was rebuilt from the current checkout;
+  installed-tool preview/expand and configuration probes passed.
+- Final 19:11 CST refresh after the layout/shortcut hint polish preserved the same green evidence.
+
+## Current TUI Dependency/Startup Repair (2026-08-11 19:23 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Change: pinned Rich to the Textual-compatible `<14.2` range, added a Markdown-link regression,
+  and refreshed the global `613-coding` uv tool so the Responses-aware configuration fields are
+  available at runtime.
+- Fresh verification: `uv run pytest -q --ignore=tmp` → 522 passed; Ruff, mypy, `uv lock --check`,
+  and `git diff --check` → passed. Installed-tool configuration and Markdown-link probes passed.
+- Documentation evidence: README and `docs/deployment.md` document global-tool refresh behavior.
+- Delivery boundary: no remote CI, provider request, credential access, push, or deployment was
+  performed; changes remain in the existing uncommitted working tree.
+
+## Current TUI Tool Output Preview (2026-08-11 19:43 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Change: large `read_file`/tool-result entries now render a 1,200-character preview with
+  redaction preserved; `Ctrl+T` toggles the latest result between preview and expanded view.
+- Fresh verification: `uv run pytest -q --ignore=tmp` → 524 passed; TUI suite → 64 passed;
+  Ruff, mypy, and `git diff --check` → passed.
+- Delivery boundary: no remote CI, provider request, credential access, push, or deployment was
+  performed; changes remain in the existing uncommitted working tree.
+
+## Current Responses Tool Stream Repair (2026-08-11 20:18 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Root cause: DeepSeek's Responses stream splits function-call metadata across events and omits
+  `name` on `response.function_call_arguments.done`; the old parser rejected the valid sequence,
+  so the loop retried 30 provider errors before reporting budget exhaustion and never reached TUI
+  tool rendering.
+- Delivered: event merging now preserves the function name from `output_item.added`; repeated
+  retryable provider errors stop after two attempts with `provider_error`; regression coverage was
+  added for both behaviors.
+- Fresh evidence: `uv run pytest -q --ignore=tmp` → 529 passed; Ruff, mypy, lock, and diff checks
+  passed. Direct live stream parsing produced a `read_file` action. The refreshed global
+  `613-coding` executable passed `config check`, and a bounded print-mode smoke run persisted
+  successful `read_file`/`search_files` tool completions before its deliberate three-call cap.
+- Delivery boundary: no credentials were exposed, no target files were edited by the smoke run,
+  and no remote CI, push, or deployment was performed. Restart any old TUI process and start a
+  fresh run; historical failed runs in SQLite are retained for diagnosis.
+
+## Current apply_patch Conflict Repair (2026-08-11 20:28 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Root cause: repository tool error wrapping discarded the useful `PatchConflictError` message,
+  leaving the TUI with only the exception class and leaving the next model call without a stale-
+  patch recovery instruction.
+- Delivered: bounded redacted conflict details are now visible in the tool result and loop
+  feedback; context assembly tells the worker to re-read affected files and create a fresh patch,
+  while explicitly forbidding unchanged retries.
+- Fresh evidence: `uv run pytest -q --ignore=tmp` → 531 passed; Ruff, mypy, lock, and diff checks
+  passed. The refreshed global executable passed `config check --repo tmp/cube` and CLI help.
+- Delivery boundary: patch safety remains strict and no automatic overwrite was added; changes
+  remain in the existing uncommitted working tree.
+
+## Current Tool Output and Validation Repair (2026-08-11 20:46 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Root causes addressed: large tool output was truncated in the agent progress layer before TUI
+  expansion; `run_validation` displayed shell syntax that encouraged a one-element argv; and the
+  finish gate required validation for read-only inspections.
+- Delivered: tool output now travels through a redacted 1 MiB safety cap, renders as a 1,200-character
+  preview with `Ctrl+T` expansion, and validation descriptions/errors show exact JSON argv arrays.
+  Read-only runs may finish without validation; any repository mutation still requires fresh passing
+  validation.
+- Fresh evidence: `uv run pytest -q --ignore=tmp` passed 533 tests; Ruff, mypy, `uv lock --check`,
+  and `git diff --check` passed. The refreshed global executable passed `613-coding config check
+  --repo /home/int21/Workspace/ai4se_project/tmp/cube` and CLI help.
+- Delivery boundary: no credentials, provider request, target cube source edit, remote CI/push, or
+  deployment was performed. Changes remain in the existing uncommitted working tree.
+
+## Current Legacy Validation argv Compatibility (2026-08-11 20:52 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Delivered: old prompts that send `argv=["bash scripts/verify.sh"]` are canonicalized only when
+  they exactly match a declared command after `shlex.split`; exact JSON argv remains the primary
+  model contract and undeclared commands are still rejected.
+- Fresh evidence: focused RED/GREEN regression, `uv run pytest -q --ignore=tmp` → 534 passed,
+  Ruff, mypy, `uv lock --check`, and `git diff --check` passed. Global `613-coding` refresh,
+  `config check --repo /home/int21/Workspace/ai4se_project/tmp/cube`, and CLI help passed.
+- Delivery boundary: shell execution remains disabled; no credentials, provider request, target
+  source edit, remote CI/push, or deployment was used.
+
+## Current Codex-aligned Provider Retry Window (2026-08-11 21:32 CST)
+
+- Status: implemented and offline verified; responsible actor: `/root`.
+- Behavior: transient provider failures now have five retries after the initial request (`1/5`
+  through `5/5`), allowing at most six total requests; the sixth failure is terminal. Authentication and other client-side HTTP 4xx request errors
+  are classified as non-retryable `ProviderRequestError`; rate limits, transport failures, and
+  5xx responses remain retryable.
+- TDD/verification: the updated repeated-provider-error test was RED at the old two-attempt
+  behavior; focused loop/adapter tests passed 85; full offline suite passed 538 tests. Ruff,
+  mypy, lock, and diff checks passed.
+- Boundary: the historical failed run is not rewritten. No real provider request, credential
+  access, target source edit, remote push, or deployment was performed; restart an installed TUI
+  and start a fresh run to exercise the change.
+
+## Current Retry Semantics Correction (2026-08-11 21:40 CST)
+
+- Codex parity is now precise: five retries after the initial request (`1/5` through `5/5`),
+  allowing six total provider calls; the sixth failure is terminal.
+- Final evidence: the six-call RED/GREEN regression passed; `uv run pytest -q --ignore=tmp` passed
+  538 tests; Ruff, mypy, lock, and diff checks passed. The global `613-coding` tool was refreshed,
+  and CLI/config probes passed.
+- No real provider request, credential exposure, target source edit, remote push, or deployment
+  occurred. Existing failed runs remain historical; use a fresh run.
+
+## Current Context/Validation/TUI/Budget Follow-up (2026-08-11 22:10 CST)
+
+- Status: implemented and offline verified; responsible actor: `/root`.
+- Context/cache: the stable system prefix now contains worker/repository/memory/final guidance,
+  with task before changing ledger/events; `cache_prefix_sha256` is emitted for diagnostics.
+- Validation: write tools no longer launch validation; explicit `run_validation` or the final
+  `finish` boundary performs the objective check, while no-op writes remain immediately classified.
+- TUI: tool and validation results render with plain `Text`, validation previews are capped at 240
+  lines, and `Ctrl+T` expands both details; output backgrounds are explicit to avoid Syntax blocks.
+- Budgets: model-selected `set_task_budget` chooses clamped simple/standard/complex profiles,
+  persists the selection, updates per-agent turns, and passes per-run output-token caps to both
+  OpenAI-compatible Chat and Responses adapters.
+- Evidence: `uv run pytest -q --ignore=tmp` → 542 passed with 316 existing warnings;
+  `uv run ruff check .` and `uv run mypy src` passed. No real provider request, credential access,
+  target `tmp/cube` source edit, remote push, deployment, or destructive Git operation occurred.
+
+### Final verification (2026-08-11 22:22 Asia/Shanghai)
+
+- Status: verified locally; responsible actor: `/root`.
+- Offline suite: 542 passed, 316 existing warnings.
+- Ruff, mypy, lock consistency, and diff whitespace checks passed.
+- Installed `613-coding` was rebuilt from this checkout; CLI help and the `tmp/cube` configuration
+  probe passed.
+- No provider request, credential access, target source mutation, remote push, or deployment was
+  performed.
+
+### TUI Preview Limits (2026-08-11 22:24 Asia/Shanghai)
+
+- Status: verified locally; responsible actor: `/root`.
+- Requested limits: tool preview 200 characters, validation preview 10 lines; expansion and safety
+  bounds are unchanged.
+- Focused renderer tests and full offline suite passed; Ruff, mypy, lock, and diff checks passed.
+- Global CLI was rebuilt and the `tmp/cube` configuration probe passed.
+
+### Context-Controlled Agent Conversation (2026-08-11 23:09 Asia/Shanghai)
+
+- Status: implemented and verified locally; responsible actor: `/root`.
+- User-visible repair: when the model returns an empty `content` with a valid `finish.summary`,
+  the TUI/transcript now shows the finish answer rather than stale planning text. The profile
+  selection tool is removed from subsequent model requests.
+- Runtime behavior: per-agent-turn budgets no longer stop a run; context compaction controls
+  dynamic conversation length. Output-token profiles remain adaptive, while total calls, wall time,
+  and provider cost remain safety limits. Legacy config is displayed as `per_agent_turns:unbounded`.
+- Fresh evidence: `uv run pytest -q --ignore=tmp` → 543 passed (316 warnings); Ruff, mypy, and
+  `git diff --check` passed. `uv tool install --force --editable .`, direct CLI config check, and
+  installed-module inspection passed.
+- Latest verification timestamp: 2026-08-11 23:09 CST. No provider request, credential access,
+  target `tmp/cube` source edit, remote push, deployment, or destructive Git operation occurred.
+
+### Final-answer precedence follow-up (2026-08-11 23:15 Asia/Shanghai)
+
+- A screenshot-shaped regression (planning text first, accepted finish summary second, empty final
+  content) was reproduced and fixed. Completed-iteration `finish.summary` now takes precedence over
+  stale planning text in the interactive transcript.
+- Fresh evidence: full offline suite 543 passed with 316 warnings; Ruff, mypy, and diff checks
+  passed; editable `613-coding` refresh and `tmp/cube` config check passed.
+
+### LLM Context Window Configuration (2026-08-11 23:36 Asia/Shanghai)
+
+- Status: implemented and verified locally; responsible actor: `/root`.
+- Configuration: add `[llm] context_window_chars = 48000` to `harness.toml`; the setting controls
+  dynamic event compaction. `/config set llm.context_window_chars VALUE` validates and applies it
+  to future turns after reload; the CLI config check displays the active value.
+- Fresh evidence: `uv run pytest -q --ignore=tmp` → 547 passed (316 warnings); Ruff, mypy,
+  `uv lock --check`, and `git diff --check` passed. Editable global CLI refresh and `tmp/cube`
+  config probe passed.
+- Latest verification timestamp: 2026-08-11 23:36 CST. No provider request, credential access,
+  target source/config mutation, remote push, deployment, or destructive Git operation occurred.
+
+### Default resource and reasoning-level update — 2026-08-12 01:13 Asia/Shanghai
+
+- Status: implemented and verified locally; responsible actor `/root`.
+- Delivery: default context `256000` chars; internal tool output progress cap `10000000` chars;
+  standard/complex output profiles `16384`/`128000` decimal tokens; `simple` removed; arbitrary
+  provider-defined reasoning strings supported in configuration, CLI, TUI suggestions, Chat
+  Completions, Responses, and Anthropic paths.
+- Verification: 582 offline tests passed (334 warnings); Ruff, mypy, lock, and whitespace checks
+  passed. Editable CLI installation, provider help, local defaults probe, and `tmp/cube` policy
+  config check passed. No provider request or credential mutation was performed.

@@ -23,14 +23,19 @@ from openai import (
 from coding613.application.progress import ProviderCancelledError
 from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
 from coding613.domain.redaction import redact_text
-from coding613.ports.llm import LLMResponse, ModelContext, ToolDefinition
+from coding613.ports.llm import (
+    LLMResponse,
+    ModelContext,
+    RetryableProviderError,
+    ToolDefinition,
+)
 
 
 class ProviderError(RuntimeError):
     """Base class for typed provider failures."""
 
 
-class ProviderTimeoutError(ProviderError):
+class ProviderTimeoutError(ProviderError, RetryableProviderError):
     pass
 
 
@@ -38,15 +43,19 @@ class ProviderAuthenticationError(ProviderError):
     pass
 
 
-class ProviderRateLimitError(ProviderError):
+class ProviderRateLimitError(ProviderError, RetryableProviderError):
     pass
 
 
-class ProviderHTTPError(ProviderError):
+class ProviderHTTPError(ProviderError, RetryableProviderError):
     pass
 
 
-class ProviderResponseError(ProviderError):
+class ProviderRequestError(ProviderError):
+    """A non-retryable client request rejected by the provider (HTTP 4xx)."""
+
+
+class ProviderResponseError(ProviderError, RetryableProviderError):
     pass
 
 
@@ -55,6 +64,9 @@ class SDKClient(Protocol):
 
     @property
     def chat(self) -> Any: ...
+
+    @property
+    def responses(self) -> Any: ...
 
     def close(self) -> None: ...
 
@@ -67,23 +79,31 @@ class OpenAICompatibleLLM:
         client: SDKClient,
         *,
         timeout_seconds: float = 60.0,
+        max_output_tokens: int = 1536,
+        reasoning_effort: str = "low",
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._client = client
         self._timeout_seconds = timeout_seconds
+        self._max_output_tokens = max_output_tokens
+        self._reasoning_effort = reasoning_effort
         self._clock = clock
 
     def complete(
         self, context: ModelContext, tools: Sequence[ToolDefinition]
     ) -> LLMResponse:
         try:
-            completion = self._client.chat.completions.create(
-                model=self._model_for(context),
-                messages=self._messages(context),
-                tools=[self._tool_payload(tool) for tool in tools],
-            )
+            request: dict[str, Any] = {
+                "model": self._model_for(context),
+                "messages": self._messages(context),
+                "tools": [self._tool_payload(tool) for tool in tools],
+                "max_tokens": self._max_output_tokens_for(context),
+            }
+            if self._reasoning_effort != "low":
+                request["reasoning_effort"] = self._reasoning_effort
+            completion = self._client.chat.completions.create(**request)
         except ProviderError:
             raise
         except Exception as error:
@@ -105,19 +125,30 @@ class OpenAICompatibleLLM:
         try:
             if cancelled():
                 raise ProviderCancelledError("provider stream was cancelled")
-            stream = self._client.chat.completions.create(
-                model=self._model_for(context),
-                messages=self._messages(context),
-                tools=[self._tool_payload(tool) for tool in tools],
-                stream=True,
-            )
+            request = {
+                "model": self._model_for(context),
+                "messages": self._messages(context),
+                "tools": [self._tool_payload(tool) for tool in tools],
+                "max_tokens": self._max_output_tokens_for(context),
+                "stream": True,
+                "stream_options": {"include_usage": True},
+            }
+            if self._reasoning_effort != "low":
+                request["reasoning_effort"] = self._reasoning_effort
+            stream = self._client.chat.completions.create(**request)
             content_parts: dict[int, list[str]] = {}
             tool_calls: dict[int, dict[str, str]] = {}
+            usage: Any = None
             saw_chunk = False
             for chunk in self._stream_chunks(
                 stream, started_at, cancelled, stream_closed, cleanup_errors
             ):
                 saw_chunk = True
+                chunk_usage = self._field(chunk, "usage")
+                if chunk_usage is not None:
+                    usage = chunk_usage
+                if self._field(chunk, "choices") is None:
+                    continue
                 self._accumulate_stream_chunk(chunk, content_parts, tool_calls, on_text_delta)
             self._check_stream_limits(started_at, cancelled)
             if not saw_chunk:
@@ -140,7 +171,7 @@ class OpenAICompatibleLLM:
                     for index, value in sorted(tool_calls.items())
                 ],
             }
-            return self._parse_message(message)
+            return self._with_usage(self._parse_message(message), usage)
         except ProviderError as error:
             primary_error = error
             raise
@@ -237,6 +268,12 @@ class OpenAICompatibleLLM:
             return override.strip()
         return self._model
 
+    def _max_output_tokens_for(self, context: ModelContext) -> int:
+        override = context.metadata.get("max_output_tokens")
+        if type(override) is int and override > 0:
+            return min(self._max_output_tokens, override)
+        return self._max_output_tokens
+
     @staticmethod
     def _messages(context: ModelContext) -> list[dict[str, str]]:
         messages = [
@@ -280,7 +317,67 @@ class OpenAICompatibleLLM:
         choices = cls._field(completion, "choices")
         if not isinstance(choices, (list, tuple)) or not choices:
             raise ProviderResponseError("provider response has no valid choice")
-        return cls._parse_message(cls._field(choices[0], "message"))
+        return cls._with_usage(
+            cls._parse_message(cls._field(choices[0], "message")),
+            cls._field(completion, "usage"),
+        )
+
+    @classmethod
+    def _with_usage(cls, response: LLMResponse, usage: Any) -> LLMResponse:
+        values = cls._usage_metadata(usage)
+        if not values:
+            return response
+        metadata = dict(response.provider_metadata)
+        metadata["usage"] = values
+        return response.model_copy(update={"provider_metadata": metadata})
+
+    @classmethod
+    def _usage_metadata(cls, usage: Any) -> dict[str, int | float]:
+        if usage is None:
+            return {}
+        values: dict[str, int | float] = {}
+        for name in (
+            "prompt_tokens",
+            "completion_tokens",
+            "total_tokens",
+            "prompt_cache_hit_tokens",
+            "prompt_cache_miss_tokens",
+        ):
+            value = cls._field(usage, name)
+            if type(value) in {int, float}:
+                values[name] = value
+        # Responses API names the same counters input/output tokens and nests
+        # cache/reasoning details. Normalize them to the project vocabulary so
+        # usage accounting is independent of the selected provider API.
+        input_tokens = cls._field(usage, "input_tokens")
+        output_tokens = cls._field(usage, "output_tokens")
+        if type(input_tokens) in {int, float}:
+            values.setdefault("prompt_tokens", input_tokens)
+        if type(output_tokens) in {int, float}:
+            values.setdefault("completion_tokens", output_tokens)
+        # Anthropic Messages usage names cache counters explicitly.  Keep the
+        # normalized vocabulary used by the loop and cost display.
+        cache_read = cls._field(usage, "cache_read_input_tokens")
+        cache_creation = cls._field(usage, "cache_creation_input_tokens")
+        if type(cache_read) in {int, float}:
+            values.setdefault("prompt_cache_hit_tokens", cache_read)
+        if type(cache_creation) in {int, float}:
+            values.setdefault("prompt_cache_miss_tokens", cache_creation)
+        responses_input_details = cls._field(usage, "input_tokens_details")
+        cached_tokens = cls._field(responses_input_details, "cached_tokens")
+        if type(cached_tokens) in {int, float}:
+            values.setdefault("prompt_cache_hit_tokens", cached_tokens)
+            prompt_tokens = values.get("prompt_tokens")
+            if type(prompt_tokens) in {int, float}:
+                values.setdefault("prompt_cache_miss_tokens", prompt_tokens - cached_tokens)
+        completion_details = cls._field(usage, "completion_tokens_details")
+        reasoning_tokens = cls._field(completion_details, "reasoning_tokens")
+        responses_output_details = cls._field(usage, "output_tokens_details")
+        if type(reasoning_tokens) not in {int, float}:
+            reasoning_tokens = cls._field(responses_output_details, "reasoning_tokens")
+        if type(reasoning_tokens) in {int, float}:
+            values["reasoning_tokens"] = reasoning_tokens
+        return values
 
     @classmethod
     def _parse_message(cls, message: Any) -> LLMResponse:
@@ -422,6 +519,10 @@ class OpenAICompatibleLLM:
                 return ProviderAuthenticationError("provider rejected authentication")
             if status_code == 429:
                 return ProviderRateLimitError("provider rate limit exceeded")
+            if isinstance(status_code, int) and 400 <= status_code < 500:
+                return ProviderRequestError(
+                    f"provider rejected request (HTTP {status_code})"
+                )
         if isinstance(error, (APIConnectionError, APIStatusError, APIError, OpenAIError)):
             return ProviderHTTPError("provider request failed")
         return ProviderHTTPError("provider transport failed")

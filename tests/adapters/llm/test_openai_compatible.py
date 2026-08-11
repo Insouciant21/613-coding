@@ -9,6 +9,7 @@ import httpx
 import pytest
 from openai import (
     APIConnectionError,
+    APIStatusError,
     APITimeoutError,
     AuthenticationError,
     PermissionDeniedError,
@@ -30,6 +31,7 @@ from coding613.adapters.llm.openai_compatible import (
     ProviderAuthenticationError,
     ProviderHTTPError,
     ProviderRateLimitError,
+    ProviderRequestError,
     ProviderResponseError,
     ProviderTimeoutError,
 )
@@ -99,6 +101,64 @@ def test_openai_adapter_uses_context_model_override() -> None:
     )
 
     assert client.chat.completions.calls[0]["model"] == "gpt-test"
+
+
+def test_openai_adapter_sends_configured_output_limit() -> None:
+    client = FakeSDKClient(completion=FakeCompletion(FakeMessage(content="ok")))
+    provider = OpenAICompatibleLLM(
+        "https://provider.invalid", "model", client, max_output_tokens=1234
+    )
+
+    provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+
+    assert client.chat.completions.calls[0]["max_tokens"] == 1234
+
+
+def test_openai_adapter_sends_non_default_reasoning_effort() -> None:
+    client = FakeSDKClient(completion=FakeCompletion(FakeMessage(content="ok")))
+    provider = OpenAICompatibleLLM(
+        "https://provider.invalid", "model", client, reasoning_effort="high"
+    )
+
+    provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+
+    assert client.chat.completions.calls[0]["reasoning_effort"] == "high"
+
+
+def test_openai_adapter_forwards_provider_specific_reasoning_effort() -> None:
+    client = FakeSDKClient(completion=FakeCompletion(FakeMessage(content="ok")))
+    provider = OpenAICompatibleLLM(
+        "https://provider.invalid", "model", client, reasoning_effort="xhigh"
+    )
+
+    provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+
+    assert client.chat.completions.calls[0]["reasoning_effort"] == "xhigh"
+
+
+def test_openai_adapter_records_numeric_usage_metadata() -> None:
+    completion = FakeCompletion(FakeMessage(content="ok"))
+    completion.usage = SimpleNamespace(
+        prompt_tokens=10,
+        completion_tokens=8,
+        total_tokens=18,
+        prompt_cache_hit_tokens=7,
+        prompt_cache_miss_tokens=3,
+        completion_tokens_details=SimpleNamespace(reasoning_tokens=5),
+    )
+    client = FakeSDKClient(completion=completion)
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+
+    response = provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+
+    assert response.provider_metadata["usage"] == {
+        "prompt_tokens": 10,
+        "completion_tokens": 8,
+        "total_tokens": 18,
+        "prompt_cache_hit_tokens": 7,
+        "prompt_cache_miss_tokens": 3,
+        "reasoning_tokens": 5,
+    }
 
 
 def test_openai_adapter_omits_local_schema_id_without_mutating_definition() -> None:
@@ -182,6 +242,14 @@ def _request() -> httpx.Request:
             ),
             ProviderRateLimitError,
         ),
+        (
+            APIStatusError(
+                "bad request",
+                response=httpx.Response(400, request=_request()),
+                body={"error": {"message": "invalid request"}},
+            ),
+            ProviderRequestError,
+        ),
     ],
 )
 def test_openai_adapter_maps_sdk_errors(
@@ -206,7 +274,9 @@ def test_openai_adapter_streams_sdk_text_and_split_tool_arguments() -> None:
         ]
     )
     client = FakeSDKClient(stream=stream)
-    provider = OpenAICompatibleLLM("https://provider.invalid/v1", "model", client)
+    provider = OpenAICompatibleLLM(
+        "https://provider.invalid/v1", "model", client, max_output_tokens=1234
+    )
     deltas: list[str] = []
 
     response = provider.complete_stream(
@@ -224,6 +294,28 @@ def test_openai_adapter_streams_sdk_text_and_split_tool_arguments() -> None:
     assert response.provider_metadata["tool_call_ids"] == ["call-1"]
     assert stream.closed is True
     assert client.chat.completions.calls[0]["stream"] is True
+    assert client.chat.completions.calls[0]["max_tokens"] == 1234
+    assert client.chat.completions.calls[0]["stream_options"] == {"include_usage": True}
+
+
+def test_openai_adapter_records_stream_usage_chunk() -> None:
+    usage_chunk = FakeChunk()
+    usage_chunk.usage = SimpleNamespace(
+        prompt_tokens=4,
+        completion_tokens=2,
+        total_tokens=6,
+        prompt_cache_hit_tokens=3,
+        prompt_cache_miss_tokens=1,
+    )
+    stream = FakeStream([FakeChunk(content="ok"), usage_chunk])
+    client = FakeSDKClient(stream=stream)
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+
+    response = provider.complete_stream(
+        ModelContext(run_id=uuid4(), task="task"), (), lambda _: None, lambda: False
+    )
+
+    assert response.provider_metadata["usage"]["prompt_cache_hit_tokens"] == 3
 
 
 def test_openai_adapter_rejects_empty_stream() -> None:

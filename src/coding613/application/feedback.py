@@ -29,7 +29,7 @@ class FeedbackClassifier:
         "no such file or directory",
     )
     _CHANGE_ACTIONS: ClassVar[frozenset[str]] = frozenset(
-        {"apply_patch", "delete_file", "edit_file", "write_file"}
+        {"apply_patch", "delete_file", "edit_file", "write_file", "install_dependency"}
     )
 
     def __init__(self, repeated_failure_limit: int = 3) -> None:

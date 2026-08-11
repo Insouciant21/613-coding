@@ -44,11 +44,49 @@ HTTPX for the independent embedding adapter, `unidiff`, and PyInstaller.
 | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md` | Recover and complete Cube Task 3 through the new TUI | safe mutations and TUI/distribution | committed in `9ee205d`; pending execution approval |
 | `docs/superpowers/plans/2026-08-09-cube-solver.md` Tasks 4-9 | Validation, real solver, jobs, 3D editor, playback, local Compose, final audit | Cube Task 3 recovery | approved existing plan; pending prerequisite |
 | `docs/superpowers/plans/2026-08-10-openai-sdk-llm.md` | Replace chat/tool HTTP and SSE with the official OpenAI SDK | approved SDK design `b4b5a94` | implemented and integrated into `main` at `8e708e2` (implementation `f7f2301`, repair `0fcd2af`, evidence `581402b`/`8e708e2`) |
+| `docs/superpowers/plans/2026-08-11-responses-api-llm.md` | Add selectable OpenAI Responses API request/tool/stream adapter | user request supersedes the Chat-only migration scope | implemented in the current worktree; offline evidence below |
 | `docs/superpowers/plans/2026-08-10-613-coding-claude-code-parity.md` | Shared Claude-Code-like TUI/CLI conversation, permissions, context, resume, and output contracts | approved parity design `3a07f09` | Tasks 1-7 complete through `fd8871e`; delivery evidence recorded in `f27dba6` |
 
 The completed historical critical path was `CORE → SANDBOX → MULTI_AGENT → DELIVERY`. The current
 critical path is `SAFE_MUTATION → TUI_DISTRIBUTION → CUBE_RECOVERY → CUBE Tasks 4-9`. Do not start
 Cube recovery with the old whole-file editing boundary.
+
+## Harness Prompt And Loop Enhancement Evidence (2026-08-11)
+
+- Status: implemented in the existing working tree; no commit was created and no Superpowers skill
+  was invoked, per the user's explicit instruction.
+- Scope: strengthened the worker prompt with inspect/implement/review task classification,
+  evidence-first tool use, scoped mutation guidance, validation feedback discipline, and an explicit
+  concurrent-read/ordered-write contract. The context assembler now loads bounded, redacted
+  `AGENTS.override.md`/`AGENTS.md`/`CLAUDE.local.md`/`CLAUDE.md` guidance from the selected repository
+  root, emits a deterministic run ledger, bounds event evidence, and compacts old dynamic messages
+  while retaining the task, ledger, and newest evidence. The loop preflights and concurrently
+  dispatches independent read-only batches, then records their results in model order; policy,
+  approval, writes, and validation remain on the ordered path.
+- TDD: new context tests for repository guidance, ledger, bounded compaction, and newest evidence,
+  plus a loop regression proving two independent reads overlap and preserve persisted result order.
+  The focused tests were RED before implementation and GREEN afterward.
+- Verification: `uv run pytest -q --ignore=tmp` passed 537 tests; `uv run ruff check .`,
+  `uv run mypy src`, and `git diff --check` passed. No provider request, credential access,
+  remote push, deployment, or target `tmp/cube` source edit was performed.
+- References used for behavior only: OpenAI's public agent-loop/context-compaction description and
+  Claude Code's public agent-loop/context-management documentation. The harness still owns its
+  loop, policy, tool schemas, and deterministic validation; no high-level SDK runner was added.
+
+## User-scoped Configuration Evidence (2026-08-12)
+
+- Status: implemented and offline verified in the current dirty worktree; responsible actor `/root`.
+- Scope: keep repository `harness.toml` policy-only; move provider profiles, context-window options,
+  and budgets to a user-wide TOML file with atomic writes, keyring-only credentials, CLI profile
+  management, and TUI switching.
+- TDD/verification: legacy project-`[llm]`/`[budgets]` tests were observed failing at the new
+  boundary, then rewritten with user-config and provider-service regressions. Full offline suite
+  `uv run pytest -q --ignore=tmp` passed 562 tests with 325 warnings; Ruff, mypy, `uv lock --check`,
+  and diff checks passed. The editable CLI was refreshed and provider listing plus the `tmp/cube`
+  policy-only config check passed at 2026-08-12 00:18 Asia/Shanghai.
+- Files: `src/coding613/config.py`, `application/user_configuration.py`, `cli/providers.py`,
+  composition/TUI wiring, project/user config tests, and `tmp/cube/harness.toml`. API keys remain
+  outside files; the migrated user file contains only the existing `ai2` credential reference.
 
 ## Phase Gates
 
@@ -564,6 +602,19 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Boundary: no provider request, keyring access, network, Docker, remote CI, merge, or main-worktree
   mutation was performed; unrelated dirty main files remain outside this branch.
 
+## Same-Run Provider Retry Evidence
+
+- Verification timestamp: 2026-08-10 18:05:00 Asia/Shanghai.
+- Scope: make the owned `AgentLoop` continue across transient OpenAI-compatible provider timeouts
+  without an external controller restart, while retaining explicit model-call and wall-clock limits.
+- TDD RED: the focused timeout retry test failed with a terminal provider error before the change.
+- GREEN: `RetryableProviderError` is a port-level marker; the SDK adapter marks timeout failures;
+  `AgentLoop` persists retryable environment feedback and continues the same run. The focused
+  application/adapter tests passed 71, `uv run pytest tests -q` passed 472, Ruff passed, and mypy
+  passed for 102 source files.
+- Boundary: authentication, policy, tool, context, and other non-retryable dependency failures
+  remain terminal; `deepseek-chat` was not used after the explicit user override.
+
 ### Claude-Code-Parity local integration evidence
 
 - Verification timestamp: 2026-08-10 16:22:48 Asia/Shanghai.
@@ -574,3 +625,394 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Merged-main verification passed 471 tests (253 existing pytest-asyncio deprecation warnings),
   Ruff, mypy (102 files), `uv lock --check`, and `git diff HEAD --check`. User-owned tracked and
   untracked files remain uncommitted and unstaged.
+
+## Self-iteration target audit (2026-08-10 21:19:31 Asia/Shanghai)
+
+- Status: the root harness retry slice is implemented; the external `tmp/cube` product run is not
+  complete and is intentionally not marked done.
+- Evidence: `5bdaef15-c288-429c-b3ac-5cd22d7dd1a6` persisted 16 model calls in one run and briefly
+  reached 43/43 web tests, but oscillated on a single lint error. Bounded follow-ups
+  `ae7c581b-e52f-4fc2-9d15-30fb7eedf4fb`, `54240807-d35b-4b76-863e-41836f2d3539`, and
+  `74a5ee84-f4f3-41b8-9dc4-bd5d8f47f1cc` failed to perform the requested minimal repair and were
+  cancelled after repeated read/rewrite behavior.
+- Verification: the target `bash scripts/verify.sh` remained RED in the final worker artifacts;
+  no controller edit or completion claim is recorded. Root offline verification remains the
+  acceptance gate for this harness slice.
+- Fresh independent target verification at 21:22 returned 36/43 web tests failing with
+  `TypeError: cloneStickers is not a function` from `moves.ts:212`; this is the explicit blocker.
+
+## Root verification refresh (2026-08-10 21:23:17 Asia/Shanghai)
+
+- `uv run pytest tests -q`: 473 passed (253 existing warnings).
+- Retry-focused tests passed; Ruff, mypy (102 files), `uv lock --check`, and `git diff --check`
+  passed.
+- Target boundary: `tmp/cube` remains RED and is not included in the root offline suite.
+
+## Repeated-write guard (2026-08-10 22:18:00 Asia/Shanghai)
+
+- Status: harness boundary complete; target implementation remains in progress.
+- TDD: the new exact successful-write replay test was observed RED before implementation and GREEN
+  afterward. The guard covers all owned write tools and only blocks a matching prior successful
+  mutation with non-empty changed files.
+- Verification: `uv run pytest tests -q` passed 481 (253 existing warnings), Ruff passed, mypy
+  passed for 102 files, `uv lock --check` passed, and `git diff --check` passed.
+- Target evidence: run `559fb873-1725-464c-9289-6e573e2893a9` reached 43/43 web tests but exhausted
+  its 30 model-call budget while build/API contracts remained RED. The next target run must restore
+  the missing state helpers once, then repair build errors one module at a time.
+
+## Codex patch-format compatibility (2026-08-10 21:37:42 Asia/Shanghai)
+
+- Status: complete for the harness boundary; target implementation remains in progress.
+- TDD: the Codex marker-format update test was observed RED before the parser change and GREEN
+  afterward.
+- Verification: focused patch/application tests passed 81; full `uv run pytest tests -q` passed
+  475, Ruff and mypy passed, and lock/diff checks passed.
+- Implementation: `prepare_patch` accepts `*** Begin/Update/Add/Delete/End Patch`, normalizes it
+  into the existing strict unified-diff path, and retains repository path and hunk safety checks.
+- Next task: launch a fresh patch-only, same-process 613 Coding run against `tmp/cube` and verify
+  the target's independent `bash scripts/verify.sh`.
+
+## 613 Coding target foundation/domain slice (2026-08-10 23:25:55 Asia/Shanghai)
+
+- Status: foundation/domain slice completed by governed 613 Coding worker runs; the controller did
+  not author target product source. The full design acceptance criteria remain open.
+- Delivered: flat 2x2–7x7 cube state, move/wide/rotation behavior, undo/redo/reset, storage
+  validation, notation compatibility, coordinate helpers, history/random helpers, and the web/API
+  foundation. Full 3D UI, solver jobs, rich validation, and browser workflow are not yet claimed.
+- Verification: `(cd tmp/cube && bash scripts/verify.sh)` passed 43 web tests, lint, typecheck,
+  production build, API pytest, Ruff, and mypy. The sensitive worker temporary file `tmp` was
+  removed through governed `delete_file`; target scanning found no credential-like pattern.
+- Worker evidence: cleanup run `5f3869d6-e25c-4716-b438-c558c6e9e141`; repair run IDs are in the
+  corresponding `AGENT_LOG.md` entry.
+- Root gate: `uv run pytest tests -q` passed 481; Ruff, mypy, `uv lock --check`, and
+  `git diff --check` also passed.
+
+## 613 Coding target workbench/API vertical slice (2026-08-11 00:14:26 Asia/Shanghai)
+
+- Status: the responsive interactive web workbench and deterministic validation API slice are
+  complete through governed 613 Coding runs; the complete cube-solver product remains in progress.
+- Delivered: selectable 2x2–7x7 sticker grids, palette painting, revision status, move entry,
+  undo/redo/reset controls, and `/api/validate` with structural, color-count, and front/top
+  adjacency diagnostics in Chinese.
+- Verification: `(cd tmp/cube && bash scripts/verify.sh)` passed 45 web tests, lint, typecheck,
+  production build, 5 API tests, Ruff, and mypy. Root verification passed 482 tests, Ruff, mypy,
+  `uv lock --check`, and `git diff --check`.
+- Open scope: actual Three.js 3D interaction, authoritative reachability validation, solver
+  jobs/SSE/cancellation, orientation-aware formula playback, Docker Compose, and Playwright
+  acceptance remain unimplemented and are not claimed complete.
+
+## Responses API adapter evidence (2026-08-11 Asia/Shanghai)
+
+- User request: support the OpenAI Responses API in addition to the existing synchronous and
+  streamed Chat Completions adapters.
+- Design revision: `docs/superpowers/specs/2026-08-11-responses-api-llm-design.md`; plan:
+  `docs/superpowers/plans/2026-08-11-responses-api-llm.md`.
+- TDD RED: collecting the new adapter test failed with the expected missing
+  `coding613.adapters.llm.responses` module. The streaming test then failed with the expected
+  missing `complete_stream` method before its implementation.
+- GREEN: `uv run pytest tests/adapters/llm/test_responses.py tests/adapters/llm/test_credentialed.py
+  tests/application/test_composition.py tests/config/test_config.py -q` passed 60 tests; the
+  complete offline suite passed 495 tests with 253 existing pytest-asyncio deprecation warnings.
+- Implementation: `[llm].api` selects `chat_completions` (default) or `responses`; Responses maps
+  flat function tools, output items, streaming deltas, `finish`, normalized usage, and provider
+  IDs while preserving the owned loop and `store=false` state boundary.
+- Static verification: Ruff, mypy, `uv lock --check`, and `git diff --check` passed. Independent
+  `(cd tmp/cube && bash scripts/verify.sh)` passed 46 Web tests, 5 API tests, lint, typecheck,
+  build, Ruff, and mypy.
+
+## Context/tool-use forensic follow-up (2026-08-11 04:02 Asia/Shanghai)
+
+- Status: root harness compatibility repairs are verified; the target Cube product remains in
+  progress and is not claimed complete.
+- Evidence: direct Responses SDK probing with the configured DeepSeek endpoint produced a tool
+  call only after 1,800 reasoning tokens in a short request. The target worker initially used a
+  1,536-token default and later generated ordinary Git patches that the executor rejected as
+  unsupported metadata. Persisted run events show model actions, invalid patch errors, and
+  repeated no-action retries; this rules out a zero-context explanation.
+- Root changes: default `llm.max_output_tokens` is now 8192 (RED/GREEN config test); patch parsing
+  accepts only the harmless `diff --git`/`index` wrapper metadata and can recover a uniquely
+  matching stale hunk offset (both RED/GREEN tested). Existing path, ambiguity, and safety
+  checks remain authoritative.
+- Verification: `uv run pytest tests -q` passed 500; Ruff, mypy, and `git diff --check` passed.
+  Fresh target `bash scripts/verify.sh` passed 61 Web tests, 8 API tests, lint, typecheck, build,
+  Ruff, and mypy at 04:01. Target persistence remains a bounded interim implementation; the
+  complete Three.js/solver/Compose/Playwright product is still open.
+
+## Context budget and Three.js progress (2026-08-11 04:44 CST)
+
+- The persisted worker trace proved the 8192 output cap was consumed entirely by reasoning on
+  complex edits; the model had the task, target reads, and repair prompts. The root config now
+  defaults Responses/Chat runs to `max_output_tokens = 32768`, with a focused RED/GREEN config
+  test and README update.
+- Governed workers installed Three.js and types, recorded the canvas RED test, and delivered a
+  dynamic Three.js canvas for 2x2–7x7 with pointer orbit and a transparent SVG semantic fallback.
+  One worker regression (`state.faces`, fixed order, missing default export) was caught by target
+  validation and repaired by a later worker.
+- Fresh `(cd tmp/cube && bash scripts/verify.sh)` at 04:44 passed 62 Web tests, 8 API tests,
+  ESLint, TypeScript, Vite build, Ruff, and mypy. This closes only the viewport slice; real
+  reachability/solver jobs, formula playback, Compose/Nginx, and Playwright acceptance remain.
+- Root post-change gate at 04:45 passed 503 offline tests, Ruff, mypy, and `git diff --check`.
+
+## Working-tree TUI Configuration Repair (2026-08-11)
+
+- Status: complete in the existing uncommitted working tree; no commit was created.
+- Scope: actionable undeclared-validation errors, declared-command tool guidance, repository-mode
+  inheritance in the TUI entrypoint, and validated `/config` TUI show/set commands with atomic
+  `harness.toml` persistence and runtime reload for future runs.
+- Verification: `uv run pytest -q --ignore=tmp` passed 517 tests; `uv run ruff check .` and
+  `uv run mypy src` passed; installed `613-coding config check --repo tmp/cube` exited 0.
+- User intervention/deviation: user explicitly requested no Superpowers skills; implementation
+  followed the existing application boundaries without invoking those skills.
+
+## Working-tree TUI Discoverability Hints (2026-08-11 19:09 CST)
+
+- Status: complete in the existing uncommitted working tree; no commit was created.
+- Scope: deterministic slash-command prefix matching, Tab/↑/↓ cycling, live candidate hints,
+  persistent keyboard/approval guidance, and `/help` discovery text.
+- TDD: the initial focused collection failed because the new `CommandHints` widget did not yet
+  exist; focused `tests/tui/test_commands.py tests/tui/test_app.py` then passed 47 tests.
+- Verification: `uv run pytest -q --ignore=tmp` → 521 passed; `uv run ruff check .`,
+  `uv run mypy src`, and `git diff --check` → passed.
+- Documentation: README and `docs/development.md` now document `/` filtering, Tab completion,
+  arrow cycling, history fallback, `/help`, and `//` literal-slash prompts.
+- Boundary: no target `tmp/cube` source was modified by this slice; the product remains in
+  progress and is not claimed complete.
+- Final 19:11 CST verification after the narrow-terminal hint layout polish remained green:
+  521 tests, Ruff, mypy, and `git diff --check`.
+
+## Working-tree TUI Dependency/Startup Repair (2026-08-11 19:23 CST)
+
+- Status: complete in the existing uncommitted working tree; no commit was created.
+- Scope: eliminate the Markdown-link `bad marshal data` crash and ensure the installed global
+  `613-coding` uses the current Responses-aware configuration model.
+- TDD: the focused Markdown-link test was RED under Rich 15; it passed after pinning Rich below
+  14.2, which is the first release family that changed style metadata from marshal to pickle.
+- Verification: `uv run pytest -q --ignore=tmp` → 522 passed; Ruff, mypy, `uv lock --check`, and
+  `git diff --check` → passed. Installed-tool probes confirmed Rich 14.1.0, valid `tmp/cube`
+  configuration, and successful Markdown-link rendering.
+- Documentation: README and `docs/deployment.md` explain `uv tool install --force .` for stale
+  global installations and `uv run 613-coding` for the live checkout.
+- Boundary: no `tmp/cube` product source was changed; the product remains in progress.
+
+## Working-tree TUI Tool Output Preview (2026-08-11 19:43 CST)
+
+- Status: complete in the existing uncommitted working tree; no commit was created.
+- Scope: collapse large tool-result output to a redacted preview and add `Ctrl+T` to expand or
+  collapse the latest expandable result.
+- TDD: focused renderer/app tests were RED before `DetailMessage` gained expandable state;
+  TUI tests then passed 64 cases.
+- Verification: `uv run pytest -q --ignore=tmp` → 524 passed; Ruff, mypy, and
+  `git diff --check` → passed.
+- Documentation: README and `docs/development.md` document the preview and shortcut.
+- Boundary: the model-facing tool result and its existing redaction/output cap are unchanged;
+  only the TUI presentation is collapsed.
+- Distribution refresh at 19:45 CST verified the global Python 3.12 `613-coding` executable has
+  the new binding and preview/expand behavior.
+
+## Working-tree TUI No-action and Composer Display Repair (2026-08-11 19:55 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Change: repeated text-only provider responses now receive an explicit action-repair prompt and
+  stop after one repair turn with deterministic `no_progress`; assistant drafts are replaced per
+  model turn; the composer hover tooltip was removed and bottom-row geometry is covered at
+  60x20/80x24 terminal sizes.
+- TDD: the new loop test first reproduced `provider_error` after the fake provider ran out of
+  responses (the previous budget-loop behavior); the UI test first observed the unwanted tooltip.
+- Fresh verification: `uv run pytest -q --ignore=tmp` → 528 passed; Ruff, mypy, `uv lock --check`,
+  and `git diff --check` → passed. Global refresh used
+  `uv tool install --force --reinstall --no-cache .`; installed config and model-state probes
+  passed for `tmp/cube` (final refresh/probe at 20:00 CST).
+- Delivery boundary: no target `tmp/cube` source, credentials, provider request, remote push, or
+  deployment was used; the complete cube-solver product remains in progress.
+
+## Working-tree Responses Tool Stream Repair (2026-08-11 20:18 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Scope: repair DeepSeek Responses streaming function-call assembly and prevent repeated provider
+  protocol failures from consuming the entire model-call budget without a useful error.
+- Evidence: target SQLite for the reported runs showed 30 provider-boundary response errors and no
+  tool action. A direct stream reproduction showed `name` present on `output_item.added` but null
+  on `function_call_arguments.done`; the parser now retains the earlier name. The loop tracks a
+  persisted provider-error streak and stops after two retryable failures with `provider_error`.
+- TDD: the null-name stream case and repeated-provider-error budget test were RED before their
+  respective implementations and pass now.
+- Fresh verification: `uv run pytest -q --ignore=tmp` → 529 passed; Ruff, mypy, `uv lock --check`,
+  and `git diff --check` → passed. The global uv tool was force-reinstalled from this checkout;
+  a live provider probe parsed `read_file`, and a bounded CLI smoke run recorded successful tool
+  completions before its intentional three-call budget ended.
+- Delivery boundary: no target source, credentials, remote push, or deployment was changed; the
+  complete cube-solver product remains in progress. Restart an already-running TUI process before
+  testing so it loads the refreshed package.
+
+## Working-tree apply_patch Conflict Repair (2026-08-11 20:28 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Scope: preserve actionable `PatchConflictError` details in tool results and give the next model
+  call deterministic instructions to re-read and regenerate a stale patch.
+- TDD: direct repository and context regressions were RED before implementation and pass now.
+- Fresh verification: `uv run pytest -q --ignore=tmp` → 531 passed; Ruff, mypy, `uv lock --check`,
+  and `git diff --check` → passed. Global `613-coding` was force-reinstalled and its config/CLI
+  probes passed.
+- Safety boundary: no automatic overwrite or fuzzy application is introduced. The exact conflict
+  remains rejected; only a fresh patch based on current file content can proceed.
+
+## Working-tree Tool Output and Validation Repair (2026-08-11 20:46 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Scope: preserve large tool results until the TUI preview/`Ctrl+T` boundary, make declared
+  validation argv unambiguous, and stop requiring validation for read-only conversations.
+- Root cause evidence: the loop previously capped progress text at 8,000 characters; the tool
+  description used shell-formatted argv; and `finish` treated every run as requiring validation.
+  Automatic validation triggers already exclude read-only tools.
+- TDD: regressions for output preservation, JSON argv guidance, and read-only completion were
+  added before the implementation and are green.
+- Fresh verification: `uv run pytest -q --ignore=tmp` → 533 passed; Ruff, mypy, lock, and diff
+  checks passed. Global `613-coding` was force-reinstalled; the `tmp/cube` config check and CLI
+  help probes passed.
+- Safety boundary: output remains redacted and bounded at 1 MiB; changed repositories still need
+  fresh passing validation before `finish`; no target source, credentials, remote push, or deploy
+  was changed.
+
+## Working-tree Legacy Validation argv Compatibility (2026-08-11 20:52 CST)
+
+- Status: verified locally; responsible actor: controller.
+- Change: a one-element legacy shell-rendered validation argument is accepted only when
+  `shlex.split` produces an exact policy-declared argv tuple; subprocess execution remains
+  `shell=False`.
+- TDD/verification: the focused regression was RED before implementation and GREEN afterward;
+  final `uv run pytest -q --ignore=tmp` → 534 passed, with Ruff, mypy, lock, and diff checks green.
+  The refreshed global executable passed the `tmp/cube` config check and CLI help probe.
+- Boundary: no arbitrary shell parsing, policy bypass, credential access, target source edit,
+  remote push, or deployment was performed.
+
+## Working-tree Codex-aligned Provider Retry Window (2026-08-11 21:32 CST)
+
+- Status: implemented and verified in the current dirty worktree; no Superpowers skills were
+  invoked, and unrelated user changes remain preserved.
+- Scope: align transient provider retry handling with Codex's visible five-retry reconnect
+  window while keeping the harness loop, budgets, persistence, and policy authoritative.
+- TDD RED: `test_repeated_retryable_provider_errors_stop_before_model_budget` was changed to
+  assert the new bounded retry behavior and failed against the previous two-attempt
+  implementation.
+- Codex parity clarification: the current Codex source sets `DEFAULT_STREAM_MAX_RETRIES = 5`;
+  this is five retries after the initial call, so the harness allows six total requests and
+  terminates on the sixth failure. `_MAX_PROVIDER_RETRIES = 5` records retry counts in feedback.
+  OpenAI SDK 4xx request errors (except authentication and rate limits) map to non-retryable
+  `ProviderRequestError` so invalid payloads fail fast.
+- Verification evidence: focused loop/adapter tests passed 85; `uv run pytest -q --ignore=tmp`
+  passed 538 tests; `uv run ruff check src tests`, `uv run mypy src`, `uv lock --check`, and
+  `git diff --check` passed. README and `docs/development.md` document the behavior.
+- Delivery boundary: no real provider request, credential access, target `tmp/cube` source edit,
+  remote push, deployment, or destructive Git operation was performed. Start a fresh run after
+  restarting an installed TUI process to exercise the new code.
+
+## Working-tree Retry Semantics Correction (2026-08-11 21:40 CST)
+
+- Codex source verification: `DEFAULT_STREAM_MAX_RETRIES = 5` is a retry count after the initial
+  Responses stream request; Codex displays `1/5` through `5/5`. The implementation therefore uses
+  `_MAX_PROVIDER_RETRIES = 5`, allowing six total provider calls and stopping on the sixth failure.
+- TDD: the six-call regression was RED against the intermediate five-total implementation and is
+  GREEN after the semantic correction.
+- Final verification: `uv run pytest -q --ignore=tmp` → 538 passed; Ruff, mypy, `uv lock --check`,
+  and `git diff --check` passed. The global uv tool was force-reinstalled from this checkout;
+  CLI help and the `tmp/cube` configuration probe passed.
+
+## Working-tree Context/Validation/TUI/Budget Follow-up (2026-08-11 22:10 CST)
+
+- Status: implemented and offline verified in the current dirty worktree; no Superpowers skills
+  were invoked and unrelated user changes remain preserved.
+- Scope: stabilize the Responses prompt prefix, defer repository validation to an explicit
+  task-boundary request, make validation/tool output line-bounded and expandable without large
+  `Syntax` backgrounds, and add model-selected resource profiles.
+- TDD RED/GREEN: new regressions covered stable task-prefix/cache hash, one validation after a
+  multi-write batch, `set_task_budget` propagation to the next provider request, and 240-line
+  validation rendering. All focused tests passed after implementation.
+- Verification evidence: `uv run pytest -q --ignore=tmp` → 542 passed with 316 existing warnings;
+  `uv run ruff check .` and `uv run mypy src` passed. No provider request, credential access,
+  target `tmp/cube` source edit, remote push, deployment, or destructive Git operation occurred.
+
+### Final verification (2026-08-11 22:22 CST)
+
+- `uv run pytest -q --ignore=tmp`: 542 passed, 316 existing warnings.
+- `uv run ruff check .`, `uv run mypy src`, `uv lock --check`, and `git diff --check`: passed.
+- Global package refreshed with `uv tool install --force --reinstall --no-cache .`; CLI help and
+  the `tmp/cube` configuration probe passed.
+
+## TUI Preview Limits (2026-08-11 22:24 CST)
+
+- Scope: reduce the default tool-result preview to 200 characters and validation preview to 10
+  lines while retaining expandable output and the safety cap.
+- Verification: focused renderer tests 8 passed; full offline suite 542 passed with 316 existing
+  warnings; Ruff, mypy, lock, and diff checks passed. The global CLI was rebuilt and its help/config
+  probes passed.
+
+## Context-Controlled Agent Conversation (2026-08-11 23:09 CST)
+
+- Status: implemented and verified locally; responsible actor: `/root`.
+- Scope: remove enforced per-agent-turn stopping, keep context compaction as the conversation
+  boundary, prevent repeated `set_task_budget` calls, and return a finish summary when a provider
+  supplies no final text content.
+- Root cause: a completed historical run stored the user-facing answer only in `FinishAction.summary`
+  while the transcript selected the last non-empty planning content; the model also saw the budget
+  tool after profile selection and repeatedly invoked it.
+- TDD/verification: focused regressions were RED before implementation and GREEN afterward;
+  `uv run pytest -q --ignore=tmp` → 543 passed with 316 warnings; Ruff, mypy, and diff checks passed.
+  Editable global `613-coding` install and the `tmp/cube` config probe confirm the direct CLI uses
+  the updated source.
+- Safety boundary: legacy `per_agent_turns` remains accepted for compatibility but is informational;
+  finite total model-call, wall-time, and provider-cost limits remain available for unattended safety.
+  No target cube source, credentials, provider, remote repository, or deployment was changed.
+
+### Final-answer precedence follow-up (2026-08-11 23:15 CST)
+
+- A RED regression demonstrated that an earlier planning message could still mask a later accepted
+  `finish.summary` when the final response content was empty.
+- The transcript now selects the summary attached to the completed iteration before considering
+  earlier model text. Focused and full verification remain green: 543 tests passed; Ruff, mypy, and
+  diff checks passed; the editable CLI config probe reports `per_agent_turns:unbounded`.
+
+## LLM Context Window Configuration (2026-08-11 23:36 CST)
+
+- Status: implemented and verified locally; responsible actor: `/root`.
+- Scope: make the dynamic context-compaction window configurable under `[llm]` as
+  `context_window_chars`, while preserving the 48,000-character default and live TUI reload.
+- TDD/verification: RED configuration tests were observed before implementation; composition and
+  configuration-service regressions are green. Full offline suite: 547 passed with 316 warnings;
+  Ruff, mypy, lock, and diff checks passed. Direct CLI check reports `context_window_chars=48000`.
+- Safety boundary: the value is positive and capped at 4,000,000 characters; no tokenizer or
+  provider request is required. No target cube source/config, credentials, remote repository, or
+  deployment was changed.
+
+## Provider model catalog, Anthropic SDK, and slash menus (2026-08-12)
+
+- Status: implemented and offline verified in the current worktree; responsible actor: `/root`.
+- Scope: add per-provider model aliases with reasoning/output/context/streaming overrides, model
+  selection APIs and CLI commands, official Anthropic Messages SDK transport, and selectable TUI
+  menus for `/config`, `/provider`, and `/model`.
+- Evidence: `ModelConfig.effective`, `UserConfigurationService.models/select_model/upsert_model`,
+  `src/coding613/adapters/llm/anthropic.py`, `CredentialedAnthropicLLM`, composition injection,
+  `ConfigMenu`, and tests under `tests/adapters/llm/test_anthropic.py`,
+  `tests/application/test_user_configuration.py`, `tests/application/test_composition.py`,
+  `tests/cli/test_providers.py`, and `tests/tui/test_app.py`.
+- Verification: `uv run pytest -q --ignore=tmp` -> 568 passed with 334 warnings; Ruff, mypy,
+  `uv lock --check`, and `git diff --check` passed. No remote/provider smoke was run.
+- Final installed-CLI gate at 2026-08-12 00:43:06: `uv tool install --force --editable .`, provider
+  and model management help, redacted provider listing, and `config check --repo tmp/cube` passed;
+  the final suite is 570 passed with 334 warnings plus Ruff, mypy, lock, and diff checks.
+- Follow-up at 00:45:33 added explicit low/medium/high reasoning switching for each model alias via
+  the service, CLI, and TUI menus; focused service/CLI/TUI tests passed (37 tests). Final full gate
+  at 00:46:32 passed 571 tests with 334 warnings plus Ruff, mypy, lock, and diff checks. The final
+  00:50:51 gate also verifies Chat Completions forwards non-default reasoning and passes 573 tests.
+
+## Default resource and reasoning-level update (2026-08-12 01:13 Asia/Shanghai)
+
+- Status: implemented and offline verified locally; responsible actor: `/root`.
+- Changes: default context compaction window `256000` characters; internal tool-progress cap
+  `10000000` characters; resource profiles `standard=16384` and `complex=128000` with `simple`
+  removed; provider/model reasoning levels are arbitrary validated non-empty strings, with TUI
+  suggestions for common levels and direct CLI/config support for provider-specific values.
+- Evidence: `tests/application/test_resources.py`, config defaults and model-catalog tests, loop
+  output-cap regression, OpenAI-compatible/Anthropic adapter regressions, and provider CLI tests.
+- Verification: `uv run pytest -q --ignore=tmp` -> 582 passed with 334 warnings; Ruff, mypy,
+  `uv lock --check`, and `git diff --check` passed. `uv tool install --force --editable .`, CLI
+  help, and the `tmp/cube` config probe passed.

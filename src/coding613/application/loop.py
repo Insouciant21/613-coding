@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol
@@ -25,6 +26,11 @@ from coding613.application.progress import (
     CancellationToken,
     ProviderCancelledError,
     complete_with_progress,
+)
+from coding613.application.resources import (
+    ResourceProfile,
+    TaskBudgetRequest,
+    resource_profile,
 )
 from coding613.application.tool_registry import ToolRegistry, ToolRegistryError
 from coding613.application.validation import ValidationResult, ValidationTracker
@@ -46,7 +52,13 @@ from coding613.domain.models import (
 )
 from coding613.domain.permissions import ToolFilter
 from coding613.domain.redaction import redact_text
-from coding613.ports.llm import LLMProvider, LLMResponse, ModelContext, ToolDefinition
+from coding613.ports.llm import (
+    LLMProvider,
+    LLMResponse,
+    ModelContext,
+    RetryableProviderError,
+    ToolDefinition,
+)
 from coding613.ports.policy import PolicyDecision, PolicyEffect
 from coding613.ports.progress import NullProgressSink, ProgressKind, ProgressSink, RunProgress
 from coding613.ports.storage import EventStore, LoopSessionStore
@@ -54,7 +66,10 @@ from coding613.ports.tools import ToolContext, ToolResult
 
 _FINISH_TOOL = ToolDefinition(
     name="finish",
-    description="Finish the task only after objective validation is fresh and passing.",
+    description=(
+        "Finish the task only after objective validation is fresh and passing. "
+        "Put the complete user-facing final answer in summary; do not use planning narration."
+    ),
     input_schema={
         "type": "object",
         "properties": {"summary": {"type": "string", "minLength": 1}},
@@ -63,8 +78,46 @@ _FINISH_TOOL = ToolDefinition(
     },
 )
 
+_TASK_BUDGET_TOOL = ToolDefinition(
+    name="set_task_budget",
+    description=(
+        "Classify the task before repository work and select standard or complex "
+        "resource limits (standard targets 16,384 output tokens; complex targets 128,000). "
+        "The configured provider ceiling may clamp the target. Call this once at the start "
+        "of a run."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "difficulty": {
+                "type": "string",
+                "enum": ["standard", "complex"],
+            }
+        },
+        "required": ["difficulty"],
+        "additionalProperties": False,
+    },
+)
 
-def _progress_text(value: str, limit: int = 8_000) -> str:
+_READ_ONLY_TOOLS = frozenset({"git_diff", "list_files", "read_file", "search_files"})
+_WRITE_TOOLS = frozenset(
+    {"apply_patch", "delete_file", "edit_file", "write_file", "install_dependency"}
+)
+# Writes only invalidate freshness. Validation is requested explicitly by the model
+# or once at the task-end ``finish`` boundary; a write must not launch a subprocess.
+_VALIDATION_TRIGGER_TOOLS = frozenset({"run_validation"})
+# A text-only response can be a transient planning turn, but repeating it is
+# deterministic evidence that the provider is not driving the tool loop.
+_MAX_NO_ACTION_STREAK = 2
+# Codex's Responses provider defaults to five retries after the initial call,
+# surfaced as reconnects 1/5 ... 5/5.  Keep this as a retry-count limit: the
+# sixth provider failure is terminal.
+_MAX_PROVIDER_RETRIES = 5
+_TOOL_PROGRESS_OUTPUT_LIMIT = 10_000_000
+_MAX_PARALLEL_READ_TOOLS = 4
+
+
+def _progress_text(value: str, limit: int = _TOOL_PROGRESS_OUTPUT_LIMIT) -> str:
     safe = redact_text(value)
     if len(safe) <= limit:
         return safe
@@ -106,6 +159,7 @@ class LoopDependencies:
     progress: ProgressSink = field(default_factory=NullProgressSink)
     cancellation: CancellationToken = field(default_factory=CancellationToken)
     tool_filter: ToolFilter = field(default_factory=ToolFilter)
+    max_output_tokens: int = 128_000
 
 
 @dataclass(slots=True)
@@ -124,9 +178,18 @@ class _Session:
     changed_files: list[str] = field(default_factory=list)
     context_summary: str = ""
     classifier_state: dict[str, Any] | None = None
+    force_write: bool = False
+    no_action_streak: int = 0
+    provider_error_streak: int = 0
+    resource_profile: ResourceProfile | None = None
 
     @classmethod
-    def restore(cls, snapshot: LoopSession, limits: BudgetLimits) -> _Session:
+    def restore(
+        cls,
+        snapshot: LoopSession,
+        limits: BudgetLimits,
+        configured_max_output_tokens: int = 128_000,
+    ) -> _Session:
         restored_limits = (
             BudgetLimits.model_validate_json(
                 json.dumps(snapshot.budget_limits, separators=(",", ":"))
@@ -156,6 +219,17 @@ class _Session:
             changed_files=list(snapshot.changed_files),
             context_summary=snapshot.context_summary,
             classifier_state=snapshot.classifier_state,
+            force_write=snapshot.force_write,
+            no_action_streak=snapshot.no_action_streak,
+            provider_error_streak=snapshot.provider_error_streak,
+            resource_profile=(
+                resource_profile(
+                    snapshot.resource_profile,
+                    configured_max_output_tokens=configured_max_output_tokens,
+                )
+                if snapshot.resource_profile
+                else None
+            ),
         )
 
     def snapshot(self, run_id: UUID) -> LoopSession:
@@ -178,6 +252,13 @@ class _Session:
             classifier_state=self.classifier_state,
             changed_files=tuple(self.changed_files),
             context_summary=self.context_summary,
+            resource_profile=self.resource_profile.name if self.resource_profile else None,
+            max_output_tokens=(
+                self.resource_profile.max_output_tokens if self.resource_profile else None
+            ),
+            force_write=self.force_write,
+            no_action_streak=self.no_action_streak,
+            provider_error_streak=self.provider_error_streak,
         )
 
 
@@ -235,13 +316,29 @@ class AgentLoop:
                     error=error,
                     state_before=RunState.WAITING_MODEL,
                 )
+            context = self._with_resource_metadata(context, session, dependencies)
             session.context_summary = self._summarize_context(context)
 
             try:
-                definitions = tuple(
+                repository_definitions = tuple(
                     ToolDefinition.model_validate(definition)
                     for definition in dependencies.tools.definitions()
-                ) + (_FINISH_TOOL,)
+                    if (
+                        definition.name == "finish"
+                        or (
+                            definition.name not in dependencies.tool_filter.disallowed
+                            and (
+                                not dependencies.tool_filter.allowed
+                                or definition.name in dependencies.tool_filter.allowed
+                            )
+                        )
+                    )
+                    if not (session.force_write and definition.name in _READ_ONLY_TOOLS)
+                )
+                budget_definition = (
+                    (_TASK_BUDGET_TOOL,) if session.resource_profile is None else ()
+                )
+                definitions = budget_definition + repository_definitions + (_FINISH_TOOL,)
             except Exception as error:
                 return self._dependency_failure(
                     run_id,
@@ -282,7 +379,44 @@ class AgentLoop:
                 return self._summary(run_id, session)
             except Exception as error:
                 elapsed = time.monotonic() - started
-                session.budget.consume(turns=0, calls=0, seconds=elapsed, cost=0)
+                post_budget = session.budget.consume(
+                    turns=0, calls=0, seconds=elapsed, cost=0
+                )
+                if isinstance(error, RetryableProviderError):
+                    session.provider_error_streak += 1
+                if (
+                    isinstance(error, RetryableProviderError)
+                    and post_budget.allowed
+                    and session.provider_error_streak <= _MAX_PROVIDER_RETRIES
+                ):
+                    self._transition(
+                        run_id, session, dependencies, RunState.RUNNING
+                    )
+                    feedback = Feedback(
+                        kind=FeedbackKind.ENVIRONMENT_FAILURE,
+                        message=(
+                            "provider dependency failed; retrying in the same run "
+                            f"(retry {session.provider_error_streak}/"
+                            f"{_MAX_PROVIDER_RETRIES})"
+                        ),
+                        retryable=True,
+                        details={
+                            "boundary": "provider",
+                            "error_type": type(error).__name__,
+                            "retry_count": session.provider_error_streak,
+                            "max_retries": _MAX_PROVIDER_RETRIES,
+                        },
+                    )
+                    self._feedback_event(dependencies, run_id, feedback)
+                    self._record(
+                        run_id,
+                        session,
+                        dependencies,
+                        state_before=RunState.WAITING_MODEL,
+                        context=context,
+                        feedback=feedback,
+                    )
+                    continue
                 return self._dependency_failure(
                     run_id,
                     session,
@@ -336,6 +470,7 @@ class AgentLoop:
                 )
                 continue
 
+            session.provider_error_streak = 0
             provider_cost = response.provider_metadata.get("cost", 0)
             cost = float(provider_cost) if isinstance(provider_cost, (int, float)) else 0.0
             post_budget = session.budget.consume(
@@ -358,10 +493,54 @@ class AgentLoop:
             self._transition(run_id, session, dependencies, RunState.RUNNING)
             self._resolve_blocker(session, FeedbackKind.INVALID_ACTION)
 
+            if session.resource_profile is None:
+                selected = next(
+                    (
+                        envelope.action
+                        for envelope in response.actions
+                        if isinstance(envelope.action, ToolCall)
+                        and envelope.action.name == _TASK_BUDGET_TOOL.name
+                    ),
+                    None,
+                )
+                if selected is None:
+                    # Mocks and older providers may not know the harness control
+                    # tool. Keep the loop usable with a conservative standard
+                    # profile while giving capable models the chance to select a
+                    # larger allocation on their first response.
+                    self._select_resource_profile(
+                        run_id,
+                        session,
+                        dependencies,
+                        resource_profile(
+                            "standard",
+                            configured_max_output_tokens=dependencies.max_output_tokens,
+                        ),
+                        event_type="resource_profile.defaulted",
+                    )
+
             if not response.actions:
+                session.no_action_streak += 1
+                if session.no_action_streak >= _MAX_NO_ACTION_STREAK:
+                    return self._terminal_without_action(
+                        run_id,
+                        task,
+                        session,
+                        dependencies,
+                        RunState.RUNNING,
+                        StopReason.NO_PROGRESS,
+                        "run.no_progress",
+                        FeedbackKind.NO_PROGRESS,
+                        "provider returned no tool action twice; stopping to avoid a repeated model loop",
+                        context=context,
+                        response=response,
+                    )
                 feedback = Feedback(
                     kind=FeedbackKind.INVALID_ACTION,
-                    message="provider response contained no action",
+                    message=(
+                        "provider response contained no tool action; call a repository tool "
+                        "or finish when the task is complete"
+                    ),
                 )
                 self._block(session, feedback.kind)
                 self._feedback_event(dependencies, run_id, feedback)
@@ -379,9 +558,121 @@ class AgentLoop:
                 )
                 continue
 
+            session.no_action_streak = 0
             continue_model = False
+            validation_action_index = max(
+                (
+                    action_index
+                    for action_index, envelope in enumerate(response.actions)
+                    if isinstance(envelope.action, ToolCall)
+                    and envelope.action.name in _VALIDATION_TRIGGER_TOOLS
+                ),
+                default=-1,
+            )
+            parallel_reads = self._prepare_parallel_read_batch(
+                response.actions, run_id, dependencies
+            )
+            if parallel_reads is not None:
+                if self._execute_read_only_batch(
+                    run_id,
+                    parallel_reads,
+                    (context, response),
+                    session,
+                    dependencies,
+                ):
+                    return self._summary(run_id, session)
+                continue
             for action_index, envelope in enumerate(response.actions):
                 action = envelope.action
+                if isinstance(action, ToolCall) and action.name == _TASK_BUDGET_TOOL.name:
+                    if session.resource_profile is not None:
+                        feedback = Feedback(
+                            kind=FeedbackKind.INVALID_ACTION,
+                            message="task difficulty was already selected for this run",
+                            details={"tool": _TASK_BUDGET_TOOL.name},
+                        )
+                        self._block(session, feedback.kind)
+                        self._feedback_event(dependencies, run_id, feedback)
+                        self._record(
+                            run_id,
+                            session,
+                            dependencies,
+                            state_before=session.state,
+                            context=context,
+                            response=response,
+                            action=envelope,
+                            feedback=feedback,
+                            schema_validation=SchemaValidationEvidence(
+                                valid=False, target="tool_call"
+                            ),
+                        )
+                        continue_model = True
+                        break
+                    try:
+                        budget_request = TaskBudgetRequest.model_validate(action.arguments)
+                    except ValidationError as error:
+                        feedback = Feedback(
+                            kind=FeedbackKind.INVALID_ACTION,
+                            message="set_task_budget arguments failed schema validation",
+                            details={
+                                "tool": _TASK_BUDGET_TOOL.name,
+                                "error_type": type(error).__name__,
+                            },
+                        )
+                        self._block(session, feedback.kind)
+                        self._feedback_event(dependencies, run_id, feedback)
+                        self._record(
+                            run_id,
+                            session,
+                            dependencies,
+                            state_before=session.state,
+                            context=context,
+                            response=response,
+                            action=envelope,
+                            feedback=feedback,
+                            schema_validation=SchemaValidationEvidence(
+                                valid=False, target="tool_call"
+                            ),
+                        )
+                        continue_model = True
+                        break
+                    difficulty = budget_request.difficulty
+                    try:
+                        selected_profile = resource_profile(
+                            difficulty,
+                            configured_max_output_tokens=dependencies.max_output_tokens,
+                        )
+                    except ValueError as error:
+                        feedback = Feedback(
+                            kind=FeedbackKind.INVALID_ACTION,
+                            message=str(error),
+                            details={"tool": _TASK_BUDGET_TOOL.name},
+                        )
+                        self._block(session, feedback.kind)
+                        self._feedback_event(dependencies, run_id, feedback)
+                        self._record(
+                            run_id,
+                            session,
+                            dependencies,
+                            state_before=session.state,
+                            context=context,
+                            response=response,
+                            action=envelope,
+                            feedback=feedback,
+                            schema_validation=SchemaValidationEvidence(
+                                valid=False, target="tool_call"
+                            ),
+                        )
+                        continue_model = True
+                        break
+                    self._select_resource_profile(
+                        run_id,
+                        session,
+                        dependencies,
+                        selected_profile,
+                        turn=(context, response, envelope),
+                    )
+                    continue
                 if isinstance(action, FinishAction):
                     try:
                         revision = dependencies.revision()
@@ -400,13 +691,71 @@ class AgentLoop:
                                 valid=True, target="finish"
                             ),
                         )
+                    validation_required = bool(session.changed_files)
+                    if validation_required and not session.validation.is_fresh_and_passing(revision):
+                        automatic_validation = ToolCall(
+                            name="run_validation",
+                            arguments={"argv": []},
+                        )
+                        automatic_result = ToolResult(
+                            call=automatic_validation,
+                            success=True,
+                            output="automatic task-end validation",
+                        )
+                        if self._execute(
+                            run_id,
+                            automatic_validation,
+                            (context, response, envelope),
+                            session,
+                            dependencies,
+                            validate=True,
+                            state_before=session.state,
+                            schema_validation=SchemaValidationEvidence(
+                                valid=True, target="tool_call"
+                            ),
+                            policy_decision=PolicyDecisionEvidence(
+                                effect="allow",
+                                rule_id="harness.task_end_validation",
+                                reason="validation is deferred until finish",
+                            ),
+                            dispatch_result=(automatic_result, None),
+                            tool_started=True,
+                        ):
+                            return self._summary(run_id, session)
+                        try:
+                            revision = dependencies.revision()
+                        except Exception as error:
+                            return self._dependency_failure(
+                                run_id,
+                                session,
+                                dependencies,
+                                boundary="revision",
+                                error=error,
+                                state_before=session.state,
+                                context=context,
+                                response=response,
+                                action=envelope,
+                            )
+                        if not session.validation.is_fresh_and_passing(revision):
+                            continue_model = True
+                            break
                     can_finish = (
-                        session.validation.is_fresh_and_passing(revision)
+                        (
+                            not validation_required
+                            or session.validation.is_fresh_and_passing(revision)
+                        )
                         and not session.completion_blockers
                         and not session.unresolved_risks
                         and session.pending_request is None
                     )
                     if can_finish:
+                        if not response.content.strip() and isinstance(envelope.action, FinishAction):
+                            self._publish(
+                                run_id,
+                                ProgressKind.TEXT_DELTA,
+                                dependencies,
+                                text=envelope.action.summary,
+                            )
                         terminal_before = session.state
                         self._terminal(
                             run_id,
@@ -431,8 +780,14 @@ class AgentLoop:
                         return self._summary(run_id, session)
                     feedback = Feedback(
                         kind=FeedbackKind.INVALID_ACTION,
-                        message="finish requires fresh passing validation and no blockers",
+                        message=(
+                            "finish requires fresh passing validation after repository changes "
+                            "and no blockers"
+                            if validation_required
+                            else "finish is blocked by unresolved feedback or approval"
+                        ),
                         details={
+                            "validation_required": validation_required,
                             "completion_blockers": [
                                 item.value for item in session.completion_blockers
                             ],
@@ -499,6 +854,96 @@ class AgentLoop:
                 schema_evidence = SchemaValidationEvidence(
                     valid=True, target="tool_call"
                 )
+                if self._is_repeated_read_action(action, run_id, dependencies):
+                    feedback = Feedback(
+                        kind=FeedbackKind.INVALID_ACTION,
+                        message=(
+                            "repeated read-only action made no new progress; "
+                            "write the required repository change now"
+                        ),
+                        details={"tool": action.name, "require_write": True},
+                    )
+                    self._block(session, feedback.kind)
+                    session.force_write = True
+                    self._feedback_event(dependencies, run_id, feedback)
+                    self._record(
+                        run_id,
+                        session,
+                        dependencies,
+                        state_before=session.state,
+                        context=context,
+                        response=response,
+                        action=envelope,
+                        feedback=feedback,
+                        schema_validation=schema_evidence,
+                    )
+                    continue_model = True
+                    break
+                if self._is_repeated_write_action(action, run_id, dependencies):
+                    try:
+                        revision = dependencies.revision()
+                    except Exception as error:
+                        return self._dependency_failure(
+                            run_id,
+                            session,
+                            dependencies,
+                            boundary="revision",
+                            error=error,
+                            state_before=session.state,
+                            context=context,
+                            response=response,
+                            action=envelope,
+                            schema_validation=schema_evidence,
+                        )
+                    if (
+                        session.validation.is_fresh_and_passing(revision)
+                        and not session.completion_blockers
+                        and not session.unresolved_risks
+                        and session.pending_request is None
+                    ):
+                        terminal_before = session.state
+                        self._terminal(
+                            run_id,
+                            session,
+                            dependencies,
+                            RunState.COMPLETED,
+                            StopReason.SUCCESS,
+                            "run.completed.after_repeated_write",
+                        )
+                        self._record(
+                            run_id,
+                            session,
+                            dependencies,
+                            state_before=terminal_before,
+                            context=context,
+                            response=response,
+                            action=envelope,
+                            schema_validation=schema_evidence,
+                        )
+                        return self._summary(run_id, session)
+                    feedback = Feedback(
+                        kind=FeedbackKind.INVALID_ACTION,
+                        message=(
+                            "repeated write action was already applied; "
+                            "inspect the current file and derive a fresh patch"
+                        ),
+                        details={"tool": action.name, "require_fresh_patch": True},
+                    )
+                    self._block(session, feedback.kind)
+                    self._feedback_event(dependencies, run_id, feedback)
+                    self._record(
+                        run_id,
+                        session,
+                        dependencies,
+                        state_before=session.state,
+                        context=context,
+                        response=response,
+                        action=envelope,
+                        feedback=feedback,
+                        schema_validation=schema_evidence,
+                    )
+                    continue_model = True
+                    break
                 try:
                     decision = self._policy_decision(action, dependencies)
                 except Exception as error:
@@ -589,7 +1034,7 @@ class AgentLoop:
                     (context, response, envelope),
                     session,
                     dependencies,
-                    validate=action_index == len(response.actions) - 1,
+                    validate=action_index == validation_action_index,
                     state_before=session.state,
                     schema_validation=schema_evidence,
                     policy_decision=policy_evidence,
@@ -597,6 +1042,246 @@ class AgentLoop:
                     return self._summary(run_id, session)
             if continue_model:
                 continue
+
+    @classmethod
+    def _prepare_parallel_read_batch(
+        cls,
+        actions: Sequence[ActionEnvelope],
+        run_id: UUID,
+        dependencies: LoopDependencies,
+    ) -> tuple[
+        tuple[ActionEnvelope, ToolCall, SchemaValidationEvidence, PolicyDecisionEvidence],
+        ...,
+    ] | None:
+        """Preflight an independent read batch without mutating loop state.
+
+        Claude Code-style parallelism is deliberately conservative: only a batch
+        containing two or more known read-only tools can enter this path.  Schema,
+        replay, and policy checks still happen before any executor starts; anything
+        uncertain falls back to the normal ordered action path so governance and
+        feedback semantics stay identical.
+        """
+
+        if len(actions) < 2 or any(not isinstance(item.action, ToolCall) for item in actions):
+            return None
+        prepared: list[
+            tuple[ActionEnvelope, ToolCall, SchemaValidationEvidence, PolicyDecisionEvidence]
+        ] = []
+        for envelope in actions:
+            action = envelope.action
+            if not isinstance(action, ToolCall) or action.name not in _READ_ONLY_TOOLS:
+                return None
+            try:
+                dependencies.tools.validate(action)
+                if cls._is_repeated_read_action(action, run_id, dependencies):
+                    return None
+                decision = cls._policy_decision(action, dependencies)
+            except Exception:
+                return None
+            if decision.effect is not PolicyEffect.ALLOW:
+                return None
+            prepared.append(
+                (
+                    envelope,
+                    action,
+                    SchemaValidationEvidence(valid=True, target="tool_call"),
+                    cls._policy_evidence(decision),
+                )
+            )
+        return tuple(prepared)
+
+    def _execute_read_only_batch(
+        self,
+        run_id: UUID,
+        batch: Sequence[
+            tuple[ActionEnvelope, ToolCall, SchemaValidationEvidence, PolicyDecisionEvidence]
+        ],
+        turn: tuple[ModelContext, LLMResponse],
+        session: _Session,
+        dependencies: LoopDependencies,
+    ) -> bool:
+        """Dispatch independent reads concurrently, then record them in model order."""
+
+        call_ids = tuple(str(uuid4()) for _ in batch)
+        for call_id, (_, call, _, _) in zip(call_ids, batch, strict=True):
+            self._publish(
+                run_id,
+                ProgressKind.TOOL_STARTED,
+                dependencies,
+                payload={
+                    "tool_call_id": call_id,
+                    "tool": call.name,
+                    "arguments": redact_payload(call.arguments),
+                    "parallel": True,
+                },
+            )
+
+        def dispatch(
+            item: tuple[ActionEnvelope, ToolCall, SchemaValidationEvidence, PolicyDecisionEvidence],
+        ) -> tuple[ToolResult | None, Exception | None]:
+            _, call, _, _ = item
+            context = ToolContext(
+                run_id=run_id,
+                repository_root=dependencies.policy_config.repository_root,
+                permission_mode=dependencies.permission_mode,
+            )
+            try:
+                return ToolResult.model_validate(dependencies.tools.dispatch(call, context)), None
+            except Exception as error:  # normalized by _execute on the owning thread
+                return None, error
+
+        with ThreadPoolExecutor(
+            max_workers=min(_MAX_PARALLEL_READ_TOOLS, len(batch)),
+            thread_name_prefix="613-read",
+        ) as executor:
+            outcomes = tuple(executor.map(dispatch, batch))
+
+        context, response = turn
+        for call_id, item, outcome in zip(call_ids, batch, outcomes, strict=True):
+            envelope, call, schema_evidence, policy_evidence = item
+            if self._execute(
+                run_id,
+                call,
+                (context, response, envelope),
+                session,
+                dependencies,
+                validate=False,
+                state_before=session.state,
+                schema_validation=schema_evidence,
+                policy_decision=policy_evidence,
+                dispatch_result=outcome,
+                tool_call_id=call_id,
+                tool_started=True,
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _with_resource_metadata(
+        context: ModelContext,
+        session: _Session,
+        dependencies: LoopDependencies,
+    ) -> ModelContext:
+        profile = session.resource_profile or resource_profile(
+            "standard",
+            configured_max_output_tokens=dependencies.max_output_tokens,
+        )
+        metadata = dict(context.metadata)
+        metadata["resource_profile"] = (
+            session.resource_profile.name if session.resource_profile else "pending"
+        )
+        metadata["max_output_tokens"] = profile.max_output_tokens
+        return context.model_copy(update={"metadata": metadata})
+
+    def _select_resource_profile(
+        self,
+        run_id: UUID,
+        session: _Session,
+        dependencies: LoopDependencies,
+        profile: ResourceProfile,
+        *,
+        turn: tuple[ModelContext, LLMResponse, ActionEnvelope] | None = None,
+        event_type: str = "resource_profile.selected",
+    ) -> None:
+        session.resource_profile = profile
+        payload = {
+            "profile": profile.name,
+            "max_output_tokens": profile.max_output_tokens,
+        }
+        self._event(dependencies, run_id, event_type, payload)
+        if turn is None:
+            return
+        _context, _response, envelope = turn
+        call = envelope.action
+        if not isinstance(call, ToolCall):
+            return
+        result = ToolResult(
+            call=call,
+            success=True,
+            output=json.dumps(payload, sort_keys=True),
+        )
+        tool_call_id = str(uuid4())
+        self._publish(
+            run_id,
+            ProgressKind.TOOL_STARTED,
+            dependencies,
+            payload={
+                "tool_call_id": tool_call_id,
+                "tool": call.name,
+                "arguments": redact_payload(call.arguments),
+            },
+        )
+        self._publish(
+            run_id,
+            ProgressKind.TOOL_FINISHED,
+            dependencies,
+            payload={
+                "tool_call_id": tool_call_id,
+                "tool": call.name,
+                "success": True,
+                "output": result.output,
+                "error": "",
+                "changed_files": (),
+            },
+        )
+        self._record_from_turn(
+            run_id,
+            turn,
+            call,
+            result,
+            None,
+            session,
+            dependencies,
+            state_before=session.state,
+            schema_validation=SchemaValidationEvidence(valid=True, target="tool_call"),
+            policy_decision=PolicyDecisionEvidence(
+                effect="allow",
+                rule_id="harness.resource_profile",
+                reason="model selected bounded task resources",
+            ),
+        )
+
+    @staticmethod
+    def _is_repeated_read_action(
+        action: ToolCall, run_id: UUID, dependencies: LoopDependencies
+    ) -> bool:
+        """Reject an exact repeated read once its prior result is available."""
+
+        if action.name not in _READ_ONLY_TOOLS:
+            return False
+        for event in reversed(dependencies.events.list_for_run(run_id)):
+            if event.event_type != "tool.completed":
+                continue
+            payload = event.payload
+            previous = payload.get("call")
+            if not isinstance(previous, dict):
+                continue
+            if previous.get("name") == action.name and previous.get("arguments") == action.arguments:
+                return True
+            if payload.get("changed_files"):
+                return False
+        return False
+
+    @staticmethod
+    def _is_repeated_write_action(
+        action: ToolCall, run_id: UUID, dependencies: LoopDependencies
+    ) -> bool:
+        """Reject an exact write replay after a successful file mutation."""
+
+        if action.name not in _WRITE_TOOLS:
+            return False
+        for event in reversed(dependencies.events.list_for_run(run_id)):
+            if event.event_type != "tool.completed":
+                continue
+            payload = event.payload
+            previous = payload.get("call")
+            if not isinstance(previous, dict):
+                continue
+            if previous.get("name") == action.name and previous.get("arguments") == action.arguments:
+                return bool(payload.get("success")) and bool(payload.get("changed_files"))
+            if payload.get("changed_files"):
+                return False
+        return False
 
     def cancel(
         self,
@@ -678,7 +1363,12 @@ class AgentLoop:
         if snapshot is None:
             raise KeyError(f"run has no summary: {run_id}")
         return self._summary(
-            run_id, _Session.restore(snapshot, dependencies.budget_limits)
+            run_id,
+            _Session.restore(
+                snapshot,
+                dependencies.budget_limits,
+                dependencies.max_output_tokens,
+            ),
         )
 
     def _resume_pending(
@@ -1004,27 +1694,39 @@ class AgentLoop:
         schema_validation: SchemaValidationEvidence,
         policy_decision: PolicyDecisionEvidence,
         approval_update: ApprovalRequest | None = None,
+        dispatch_result: tuple[ToolResult | None, Exception | None] | None = None,
+        tool_call_id: str | None = None,
+        tool_started: bool = False,
     ) -> bool:
-        tool_call_id = str(uuid4())
+        tool_call_id = tool_call_id or str(uuid4())
         context = ToolContext(
             run_id=run_id,
             repository_root=dependencies.policy_config.repository_root,
             permission_mode=dependencies.permission_mode,
         )
-        self._publish(
-            run_id,
-            ProgressKind.TOOL_STARTED,
-            dependencies,
-            payload={
-                "tool_call_id": tool_call_id,
-                "tool": call.name,
-                "arguments": redact_payload(call.arguments),
-            },
-        )
-        try:
-            tool_result = ToolResult.model_validate(
-                dependencies.tools.dispatch(call, context)
+        if not tool_started:
+            self._publish(
+                run_id,
+                ProgressKind.TOOL_STARTED,
+                dependencies,
+                payload={
+                    "tool_call_id": tool_call_id,
+                    "tool": call.name,
+                    "arguments": redact_payload(call.arguments),
+                },
             )
+        try:
+            if dispatch_result is None:
+                tool_result = ToolResult.model_validate(
+                    dependencies.tools.dispatch(call, context)
+                )
+            else:
+                prepared_result, prepared_error = dispatch_result
+                if prepared_error is not None:
+                    raise prepared_error
+                if prepared_result is None:
+                    raise ToolRegistryError("parallel dispatch returned no tool result")
+                tool_result = prepared_result
         except ToolRegistryError as error:
             feedback = Feedback(
                 kind=FeedbackKind.TOOL_ERROR,
@@ -1085,6 +1787,8 @@ class AgentLoop:
         for path in tool_result.changed_files:
             if path not in session.changed_files:
                 session.changed_files.append(path)
+        if call.name in _WRITE_TOOLS and tool_result.success:
+            session.force_write = False
         self._event(
             dependencies,
             run_id,
@@ -1092,8 +1796,22 @@ class AgentLoop:
             tool_result.model_dump(mode="json"),
         )
         if not tool_result.success:
+            tool_error = tool_result.error or "unknown tool error"
+            if call.name == "apply_patch" and tool_error.startswith("PatchConflictError"):
+                message = (
+                    "apply_patch conflicted with current repository content; "
+                    "re-read the affected files and create a fresh patch"
+                )
+            else:
+                message = "tool execution failed"
             feedback = Feedback(
-                kind=FeedbackKind.TOOL_ERROR, message="tool execution failed"
+                kind=FeedbackKind.TOOL_ERROR,
+                message=message,
+                details={
+                    "tool": call.name,
+                    "error": tool_error,
+                    "changed_files": list(tool_result.changed_files),
+                },
             )
             self._block(session, feedback.kind)
             self._feedback_event(dependencies, run_id, feedback)
@@ -1112,7 +1830,15 @@ class AgentLoop:
             )
             return False
 
-        if not validate:
+        # A successful write that reports no changed path is deterministic
+        # no-progress evidence; validate it immediately so the loop can classify
+        # the failure instead of asking the model to repeat a no-op forever.
+        should_validate = validate or (
+            call.name in _WRITE_TOOLS
+            and tool_result.success
+            and not tool_result.changed_files
+        )
+        if not should_validate:
             self._record_from_turn(
                 run_id,
                 turn,
@@ -1208,6 +1934,8 @@ class AgentLoop:
             )
             return True
         session.changed_files = list(dict.fromkeys((*session.changed_files, *changed_files)))
+        if not validation.passed and not changed_files:
+            session.force_write = True
         try:
             feedback = Feedback.model_validate(
                 dependencies.classifier.classify(validation, call, changed_files)
@@ -1499,7 +2227,11 @@ class AgentLoop:
     def _load(self, run_id: UUID, dependencies: LoopDependencies) -> _Session:
         snapshot = dependencies.sessions.get_loop_session(run_id)
         if snapshot is not None:
-            session = _Session.restore(snapshot, dependencies.budget_limits)
+            session = _Session.restore(
+                snapshot,
+                dependencies.budget_limits,
+                dependencies.max_output_tokens,
+            )
             if session.classifier_state is not None:
                 dependencies.classifier.restore(session.classifier_state)
             return session
@@ -1659,4 +2391,5 @@ class AgentLoop:
             unresolved_risks=tuple(dict.fromkeys(session.unresolved_risks)),
             completion_blockers=tuple(session.completion_blockers),
             resource_usage=session.budget.usage,
+            resource_profile=session.resource_profile.name if session.resource_profile else None,
         )

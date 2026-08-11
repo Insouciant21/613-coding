@@ -100,6 +100,10 @@ def prepare_patch(
         raise PatchLimitError("patch must be valid UTF-8") from error
     if len(patch_bytes) > max_patch_bytes:
         raise PatchLimitError("patch exceeds configured byte limit")
+    if patch.startswith("*** Begin Patch"):
+        patch = _normalize_codex_patch(patch, reader)
+    elif patch.startswith("diff --git "):
+        patch = _normalize_git_metadata_wrapper(patch)
     if "\x00" in patch:
         header_nul = any(
             line.startswith(("--- ", "+++ ")) and "\x00" in line
@@ -166,6 +170,158 @@ def prepare_patch(
             raise PatchLimitError("aggregate patch data exceeds configured byte limit")
         changes.append(PreparedChange(path, operation, before, after))
     return PreparedPatch(tuple(changes))
+
+
+def _normalize_codex_patch(patch: str, reader: Callable[[str], str]) -> str:
+    """Translate Codex's marker-based patch format into a strict unified diff."""
+
+    lines = patch.splitlines()
+    if not lines or lines[0].strip() != "*** Begin Patch":
+        raise InvalidPatchError("malformed Codex patch header")
+    end = len(lines) - 1
+    while end >= 0 and not lines[end].strip():
+        end -= 1
+    if end <= 0 or lines[end].strip() != "*** End Patch":
+        raise InvalidPatchError("malformed Codex patch footer")
+
+    output: list[str] = []
+    index = 1
+    while index < end:
+        marker = lines[index]
+        if not marker.strip():
+            index += 1
+            continue
+        if marker.startswith("*** Update File: "):
+            path = _normalize_path(marker.removeprefix("*** Update File: ").strip())
+            index += 1
+            block, index = _codex_block(lines, index, end)
+            output.append(_normalize_codex_update(path, block, reader))
+            continue
+        if marker.startswith("*** Add File: "):
+            path = _normalize_path(marker.removeprefix("*** Add File: ").strip())
+            index += 1
+            block, index = _codex_block(lines, index, end, allow_implicit=True)
+            output.append(_normalize_codex_add(path, block))
+            continue
+        if marker.startswith("*** Delete File: "):
+            path = _normalize_path(marker.removeprefix("*** Delete File: ").strip())
+            index += 1
+            block, index = _codex_block(lines, index, end)
+            if block:
+                raise InvalidPatchError("Codex delete patch must not contain hunks")
+            source = reader(path)
+            source_lines = source.splitlines(keepends=True)
+            output.extend(
+                [f"--- a/{path}\n", "+++ /dev/null\n", f"@@ -1,{len(source_lines)} +0,0 @@\n"]
+            )
+            output.extend(f"-{line}" if line.endswith("\n") else f"-{line}\n" for line in source_lines)
+            continue
+        raise InvalidPatchError("unsupported Codex patch operation")
+    if not output:
+        raise InvalidPatchError("Codex patch contains no file changes")
+    return "".join(output)
+
+
+def _normalize_git_metadata_wrapper(patch: str) -> str:
+    """Remove harmless Git wrapper metadata before strict unified-diff parsing.
+
+    Models commonly emit ``git diff`` output.  Only the outer ``diff --git`` and
+    ``index`` lines are ignored; all file headers, hunks, and other metadata still
+    pass through the existing path and safety validation.
+    """
+
+    lines = patch.splitlines(keepends=True)
+    if not lines or not lines[0].startswith("diff --git "):
+        raise InvalidPatchError("malformed Git patch header")
+    return "".join(
+        line for line in lines if not line.startswith(("diff --git ", "index "))
+    )
+
+
+def _codex_block(
+    lines: list[str], index: int, end: int, *, allow_implicit: bool = False
+) -> tuple[list[list[str]], int]:
+    hunks: list[list[str]] = []
+    current: list[str] | None = None
+    while index < end and not lines[index].startswith("*** "):
+        line = lines[index]
+        if line.startswith("@@"):
+            if current is not None:
+                hunks.append(current)
+            current = []
+        elif line.startswith((" ", "+", "-", "\\ No newline")):
+            if current is None:
+                if not allow_implicit:
+                    raise InvalidPatchError("Codex hunk is missing an @@ header")
+                current = []
+            if not line.startswith("\\ No newline"):
+                current.append(line)
+        else:
+            raise InvalidPatchError("unsupported Codex hunk line")
+        index += 1
+    if current is not None:
+        hunks.append(current)
+    return hunks, index
+
+
+def _normalize_codex_update(
+    path: str, hunks: list[list[str]], reader: Callable[[str], str]
+) -> str:
+    if not hunks:
+        raise InvalidPatchError(f"Codex update contains no hunks: {path}")
+    original = reader(path)
+    current_lines = original.splitlines(keepends=True)
+    for hunk in hunks:
+        old = [_codex_line(value) for value in hunk if value.startswith((" ", "-"))]
+        new = [_codex_line(value) for value in hunk if value.startswith((" ", "+"))]
+        if old:
+            start = _find_lines(current_lines, old)
+            if start is None:
+                expected = old[0].rstrip("\n") if old else ""
+                raise PatchConflictError(
+                    f"hunk context does not match: {path}; expected {expected!r}"
+                )
+        else:
+            if new and _find_lines(current_lines, new) is not None:
+                raise PatchConflictError(f"addition already exists: {path}")
+            start = len(current_lines)
+        current_lines = current_lines[:start] + new + current_lines[start + len(old) :]
+
+    original_lines = original.splitlines(keepends=True)
+    source_start = 1 if original_lines else 0
+    target_start = 1 if current_lines else 0
+    output = [
+        f"--- a/{path}\n",
+        f"+++ b/{path}\n",
+        f"@@ -{source_start},{len(original_lines)} +{target_start},{len(current_lines)} @@\n",
+    ]
+    output.extend(f"-{line}" if line.endswith("\n") else f"-{line}\n" for line in original_lines)
+    output.extend(f"+{line}" if line.endswith("\n") else f"+{line}\n" for line in current_lines)
+    return "".join(output)
+
+
+def _normalize_codex_add(path: str, block: list[list[str]]) -> str:
+    if len(block) != 1:
+        raise InvalidPatchError(f"Codex add must contain one hunk: {path}")
+    values = block[0]
+    if any(not value.startswith("+") for value in values):
+        raise InvalidPatchError(f"Codex add contains non-addition lines: {path}")
+    output = ["--- /dev/null\n", f"+++ b/{path}\n", f"@@ -0,0 +1,{len(values)} @@\n"]
+    output.extend(value + ("\n" if not value.endswith("\n") else "") for value in values)
+    return "".join(output)
+
+
+def _codex_line(value: str) -> str:
+    return value[1:] + "\n"
+
+
+def _find_lines(source: list[str], wanted: list[str]) -> int | None:
+    if not wanted:
+        return len(source)
+    for start in range(len(source) - len(wanted) + 1):
+        if all(source[start + offset].rstrip("\n") == line.rstrip("\n") for offset, line in enumerate(wanted)):
+            return start
+    return None
 
 
 def _header_path(value: str) -> str:
@@ -282,17 +438,42 @@ def _apply_hunks(patched_file: object, source: str | None, operation: PatchOpera
     for hunk in hunks:
         source_start = int(getattr(hunk, "source_start", 0))
         start = max(source_start - 1, 0)
+        hunk_lines = tuple(hunk)
+        expected = tuple(
+            str(getattr(line, "value", ""))
+            for line in hunk_lines
+            if getattr(line, "line_type", "") in {" ", "-"}
+        )
+        if expected and not _matches_at(original, start, expected):
+            candidates = [
+                candidate
+                for candidate in range(cursor, len(original) - len(expected) + 1)
+                if _matches_at(original, candidate, expected)
+            ]
+            if len(candidates) == 1:
+                start = candidates[0]
+            elif len(candidates) > 1:
+                raise PatchConflictError(f"hunk context is ambiguous: {path}")
         if start < cursor or start > len(original):
             raise PatchConflictError(f"hunk offset is out of range: {path}")
         output.extend(original[cursor:start])
+        cursor = start
         consumed = 0
         produced = 0
-        for line in hunk:
+        for line in hunk_lines:
             line_type = getattr(line, "line_type", "")
             value = str(getattr(line, "value", ""))
             if line_type in {" ", "-"}:
-                if cursor >= len(original) or original[cursor] != value:
-                    raise PatchConflictError(f"hunk context does not match: {path}")
+                if cursor >= len(original):
+                    raise PatchConflictError(
+                        f"hunk context does not match: {path}; expected {value.rstrip(chr(10))!r} "
+                        f"at line {cursor + 1}, but the file ended"
+                    )
+                if original[cursor] != value:
+                    raise PatchConflictError(
+                        f"hunk context does not match: {path}; expected {value.rstrip(chr(10))!r} "
+                        f"at line {cursor + 1}, found {original[cursor].rstrip(chr(10))!r}"
+                    )
                 if line_type == " ":
                     output.append(value)
                     produced += 1
@@ -318,3 +499,9 @@ def _apply_hunks(patched_file: object, source: str | None, operation: PatchOpera
     except UnicodeEncodeError as error:
         raise PatchLimitError("resulting text must be valid UTF-8") from error
     return result
+
+
+def _matches_at(source: list[str], start: int, expected: tuple[str, ...]) -> bool:
+    if start < 0 or start + len(expected) > len(source):
+        return False
+    return all(source[start + offset] == value for offset, value in enumerate(expected))

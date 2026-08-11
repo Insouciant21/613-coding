@@ -19,7 +19,20 @@ def test_root_invocations_launch_tui(monkeypatch, argv, expected_task) -> None:
     assert launched[0].initial_task == expected_task
 
 
-@pytest.mark.parametrize("command", ["credentials", "config", "run", "runs", "demo"])
+def test_dispatch_leaves_permission_mode_unspecified_for_repository_config(
+    monkeypatch, tmp_path: Path
+) -> None:
+    launched: list[TuiLaunchRequest] = []
+    monkeypatch.setattr(entrypoint, "launch_tui", launched.append)
+
+    assert entrypoint.dispatch(["--repo", str(tmp_path)]) == 0
+
+    assert launched[0].permission_mode is None
+
+
+@pytest.mark.parametrize(
+    "command", ["credentials", "providers", "config", "run", "runs", "demo"]
+)
 def test_reserved_management_commands_use_typer(monkeypatch, command) -> None:
     delegated: list[tuple[str, ...]] = []
     monkeypatch.setattr(

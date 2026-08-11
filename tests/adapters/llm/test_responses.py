@@ -1,0 +1,246 @@
+from __future__ import annotations
+
+from types import SimpleNamespace
+from uuid import uuid4
+
+import pytest
+
+from coding613.adapters.llm.openai_compatible import ProviderResponseError
+from coding613.adapters.llm.responses import ResponsesLLM
+from coding613.domain.actions import FinishAction, ToolCall
+from coding613.ports.llm import ModelContext, ModelMessage, ToolDefinition
+
+
+class _Responses:
+    def __init__(self, response: object, stream: object | None = None) -> None:
+        self.response = response
+        self.stream = stream
+        self.calls: list[dict[str, object]] = []
+
+    def create(self, **kwargs: object) -> object:
+        self.calls.append(kwargs)
+        return self.stream if kwargs.get("stream") is True else self.response
+
+
+class _Client:
+    def __init__(self, response: object, stream: object | None = None) -> None:
+        self.responses = _Responses(response, stream)
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _Stream:
+    def __init__(self, events: list[object]) -> None:
+        self.events = events
+        self.closed = False
+
+    def __iter__(self):  # type: ignore[no-untyped-def]
+        yield from self.events
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def _context() -> ModelContext:
+    return ModelContext(
+        run_id=uuid4(),
+        task="inspect a.py",
+        messages=(
+            ModelMessage(role="system", content="You are a coding worker."),
+            ModelMessage(role="user", content="inspect a.py"),
+        ),
+    )
+
+
+def _tool() -> ToolDefinition:
+    return ToolDefinition(
+        name="read_file",
+        description="Read a repository file",
+        input_schema={
+            "$id": "coding613.tool.read_file.v1",
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+        },
+    )
+
+
+def test_responses_adapter_maps_messages_flat_tools_and_output_items() -> None:
+    response = SimpleNamespace(
+        output=[
+            SimpleNamespace(type="reasoning", content=[]),
+            SimpleNamespace(
+                type="function_call",
+                call_id="call-1",
+                name="read_file",
+                arguments='{"path":"a.py"}',
+            ),
+        ],
+        output_text="",
+    )
+    client = _Client(response)
+    provider = ResponsesLLM(
+        "https://api.openai.com/v1", "gpt-5.6", client, max_output_tokens=777
+    )
+
+    result = provider.complete(_context(), (_tool(),))
+
+    request = client.responses.calls[0]
+    assert request["model"] == "gpt-5.6"
+    assert request["input"] == [
+        {"role": "system", "content": "You are a coding worker."},
+        {"role": "user", "content": "inspect a.py"},
+    ]
+    assert request["max_output_tokens"] == 777
+    assert request["store"] is False
+    assert request["tools"] == [
+        {
+            "type": "function",
+            "name": "read_file",
+            "description": "Read a repository file",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+            },
+        }
+    ]
+    assert result.actions[0].action == ToolCall(
+        name="read_file", arguments={"path": "a.py"}
+    )
+    assert result.provider_metadata["tool_call_ids"] == ["call-1"]
+
+
+def test_responses_adapter_sends_configured_reasoning_effort() -> None:
+    response = SimpleNamespace(output=[], output_text="")
+    client = _Client(response)
+    provider = ResponsesLLM(
+        "https://api.deepseek.com",
+        "deepseek-v4-flash",
+        client,
+        reasoning_effort="low",
+    )
+
+    provider.complete(_context(), ())
+
+    assert client.responses.calls[0]["reasoning"] == {"effort": "low"}
+
+
+def test_responses_adapter_maps_output_text_finish_and_usage() -> None:
+    response = SimpleNamespace(
+        output=[
+            SimpleNamespace(
+                type="message",
+                content=[SimpleNamespace(type="output_text", text="verified")],
+            ),
+            SimpleNamespace(
+                type="function_call",
+                call_id="call-finish",
+                name="finish",
+                arguments='{"summary":"verified"}',
+            ),
+        ],
+        output_text="verified",
+        usage=SimpleNamespace(
+            input_tokens=12,
+            output_tokens=9,
+            total_tokens=21,
+            input_tokens_details=SimpleNamespace(cached_tokens=8),
+            output_tokens_details=SimpleNamespace(reasoning_tokens=3),
+        ),
+    )
+    provider = ResponsesLLM(
+        "https://api.openai.com/v1", "gpt-5.6", _Client(response)
+    )
+
+    result = provider.complete(_context(), ())
+
+    assert result.content == "verified"
+    assert result.actions[0].action == FinishAction(summary="verified")
+    assert result.provider_metadata["usage"] == {
+        "prompt_tokens": 12,
+        "completion_tokens": 9,
+        "total_tokens": 21,
+        "prompt_cache_hit_tokens": 8,
+        "prompt_cache_miss_tokens": 4,
+        "reasoning_tokens": 3,
+    }
+
+
+def test_responses_adapter_rejects_malformed_function_call() -> None:
+    response = SimpleNamespace(
+        output=[
+            SimpleNamespace(
+                type="function_call",
+                call_id="call-1",
+                name="read_file",
+                arguments="[]",
+            )
+        ]
+    )
+    provider = ResponsesLLM("https://api.openai.com/v1", "gpt-5.6", _Client(response))
+
+    with pytest.raises(ProviderResponseError):
+        provider.complete(_context(), ())
+
+
+def test_responses_adapter_streams_text_and_function_arguments() -> None:
+    function_item = SimpleNamespace(
+        id="call-item-1",
+        type="function_call",
+        call_id="call-1",
+        name="read_file",
+        arguments="",
+    )
+    completed_item = SimpleNamespace(
+        id="call-item-1",
+        type="function_call",
+        call_id="call-1",
+        name="read_file",
+        arguments='{"path":"a.py"}',
+    )
+    response = SimpleNamespace(
+        output=[],
+        usage=SimpleNamespace(input_tokens=10, output_tokens=5, total_tokens=15),
+    )
+    stream = _Stream(
+        [
+            SimpleNamespace(type="response.output_item.added", item=function_item),
+            SimpleNamespace(
+                type="response.output_text.delta", delta="done", item_id="msg-1"
+            ),
+            SimpleNamespace(
+                type="response.function_call_arguments.delta",
+                item_id="call-item-1",
+                delta='{"path":"a.py"}',
+            ),
+            SimpleNamespace(
+                type="response.function_call_arguments.done",
+                item_id="call-item-1",
+                # DeepSeek returns the function name on output_item.added and
+                # omits it on the arguments.done event.
+                name=None,
+                arguments='{"path":"a.py"}',
+            ),
+            SimpleNamespace(type="response.output_item.done", item=completed_item),
+            SimpleNamespace(type="response.completed", response=response),
+        ]
+    )
+    client = _Client(response, stream)
+    provider = ResponsesLLM(
+        "https://api.openai.com/v1", "gpt-5.6", client, max_output_tokens=777
+    )
+    deltas: list[str] = []
+
+    result = provider.complete_stream(_context(), (_tool(),), deltas.append, lambda: False)
+
+    assert deltas == ["done"]
+    assert result.content == "done"
+    assert result.actions[0].action == ToolCall(
+        name="read_file", arguments={"path": "a.py"}
+    )
+    assert result.provider_metadata["usage"]["total_tokens"] == 15
+    assert stream.closed is True
+    request = client.responses.calls[0]
+    assert request["stream"] is True
+    assert request["stream_options"] == {"include_usage": True}

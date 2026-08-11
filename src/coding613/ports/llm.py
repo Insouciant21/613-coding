@@ -13,6 +13,10 @@ from coding613.domain.models import Feedback
 from coding613.domain.models_base import DomainModel
 
 
+class RetryableProviderError(RuntimeError):
+    """A provider failure that the owned loop may retry in the same run."""
+
+
 class ModelMessage(DomainModel):
     role: Literal["system", "user", "assistant", "tool"]
     content: str

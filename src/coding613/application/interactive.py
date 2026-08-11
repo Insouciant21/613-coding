@@ -9,9 +9,10 @@ from pydantic import Field
 
 from coding613.application.progress import CancellationToken
 from coding613.application.run_service import RunRequest, RunService
+from coding613.domain.actions import FinishAction
 from coding613.domain.conversation import PromptRequest, RunOptions
 from coding613.domain.interactive import InteractiveSession
-from coding613.domain.models import IterationRecord, PermissionMode, Run, RunSummary
+from coding613.domain.models import IterationRecord, PermissionMode, Run, RunState, RunSummary
 from coding613.domain.models_base import DomainModel
 from coding613.domain.redaction import redact_text
 from coding613.ports.progress import ProgressSink
@@ -109,12 +110,19 @@ def transcript_for_runs(store: InteractiveStore, runs: list[Run]) -> tuple[Trans
     for run in runs:
         transcript.append(TranscriptEntry(role="user", text=redact_text(run.task), run_id=run.id))
         final_text = ""
+        completed_finish_summary = ""
         for iteration in store.list_iterations(run.id):
-            if iteration.model_response is None:
-                continue
-            content = iteration.model_response.get("content")
-            if isinstance(content, str) and content.strip():
-                final_text = redact_text(content).strip()
+            if iteration.model_response is not None:
+                content = iteration.model_response.get("content")
+                if isinstance(content, str) and content.strip():
+                    final_text = redact_text(content).strip()
+            if (
+                iteration.action is not None
+                and isinstance(iteration.action.action, FinishAction)
+                and iteration.state_after is RunState.COMPLETED
+            ):
+                completed_finish_summary = redact_text(iteration.action.action.summary).strip()
+        final_text = completed_finish_summary or final_text
         if final_text:
             transcript.append(
                 TranscriptEntry(role="assistant", text=final_text, run_id=run.id)

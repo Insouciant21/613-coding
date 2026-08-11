@@ -170,6 +170,11 @@ class LoopSession(DomainModel):
     classifier_state: dict[str, Any] | None = None
     changed_files: tuple[str, ...] = ()
     context_summary: str = ""
+    resource_profile: str | None = None
+    max_output_tokens: int | None = Field(default=None, gt=0)
+    force_write: bool = False
+    no_action_streak: int = Field(default=0, ge=0)
+    provider_error_streak: int = Field(default=0, ge=0)
 
 
 class Run(DomainModel):
@@ -272,3 +277,4 @@ class RunSummary(DomainModel):
     unresolved_risks: tuple[str, ...] = ()
     completion_blockers: tuple[FeedbackKind, ...] = ()
     resource_usage: ResourceUsage = Field(default_factory=ResourceUsage)
+    resource_profile: str | None = None

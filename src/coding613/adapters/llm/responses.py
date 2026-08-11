@@ -1,0 +1,435 @@
+"""OpenAI Responses API adapter for one harness-owned model call."""
+
+from __future__ import annotations
+
+import json
+import time
+from collections.abc import Callable, Iterator, Sequence
+from queue import Empty, Queue
+from threading import Thread
+from typing import Any, Protocol
+
+from coding613.application.progress import ProviderCancelledError
+from coding613.domain.actions import ActionEnvelope, FinishAction, ToolCall
+from coding613.ports.llm import LLMResponse, ModelContext, ToolDefinition
+
+from .openai_compatible import (
+    OpenAICompatibleLLM,
+    ProviderError,
+    ProviderHTTPError,
+    ProviderResponseError,
+    ProviderTimeoutError,
+)
+
+
+class ResponsesClient(Protocol):
+    """Minimal SDK client surface required by the Responses adapter."""
+
+    @property
+    def responses(self) -> Any: ...
+
+    def close(self) -> None: ...
+
+
+class ResponsesLLM:
+    """Translate one Responses API request into the project LLM port.
+
+    The harness deliberately calls the SDK's low-level ``responses.create``
+    method itself. It does not use the SDK's hosted agent loop or tool runner.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        client: ResponsesClient,
+        *,
+        timeout_seconds: float = 60.0,
+        max_output_tokens: int = 1536,
+        reasoning_effort: str = "low",
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._model = model
+        self._client = client
+        self._timeout_seconds = timeout_seconds
+        self._max_output_tokens = max_output_tokens
+        self._reasoning_effort = reasoning_effort
+        self._clock = clock
+
+    def complete(
+        self, context: ModelContext, tools: Sequence[ToolDefinition]
+    ) -> LLMResponse:
+        try:
+            response = self._client.responses.create(
+                model=self._model_for(context),
+                input=OpenAICompatibleLLM._messages(context),
+                tools=[self._tool_payload(tool) for tool in tools],
+                max_output_tokens=self._max_output_tokens_for(context),
+                reasoning={"effort": self._reasoning_effort},
+                store=False,
+            )
+        except ProviderError:
+            raise
+        except Exception as error:
+            raise OpenAICompatibleLLM._map_sdk_error(error) from error
+        return self._parse_response(response)
+
+    def complete_stream(
+        self,
+        context: ModelContext,
+        tools: Sequence[ToolDefinition],
+        on_text_delta: Callable[[str], None],
+        cancelled: Callable[[], bool],
+    ) -> LLMResponse:
+        started_at = self._clock()
+        stream: Any = None
+        stream_closed = [False]
+        cleanup_errors: list[Exception] = []
+        primary_error: BaseException | None = None
+        try:
+            if cancelled():
+                raise ProviderCancelledError("provider stream was cancelled")
+            stream = self._client.responses.create(
+                model=self._model_for(context),
+                input=OpenAICompatibleLLM._messages(context),
+                tools=[self._tool_payload(tool) for tool in tools],
+                max_output_tokens=self._max_output_tokens_for(context),
+                reasoning={"effort": self._reasoning_effort},
+                stream=True,
+                stream_options={"include_usage": True},
+                store=False,
+            )
+            text_parts: list[str] = []
+            calls: dict[str, dict[str, Any]] = {}
+            call_order: dict[str, int] = {}
+            usage: Any = None
+            saw_event = False
+            for event in self._stream_events(
+                stream, started_at, cancelled, stream_closed, cleanup_errors
+            ):
+                saw_event = True
+                event_type = self._field(event, "type")
+                if event_type == "response.output_text.delta":
+                    delta = self._field(event, "delta")
+                    if not isinstance(delta, str):
+                        raise ProviderResponseError("provider stream text delta must be a string")
+                    text_parts.append(delta)
+                    on_text_delta(delta)
+                elif event_type in {
+                    "response.output_item.added",
+                    "response.output_item.done",
+                }:
+                    self._remember_function_item(
+                        self._field(event, "item"), calls, call_order
+                    )
+                elif event_type == "response.function_call_arguments.delta":
+                    item_id = self._field(event, "item_id")
+                    if not isinstance(item_id, str) or not item_id:
+                        raise ProviderResponseError(
+                            "provider stream function call item id is missing"
+                        )
+                    delta = self._field(event, "delta")
+                    if not isinstance(delta, str):
+                        raise ProviderResponseError(
+                            "provider stream function arguments must be a string"
+                        )
+                    target = calls.get(item_id)
+                    if target is None:
+                        target = calls[item_id] = {
+                            "id": "",
+                            "name": "",
+                            "arguments": "",
+                        }
+                        call_order[item_id] = len(call_order)
+                    target["arguments"] += delta
+                elif event_type == "response.function_call_arguments.done":
+                    item_id = self._field(event, "item_id")
+                    if not isinstance(item_id, str) or not item_id:
+                        raise ProviderResponseError(
+                            "provider stream function call item id is missing"
+                        )
+                    target = calls.get(item_id)
+                    if target is None:
+                        target = calls[item_id] = {
+                            "id": "",
+                            "name": "",
+                            "arguments": "",
+                        }
+                        call_order[item_id] = len(call_order)
+                    arguments = self._field(event, "arguments")
+                    name = self._field(event, "name")
+                    if not isinstance(arguments, str):
+                        raise ProviderResponseError(
+                            "provider stream function call is incomplete"
+                        )
+                    # Some Responses-compatible providers (including
+                    # DeepSeek) emit the function name on
+                    # ``output_item.added`` and omit it from the later
+                    # ``arguments.done`` event. Keep the earlier name when
+                    # the event carries ``null``.
+                    if name is not None:
+                        if not isinstance(name, str):
+                            raise ProviderResponseError(
+                                "provider stream function call name must be a string"
+                            )
+                        target["name"] = name
+                    target["arguments"] = arguments
+                elif event_type == "response.completed":
+                    completed = self._field(event, "response")
+                    usage = self._field(completed, "usage")
+                elif event_type in {"response.failed", "error"}:
+                    raise ProviderHTTPError("provider stream failed")
+            self._check_stream_limits(started_at, cancelled)
+            if not saw_event:
+                raise ProviderResponseError("provider stream returned no events")
+            output: list[dict[str, Any]] = []
+            if text_parts:
+                output.append(
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "".join(text_parts)}],
+                    }
+                )
+            for key in sorted(call_order, key=call_order.__getitem__):
+                value = calls[key]
+                if not value["id"]:
+                    raise ProviderResponseError(
+                        "provider stream function call has no call id"
+                    )
+                if not value["name"] or not isinstance(value["arguments"], str):
+                    raise ProviderResponseError("provider stream function call is incomplete")
+                output.append(
+                    {
+                        "type": "function_call",
+                        "call_id": value["id"],
+                        "name": value["name"],
+                        "arguments": value["arguments"],
+                    }
+                )
+            return self._parse_response(
+                {"output": output, "usage": usage}
+            )
+        except (ProviderError, ProviderCancelledError) as error:
+            primary_error = error
+            raise
+        except Exception as error:
+            mapped = OpenAICompatibleLLM._map_sdk_error(error)
+            primary_error = mapped
+            raise mapped from error
+        finally:
+            if stream is not None and not stream_closed[0]:
+                cleanup_error = self._close_stream(stream)
+                stream_closed[0] = True
+                if cleanup_error is not None:
+                    cleanup_errors.append(cleanup_error)
+            if cleanup_errors and primary_error is None:
+                raise ProviderHTTPError("provider stream cleanup failed") from cleanup_errors[0]
+
+    def close(self) -> None:
+        self._client.close()
+
+    def _check_stream_limits(
+        self, started_at: float, cancelled: Callable[[], bool]
+    ) -> None:
+        if self._clock() - started_at >= self._timeout_seconds:
+            raise ProviderTimeoutError("provider stream exceeded its deadline")
+        if cancelled():
+            raise ProviderCancelledError("provider stream was cancelled")
+
+    def _stream_events(
+        self,
+        stream: Any,
+        started_at: float,
+        cancelled: Callable[[], bool],
+        stream_closed: list[bool],
+        cleanup_errors: list[Exception],
+    ) -> Iterator[Any]:
+        events: Queue[tuple[str, Any]] = Queue()
+
+        def produce() -> None:
+            try:
+                for event in stream:
+                    events.put(("event", event))
+            except Exception as error:  # noqa: BLE001 - preserve provider iterator errors
+                events.put(("error", error))
+            finally:
+                events.put(("end", None))
+
+        producer = Thread(target=produce, daemon=True)
+        producer.start()
+        try:
+            while True:
+                if cancelled():
+                    raise ProviderCancelledError("provider stream was cancelled")
+                remaining = self._timeout_seconds - (self._clock() - started_at)
+                if remaining <= 0:
+                    raise ProviderTimeoutError("provider stream exceeded its deadline")
+                try:
+                    kind, value = events.get(timeout=remaining)
+                except Empty as error:
+                    raise ProviderTimeoutError("provider stream exceeded its deadline") from error
+                if kind == "event":
+                    yield value
+                    continue
+                if kind == "error":
+                    if isinstance(value, BaseException):
+                        raise value
+                    raise ProviderHTTPError("provider stream failed")
+                return
+        finally:
+            cleanup_error = self._close_stream(stream)
+            stream_closed[0] = True
+            if cleanup_error is not None:
+                cleanup_errors.append(cleanup_error)
+            producer.join(timeout=0.1)
+            if producer.is_alive():
+                cleanup_errors.append(RuntimeError("provider stream reader did not stop"))
+
+    @classmethod
+    def _remember_function_item(
+        cls,
+        item: Any,
+        calls: dict[str, dict[str, Any]],
+        call_order: dict[str, int],
+    ) -> None:
+        if cls._field(item, "type") != "function_call":
+            return
+        item_id = cls._field(item, "id")
+        if not isinstance(item_id, str) or not item_id:
+            raise ProviderResponseError("provider stream function call id is missing")
+        target = calls.get(item_id)
+        if target is None:
+            target = calls[item_id] = {"id": "", "name": "", "arguments": ""}
+            call_order[item_id] = len(call_order)
+        call_id = cls._field(item, "call_id")
+        name = cls._field(item, "name")
+        arguments = cls._field(item, "arguments")
+        if call_id is not None:
+            if not isinstance(call_id, str):
+                raise ProviderResponseError("provider stream function call id must be a string")
+            target["id"] = call_id
+        if name is not None:
+            if not isinstance(name, str):
+                raise ProviderResponseError("provider stream function call name must be a string")
+            target["name"] = name
+        if arguments is not None:
+            if not isinstance(arguments, str):
+                raise ProviderResponseError(
+                    "provider stream function arguments must be a string"
+                )
+            target["arguments"] = arguments
+
+    @staticmethod
+    def _close_stream(stream: Any) -> Exception | None:
+        close = getattr(stream, "close", None)
+        if not callable(close):
+            return None
+        try:
+            close()
+        except Exception as error:  # noqa: BLE001 - normalize SDK cleanup failures
+            return error
+        return None
+
+    def _model_for(self, context: ModelContext) -> str:
+        override = context.metadata.get("model")
+        if isinstance(override, str) and 0 < len(override.strip()) <= 256:
+            return override.strip()
+        return self._model
+
+    def _max_output_tokens_for(self, context: ModelContext) -> int:
+        override = context.metadata.get("max_output_tokens")
+        if type(override) is int and override > 0:
+            return min(self._max_output_tokens, override)
+        return self._max_output_tokens
+
+    @staticmethod
+    def _tool_payload(tool: ToolDefinition) -> dict[str, Any]:
+        parameters = {
+            key: value for key, value in tool.input_schema.items() if key != "$id"
+        }
+        return {
+            "type": "function",
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": parameters,
+        }
+
+    @classmethod
+    def _parse_response(cls, response: Any) -> LLMResponse:
+        output = cls._field(response, "output")
+        if not isinstance(output, (list, tuple)):
+            raise ProviderResponseError("provider response has no output items")
+
+        content_parts: list[str] = []
+        actions: list[ActionEnvelope] = []
+        call_ids: list[str] = []
+        for item in output:
+            item_type = cls._field(item, "type")
+            if item_type == "message":
+                content_parts.extend(cls._message_text(item))
+                continue
+            if item_type != "function_call":
+                continue
+            try:
+                call_id = cls._field(item, "call_id")
+                name = cls._field(item, "name")
+                arguments_text = cls._field(item, "arguments")
+                if not isinstance(call_id, str) or not call_id:
+                    raise TypeError("function call id must be a non-empty string")
+                if not isinstance(name, str) or not name:
+                    raise TypeError("function call name must be a non-empty string")
+                if not isinstance(arguments_text, str):
+                    raise TypeError("function call arguments must be a string")
+                arguments = json.loads(arguments_text)
+                if not isinstance(arguments, dict):
+                    raise TypeError("function call arguments must be an object")
+                action = (
+                    FinishAction.model_validate(arguments)
+                    if name == "finish"
+                    else ToolCall(name=name, arguments=arguments)
+                )
+                actions.append(ActionEnvelope(action=action))
+                call_ids.append(call_id)
+            except (TypeError, ValueError, json.JSONDecodeError) as error:
+                raise ProviderResponseError(
+                    "provider returned an invalid function call"
+                ) from error
+
+        if not content_parts:
+            output_text = cls._field(response, "output_text")
+            if isinstance(output_text, str):
+                content_parts.append(output_text)
+        metadata: dict[str, Any] = {"tool_call_ids": call_ids}
+        response_id = cls._field(response, "id")
+        if isinstance(response_id, str) and response_id:
+            metadata["response_id"] = response_id
+        result = LLMResponse(
+            content="".join(content_parts),
+            actions=tuple(actions),
+            provider_metadata=metadata,
+        )
+        return OpenAICompatibleLLM._with_usage(result, cls._field(response, "usage"))
+
+    @classmethod
+    def _message_text(cls, item: Any) -> list[str]:
+        content = cls._field(item, "content")
+        if isinstance(content, str):
+            return [content]
+        if not isinstance(content, (list, tuple)):
+            return []
+        parts: list[str] = []
+        for part in content:
+            if cls._field(part, "type") != "output_text":
+                continue
+            text = cls._field(part, "text")
+            if not isinstance(text, str):
+                raise ProviderResponseError("provider output text must be a string")
+            parts.append(text)
+        return parts
+
+    @staticmethod
+    def _field(value: Any, name: str) -> Any:
+        if isinstance(value, dict):
+            return value.get(name)
+        return getattr(value, name, None)

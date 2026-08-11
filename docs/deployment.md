@@ -14,14 +14,19 @@ uv tool install .
 613-coding --help
 ```
 
+After changing a local checkout, run `uv tool install --force .` to refresh an existing global
+tool environment. Use `uv run 613-coding` when you want to run directly from the current checkout.
+
 Run a repository task with `uv run 613-coding --repo PATH "task"`, resume with
-`uv run 613-coding --resume latest`, and use the management commands for credentials, config, runs,
+`uv run 613-coding --resume latest`, and use the management commands for credentials, providers,
+config, runs,
 and deterministic demos.
 
 ## Credentials And Configuration
 
-Configure only non-secret provider metadata in `harness.toml` and store the provider key through
-the OS keyring. Status output is metadata-only. `.env` is an explicit development fallback with
+Configure non-secret provider profiles and user-wide budgets in the per-user
+`613-coding/config.toml`; keep only policy in each repository's `harness.toml`. Store each provider
+key through the OS keyring. Status output is metadata-only. `.env` is an explicit development fallback with
 plaintext and process-environment exposure risk; it is ignored by Git and never copied into build
 layers.
 

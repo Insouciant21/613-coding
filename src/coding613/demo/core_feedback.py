@@ -62,6 +62,14 @@ class _EditExecutor:
         )
 
 
+class _ValidationRequestExecutor:
+    """The loop owns validation; this tool only records the explicit request."""
+
+    def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
+        del context
+        return ToolResult(call=call, success=True, output="validation requested")
+
+
 class _Validator:
     def __init__(self, target: Path) -> None:
         self._target = target
@@ -131,7 +139,25 @@ def run_core_feedback_demo(workspace: Path) -> CoreFeedbackDemoResult:
     provider = ScriptedLLM(
         (
             _edit("def answer():\n    return 1\n"),
+            LLMResponse(
+                actions=(
+                    ActionEnvelope(
+                        action=ToolCall(
+                            name="run_validation", arguments={"argv": ["demo-test"]}
+                        )
+                    ),
+                )
+            ),
             _edit("def answer():\n    return 2\n"),
+            LLMResponse(
+                actions=(
+                    ActionEnvelope(
+                        action=ToolCall(
+                            name="run_validation", arguments={"argv": ["demo-test"]}
+                        )
+                    ),
+                )
+            ),
             LLMResponse(actions=(ActionEnvelope(action=FinishAction(summary="fixed")),)),
         )
     )
@@ -154,8 +180,26 @@ def run_core_feedback_demo(workspace: Path) -> CoreFeedbackDemoResult:
         ),
         executor,
     )
+    registry.register(
+        ToolDefinition(
+            name="run_validation",
+            description="Run the declared validation command",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "argv": {"type": "array", "items": {"type": "string"}}
+                },
+                "required": ["argv"],
+                "additionalProperties": False,
+            },
+        ),
+        _ValidationRequestExecutor(),
+    )
     policy = PolicyEngine()
-    policy_config = RepositoryPolicyConfig(repository_root=workspace)
+    policy_config = RepositoryPolicyConfig(
+        repository_root=workspace,
+        validation_commands=(("demo-test",),),
+    )
     guardrail = policy.evaluate(
         ToolCall(name="edit_file", arguments={"path": "../escape", "content": "x"}),
         policy_config,
@@ -193,8 +237,7 @@ def run_core_feedback_demo(workspace: Path) -> CoreFeedbackDemoResult:
     return CoreFeedbackDemoResult(
         summary=summary,
         feedback_observed=(
-            len(provider.contexts) > 1
-            and "feedback.test_failure" in provider.contexts[1].model_dump_json()
+            any("feedback.test_failure" in context.model_dump_json() for context in provider.contexts)
         ),
         guardrail_blocked=guardrail.effect is PolicyEffect.DENY,
         memory_retrieved=bool(provider.contexts[0].metadata.get("memory_ids")),

@@ -39,7 +39,9 @@ def complete_with_progress(
     on_text_delta: Callable[[str], None],
     cancelled: Callable[[], bool],
 ) -> LLMResponse:
-    if isinstance(provider, StreamingLLMProvider):
+    if isinstance(provider, StreamingLLMProvider) and getattr(
+        provider, "streaming_enabled", True
+    ):
         return provider.complete_stream(context, tools, on_text_delta, cancelled)
     response = provider.complete(context, tools)
     if isinstance(response, LLMResponse) and response.content:

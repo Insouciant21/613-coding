@@ -89,6 +89,125 @@ def test_context_uses_authoritative_text_and_final_permission_filter(tmp_path: P
     )
 
 
+def test_context_loads_repository_instructions_and_builds_deterministic_ledger(
+    tmp_path: Path,
+) -> None:
+    repository, project, run, _, _ = setup_memory(tmp_path)
+    project_root = tmp_path / "repo"
+    (project_root / "AGENTS.md").write_text(
+        "Use the repository's existing test command. Never edit generated files.\n",
+        encoding="utf-8",
+    )
+    assembler = ContextAssembler(
+        repository,
+        FakeIndex(),
+        RecordingEmbedding(),
+        repository_root=project_root,
+    )
+    events = (
+        Event.new(
+            "tool.completed",
+            run.id,
+            {
+                "success": True,
+                "call": {"name": "read_file", "arguments": {"path": "src/main.py"}},
+                "output": "read evidence",
+                "changed_files": [],
+            },
+            datetime.now(UTC),
+        ),
+        Event.new(
+            "validation.completed",
+            run.id,
+            {"passed": True, "command": ["pytest"], "changed_files": []},
+            datetime.now(UTC),
+        ),
+    )
+
+    context = assembler.build(run.id, "inspect the repository", events)
+
+    assert project.canonical_root == project_root
+    assert any(
+        "Never edit generated files" in message.content
+        for message in context.messages
+        if message.role == "system"
+    )
+    assert context.metadata["instruction_files"] == ["AGENTS.md"]
+    assert context.metadata["ledger"]["last_validation"] == "passed"
+    assert any(
+        message.role == "user" and message.content.startswith("Run ledger")
+        for message in context.messages
+    )
+
+
+def test_context_keeps_task_in_stable_prefix_before_changing_run_evidence(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    event = Event.new(
+        "tool.completed",
+        run.id,
+        {
+            "success": True,
+            "call": {"name": "read_file", "arguments": {"path": "src/app.py"}},
+            "output": "fresh evidence",
+            "changed_files": [],
+        },
+        datetime.now(UTC),
+    )
+
+    baseline = assembler.build(run.id, "inspect the repository", ())
+    changed = assembler.build(run.id, "inspect the repository", (event,))
+    task_index = next(
+        index
+        for index, message in enumerate(baseline.messages)
+        if message.content == "inspect the repository"
+    )
+
+    assert all(message.role == "system" for message in baseline.messages[:task_index])
+    assert tuple(baseline.messages[: task_index + 1]) == tuple(
+        changed.messages[: task_index + 1]
+    )
+    assert baseline.metadata["cache_prefix_sha256"] == changed.metadata["cache_prefix_sha256"]
+    assert changed.messages[task_index + 1].content.startswith("Run ledger (")
+
+
+def test_context_compacts_old_event_messages_without_losing_task_or_latest_evidence(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(
+        repository,
+        FakeIndex(),
+        RecordingEmbedding(),
+        max_recent_events=8,
+        max_message_chars=100,
+        max_context_chars=520,
+    )
+    events = tuple(
+        Event.new(
+            "tool.completed",
+            run.id,
+            {
+                "success": True,
+                "call": {"name": "read_file", "arguments": {"path": f"{index}.py"}},
+                "output": f"evidence-{index}-" + ("x" * 90),
+                "changed_files": [],
+            },
+            datetime.now(UTC),
+        )
+        for index in range(6)
+    )
+
+    context = assembler.build(run.id, "inspect the latest evidence", events)
+
+    assert context.messages[-1].content.startswith("Context compaction:")
+    assert any(message.content == "inspect the latest evidence" for message in context.messages)
+    assert context.metadata["omitted_event_count"] > 0
+    assert "evidence-5" in context.model_dump_json()
+
+
 def test_context_falls_back_to_sqlite_keyword_search_and_bounds_events(tmp_path: Path) -> None:
     repository, _, run, public, _ = setup_memory(tmp_path)
     assembler = ContextAssembler(
@@ -107,6 +226,39 @@ def test_context_falls_back_to_sqlite_keyword_search_and_bounds_events(tmp_path:
     assert context.metadata["memory_ids"] == [str(public.id)]
     assert context.messages[-1].content.endswith('{"n":2}')
     assert all("old" not in message.content for message in context.messages)
+
+
+def test_context_pins_recent_successful_read_evidence_after_event_tail_rollover(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(
+        repository,
+        FakeIndex(),
+        RecordingEmbedding(),
+        max_recent_events=2,
+        max_pinned_tool_events=1,
+    )
+    read = Event.new(
+        "tool.completed",
+        run.id,
+        {
+            "success": True,
+            "call": {"name": "read_file", "arguments": {"path": "state.ts"}},
+            "output": "canonical CubeState contract",
+            "changed_files": [],
+        },
+        datetime.now(UTC),
+    )
+    noise = tuple(
+        Event.new("state.transition", run.id, {"step": index}, datetime.now(UTC))
+        for index in range(3)
+    )
+
+    context = assembler.build(run.id, "repair the cube state", (read, *noise))
+
+    assert any("canonical CubeState contract" in message.content for message in context.messages)
+    assert any(message.content.startswith("Event state.transition:") for message in context.messages)
 
 
 def test_context_serializes_persisted_events_without_unmatched_tool_messages(
@@ -146,9 +298,145 @@ def test_context_keeps_goal_directed_worker_instructions_ahead_of_run_history(
     assert "Act directly on the repository" in instruction.content
     assert "Do not repeat successful read-only actions" in instruction.content
     assert "objective validation" in instruction.content
-    assert context.messages[-2].content == "implement the missing file"
+    assert any(
+        message.content == "implement the missing file" for message in context.messages
+    )
     assert context.messages[-1].content.startswith("Event feedback.tool_error:")
 
+
+def test_context_escalates_after_repeated_validation_tool_errors_without_changes(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    events = (
+        Event.new(
+            "feedback.tool_error",
+            run.id,
+            {"message": "objective validation produced tool_error", "details": {"changed_files": []}},
+            datetime.now(UTC),
+        ),
+        Event.new(
+            "validation.completed",
+            run.id,
+            {"passed": False, "stderr": "42 tests failed", "changed_files": []},
+            datetime.now(UTC),
+        ),
+    )
+
+    context = assembler.build(run.id, "repair the cube domain", events)
+
+    assert any(
+        "must edit" in message.content.lower()
+        and "do not repeat read-only" in message.content.lower()
+        and "run validation" in message.content.lower()
+        for message in context.messages
+    )
+
+
+def test_context_gives_fresh_patch_guidance_after_patch_conflict(tmp_path: Path) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    event = Event.new(
+        "feedback.tool_error",
+        run.id,
+        {
+            "message": "apply_patch conflicted with repository content",
+            "details": {
+                "tool": "apply_patch",
+                "error": "PatchConflictError: hunk context does not match",
+                "changed_files": [],
+            },
+        },
+        datetime.now(UTC),
+    )
+
+    context = assembler.build(run.id, "update the parser", (event,))
+
+    assert any(
+        "fresh patch" in message.content.lower()
+        and "re-read" in message.content.lower()
+        for message in context.messages
+    )
+
+
+def test_context_adds_explicit_repair_prompt_after_actionless_response(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    event = Event.new(
+        "feedback.invalid_action",
+        run.id,
+        {
+            "message": (
+                "provider response contained no tool action; call a repository tool"
+            )
+        },
+        datetime.now(UTC),
+    )
+
+    context = assembler.build(run.id, "inspect the repository", (event,))
+
+    assert any(
+        message.role == "system"
+        and "previous model response contained no tool action" in message.content.lower()
+        and "call the appropriate repository tool" in message.content.lower()
+        for message in context.messages
+    )
+
+
+def test_context_keeps_static_prefix_stable_during_repair_escalation(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    events = (
+        Event.new(
+            "validation.completed",
+            run.id,
+            {"passed": False, "changed_files": []},
+            datetime.now(UTC),
+        ),
+    )
+
+    baseline = assembler.build(run.id, "repair the cube domain", ())
+    repair = assembler.build(run.id, "repair the cube domain", events)
+
+    def static_prefix(context: object) -> tuple[str, ...]:
+        messages = context.messages  # type: ignore[attr-defined]
+        prefix: list[str] = []
+        for message in messages:
+            if message.role != "system":
+                break
+            prefix.append(message.content)
+        return tuple(prefix)
+
+    assert static_prefix(repair) == static_prefix(baseline)
+    assert "must edit" in repair.messages[-1].content.lower()
+
+
+def test_worker_prompt_limits_initial_read_only_loop(tmp_path: Path) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+
+    context = assembler.build(run.id, "implement the missing state module", ())
+
+    prompt = context.messages[0].content
+    assert "at most two" in prompt.lower()
+    assert "write action" in prompt.lower()
+    action_messages = [
+        message
+        for message in context.messages
+        if message.role == "system" and "select a write action" in message.content.lower()
+    ]
+    assert action_messages
+    assert any(
+        "read-only inspection tasks" in message.content.lower()
+        and "do not invoke `run_validation`" in message.content
+        for message in context.messages
+        if message.role == "system"
+    )
 
 def test_session_context_bounds_and_redacts_prior_transcript(tmp_path: Path) -> None:
     repository, project, _, _, _ = setup_memory(tmp_path)
@@ -179,7 +467,7 @@ def test_session_context_bounds_and_redacts_prior_transcript(tmp_path: Path) -> 
     assert len(transcript) == 12
     assert all("sk-test-secret-1234" not in message.content for message in transcript)
     assert any(message.content == "Omitted 1 earlier transcript entries." for message in context.messages)
-    assert context.messages[-1].content == "current task"
+    assert any(message.content == "current task" for message in context.messages)
 
 
 def test_session_context_merges_run_system_prompts_and_model_metadata(tmp_path: Path) -> None:

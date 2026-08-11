@@ -63,6 +63,20 @@ def test_complete_with_progress_uses_streaming_provider() -> None:
     assert deltas == ["hel", "lo"]
 
 
+def test_complete_with_progress_can_disable_streaming_for_provider() -> None:
+    response = LLMResponse(content="done")
+    deltas: list[str] = []
+    provider = ScriptedStreamingLLM(("hel", "lo"), response)
+    provider.streaming_enabled = False
+
+    result = complete_with_progress(
+        provider, ModelContext(run_id=uuid4(), task="task"), (), deltas.append, lambda: False
+    )
+
+    assert result == response
+    assert deltas == ["done"]
+
+
 def test_streaming_provider_raises_at_cancellation_boundary() -> None:
     token = CancellationToken()
     provider = ScriptedStreamingLLM(("before", "after"), LLMResponse(content="done"))

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import typer
 
+from coding613.application.user_configuration import UserConfigurationService
 from coding613.config import load_config
 
 app = typer.Typer(no_args_is_help=True)
@@ -22,16 +23,22 @@ def check(
 
     try:
         config = load_config(repo_root)
+        user = UserConfigurationService()
+        user_config = user.load()
     except (OSError, ValueError) as error:
         typer.echo(f"invalid configuration: {error}", err=True)
         raise typer.Exit(code=1) from error
-    limits = config.budgets
     typer.echo(f"configuration valid: {config.repository_root}")
     typer.echo(f"mode={config.permission_mode.value}")
+    typer.echo("scope=project-policy-only")
+    typer.echo(
+        "validation="
+        + ("; ".join(" ".join(command) for command in config.validation_commands) or "none")
+    )
+    typer.echo(f"user_config={user.path}")
+    typer.echo(f"active_provider={user_config.active_provider or 'none'}")
+    typer.echo(f"provider_profiles={len(user_config.providers)}")
     typer.echo(
         "budgets="
-        f"per_agent_turns:{limits.per_agent_turns},"
-        f"total_model_calls:{limits.total_model_calls},"
-        f"wall_time_seconds:{limits.wall_time_seconds},"
-        f"provider_cost:{limits.provider_cost}"
+        + str(user_config.budgets.model_dump(exclude_none=True, mode="json"))
     )

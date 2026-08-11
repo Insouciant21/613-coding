@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -15,6 +16,7 @@ from sdk_fakes import (
 import coding613.adapters.llm.credentialed as credentialed_module
 from coding613.adapters.llm.credentialed import (
     CredentialedOpenAICompatibleLLM,
+    CredentialedResponsesLLM,
     ProviderCredentialError,
 )
 from coding613.ports.llm import ModelContext, ModelMessage
@@ -157,6 +159,50 @@ def test_credentialed_provider_closes_sdk_client() -> None:
     provider.close()
 
     assert client.closed is True
+
+
+def test_credentialed_responses_provider_uses_responses_surface_lazily() -> None:
+    reader = _Reader("sk-responses-secret")
+
+    class _Responses:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+
+        def create(self, **kwargs: object) -> SimpleNamespace:
+            self.calls.append(kwargs)
+            return SimpleNamespace(
+                output=[
+                    SimpleNamespace(
+                        type="message",
+                        content=[SimpleNamespace(type="output_text", text="ok")],
+                    )
+                ]
+            )
+
+    class _ResponsesClient:
+        def __init__(self) -> None:
+            self.responses = _Responses()
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    client = _ResponsesClient()
+    provider = CredentialedResponsesLLM(
+        provider="openai",
+        base_url="https://api.example.test/v1",
+        model="coding-model",
+        read_secret=reader.read_secret,
+        client_factory=lambda *_: client,  # type: ignore[arg-type]
+        streaming=True,
+    )
+
+    response = provider.complete(ModelContext(run_id=uuid4(), task="task"), ())
+
+    assert response.content == "ok"
+    assert provider.streaming_enabled is True
+    assert reader.calls == ["openai"]
+    assert len(client.responses.calls) == 1
 
 
 def test_default_client_uses_sdk_configuration(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -69,3 +69,82 @@ def test_repository_delete_reports_invalid_targets(
     assert not result.success
     assert result.error == expected_error
     assert changed_files == []
+
+
+def test_run_validation_reports_undeclared_command_and_declared_alternative(
+    tmp_path: Path,
+) -> None:
+    registry, _, _ = build_repository_tools(
+        tmp_path,
+        (("bash", "scripts", "verify.sh"),),
+    )
+    result = registry.dispatch(
+        ToolCall(
+            name="run_validation",
+            arguments={"argv": ["npm", "test", "--prefix", "apps/web"]},
+        ),
+        ToolContext(
+            run_id=uuid4(),
+            repository_root=tmp_path,
+            permission_mode=PermissionMode.BALANCED,
+        ),
+    )
+
+    assert not result.success
+    assert result.error is not None
+    assert "validation command is not declared" in result.error
+    assert '["bash", "scripts", "verify.sh"]' in result.error
+    definition = next(
+        item for item in registry.definitions() if item.name == "run_validation"
+    )
+    assert '["bash", "scripts", "verify.sh"]' in definition.description
+
+
+def test_run_validation_accepts_legacy_shell_formatted_argv(tmp_path: Path) -> None:
+    (tmp_path / "verify.sh").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    registry, _, _ = build_repository_tools(tmp_path, (("bash", "verify.sh"),))
+
+    result = registry.dispatch(
+        ToolCall(
+            name="run_validation",
+            arguments={"argv": ["bash verify.sh"]},
+        ),
+        ToolContext(
+            run_id=uuid4(),
+            repository_root=tmp_path,
+            permission_mode=PermissionMode.BALANCED,
+        ),
+    )
+
+    assert result.success
+    assert result.output is not None
+    assert '"command":["bash","verify.sh"]' in result.output
+
+
+def test_apply_patch_reports_actionable_conflict_reason(tmp_path: Path) -> None:
+    (tmp_path / "value.txt").write_text("current\n", encoding="utf-8")
+    registry, _, _ = build_repository_tools(tmp_path, ())
+
+    result = registry.dispatch(
+        ToolCall(
+            name="apply_patch",
+            arguments={
+                "patch": "--- a/value.txt\n"
+                "+++ b/value.txt\n"
+                "@@ -1 +1 @@\n"
+                "-before\n"
+                "+after\n"
+            },
+        ),
+        ToolContext(
+            run_id=uuid4(),
+            repository_root=tmp_path,
+            permission_mode=PermissionMode.BALANCED,
+        ),
+    )
+
+    assert result.success is False
+    assert result.error is not None
+    assert result.error.startswith("PatchConflictError:")
+    assert "expected 'before'" in result.error
+    assert "found 'current'" in result.error

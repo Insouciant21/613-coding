@@ -11,7 +11,8 @@ from uuid import UUID
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.widgets import Static
+from textual.widgets import Static, TextArea
+from textual.widgets.option_list import Option
 
 from coding613.application.validation import ValidationResult
 from coding613.domain.actions import ToolCall
@@ -34,7 +35,24 @@ from .renderers import (
     render_tool_result,
     render_validation,
 )
-from .widgets import ActiveOperation, ConversationLog, StatusFooter, TaskComposer, UserMessage
+from .widgets import (
+    ActiveOperation,
+    CommandHints,
+    ConfigMenu,
+    ConversationLog,
+    StatusFooter,
+    TaskComposer,
+    UsageHints,
+    UserMessage,
+)
+
+_REASONING_LEVEL_SUGGESTIONS = ("low", "med", "medium", "high", "xhigh", "max")
+
+
+def _reasoning_levels(current: str) -> tuple[str, ...]:
+    """Return common provider levels while retaining any user-defined value."""
+
+    return tuple(dict.fromkeys((*_REASONING_LEVEL_SUGGESTIONS, current)))
 
 if TYPE_CHECKING:
     from coding613.application.composition import LocalServices
@@ -47,7 +65,9 @@ class CodingApp(App[None]):
         list[Binding | tuple[str, str] | tuple[str, str, str]]
     ] = [
         Binding("enter", "submit_task", "Submit", priority=True),
+        Binding("tab", "complete_command", "Complete command", show=False, priority=True),
         Binding("ctrl+j", "insert_newline", "New line", show=False, priority=True),
+        Binding("ctrl+t", "toggle_tool_output", "Expand tool output", show=False, priority=True),
         Binding("up", "history_previous", "Previous prompt", show=False, priority=True),
         Binding("down", "history_next", "Next prompt", show=False, priority=True),
         Binding("escape", "pause_run", "Pause", priority=True),
@@ -91,8 +111,9 @@ class CodingApp(App[None]):
         self._tool_widgets: dict[str, DetailMessage] = {}
         self._tool_calls: dict[str, ToolCall] = {}
         self._tool_keys_by_name: dict[str, list[str]] = {}
+        self._last_tool_widget: DetailMessage | None = None
         self._summary_widgets: dict[UUID, DetailMessage] = {}
-        self._validation_widget: Static | None = None
+        self._validation_widget: DetailMessage | None = None
         self._approval_id: UUID | None = None
         self._current_session_id: UUID | None = None
         self._pending_user: UserMessage | None = None
@@ -104,10 +125,13 @@ class CodingApp(App[None]):
         yield ConversationLog(id="conversation-log")
         yield ActiveOperation()
         yield TaskComposer(self.initial_task or "")
+        yield CommandHints()
+        yield UsageHints()
         yield StatusFooter()
 
     def on_mount(self) -> None:
         self.query_one(TaskComposer).focus()
+        self._update_command_hints()
         self._update_footer()
         self._drain_timer = self.set_interval(0.05, self._drain_progress)
         if self.controller is not None:
@@ -119,19 +143,46 @@ class CodingApp(App[None]):
                 self.run_worker(self._submit_message(self.initial_task), group="execution")
 
     def action_submit_task(self) -> None:
+        if isinstance(self.focused, ConfigMenu):
+            self.focused.action_select()
+            return
         if not self._executing and not self.query_one(TaskComposer).disabled:
             self.query_one(TaskComposer).submit()
 
     def action_insert_newline(self) -> None:
         self.query_one(TaskComposer).insert("\n")
 
+    def action_complete_command(self) -> None:
+        self.query_one(TaskComposer).cycle_completion()
+
+    def action_toggle_tool_output(self) -> None:
+        if self._last_tool_widget is not None:
+            self._last_tool_widget.toggle_expanded()
+
     def action_history_previous(self) -> None:
-        self.query_one(TaskComposer).history_previous()
+        if isinstance(self.focused, ConfigMenu):
+            self.focused.action_cursor_up()
+            return
+        composer = self.query_one(TaskComposer)
+        if not composer.cycle_completion(-1):
+            composer.history_previous()
 
     def action_history_next(self) -> None:
-        self.query_one(TaskComposer).history_next()
+        if isinstance(self.focused, ConfigMenu):
+            self.focused.action_cursor_down()
+            return
+        composer = self.query_one(TaskComposer)
+        if not composer.cycle_completion(1):
+            composer.history_next()
+
+    def on_text_area_changed(self, message: TextArea.Changed) -> None:
+        if isinstance(message.text_area, TaskComposer):
+            self._update_command_hints()
 
     def action_pause_run(self) -> None:
+        if isinstance(self.focused, ConfigMenu):
+            self.run_worker(self._close_config_menu(), group="config-menu")
+            return
         if self.controller is not None and self.controller.active_run_id is not None:
             self.run_worker(self._pause_run(), group="pause")
         else:
@@ -187,6 +238,8 @@ class CodingApp(App[None]):
                     self.options = self.options.model_copy(update={"model": command.arguments[0]})
                 self._update_footer()
                 await log.mount(Static(f"Model selected: {command.arguments[0]}"))
+            elif getattr(self.services, "user_configuration", None) is not None:
+                await self._show_model_menu()
             elif metadata is None:
                 await log.mount(Static("Model: not configured"))
             else:
@@ -195,6 +248,94 @@ class CodingApp(App[None]):
                         f"Model: {metadata.model} | Provider: {metadata.provider} | URL: {metadata.base_url}"
                     )
                 )
+        elif command.name == "provider":
+            configuration = getattr(self.services, "user_configuration", None)
+            if configuration is None:
+                await log.mount(Static("User provider configuration is unavailable"))
+            elif not command.arguments:
+                await self._show_provider_menu()
+            elif command.arguments[0] == "list":
+                profiles = await asyncio.to_thread(configuration.profiles)
+                lines = [
+                    f"{'*' if profile.active else ' '} {profile.name} | "
+                    f"{profile.config.api} | {profile.config.model} | {profile.config.base_url} | "
+                    f"key={profile.credential.source if profile.credential.configured else 'missing'}"
+                    for profile in profiles
+                ]
+                await log.mount(Static("\n".join(lines) or "No provider profiles configured"))
+            elif command.arguments[0] == "show":
+                name = command.arguments[1]
+                profile = next(
+                    (item for item in await asyncio.to_thread(configuration.profiles) if item.name == name),
+                    None,
+                )
+                if profile is None:
+                    await log.mount(Static(f"Provider is not configured: {name}"))
+                else:
+                    await log.mount(
+                        Static(
+                            f"Provider: {profile.name}\n"
+                            f"Active: {profile.active}\n"
+                            f"API: {profile.config.api}\n"
+                            f"Model: {profile.config.model}\n"
+                            f"Base URL: {profile.config.base_url}\n"
+                            f"Key: {profile.credential.source if profile.credential.configured else 'missing'}"
+                        )
+                    )
+            else:
+                switch_provider = getattr(self.services, "switch_provider", None)
+                if not callable(switch_provider):
+                    await log.mount(Static("Provider switching is unavailable"))
+                else:
+                    name = command.arguments[1]
+                    updated = await asyncio.to_thread(switch_provider, name)
+                    self._update_footer()
+                    active = getattr(updated, "active_provider", None) or name
+                    await log.mount(Static(f"Active provider: {active}"))
+        elif command.name == "config":
+            configuration = getattr(self.services, "configuration", None)
+            if configuration is None:
+                await log.mount(Static("Configuration service is unavailable"))
+            elif not command.arguments:
+                await self._show_config_menu()
+            elif not command.arguments or command.arguments[0] == "show":
+                summary = await asyncio.to_thread(configuration.summary)
+                user_configuration = getattr(self.services, "user_configuration", None)
+                if user_configuration is not None:
+                    summary = (
+                        summary
+                        + "\n\n"
+                        + await asyncio.to_thread(user_configuration.summary)
+                    )
+                await log.mount(Static(summary))
+            else:
+                _, key, value = command.arguments
+                user_configuration = getattr(self.services, "user_configuration", None)
+                if key.strip().lower().startswith("budgets."):
+                    if user_configuration is None:
+                        raise ValueError("user configuration service is unavailable")
+                    await asyncio.to_thread(
+                        user_configuration.set_budget_value,
+                        key.split(".", 1)[1],
+                        value,
+                    )
+                    reload_configuration = getattr(self.services, "reload_configuration", None)
+                    if not callable(reload_configuration):
+                        raise ValueError("configuration reload is unavailable")
+                    updated = await asyncio.to_thread(reload_configuration)
+                    self.permission_mode = updated.permission_mode
+                    self._update_footer()
+                    summary = await asyncio.to_thread(user_configuration.summary)
+                    await log.mount(Static(f"User budget updated: {key}\n{summary}"))
+                    return
+                updated = await asyncio.to_thread(configuration.set_value, key, value)
+                reload_configuration = getattr(self.services, "reload_configuration", None)
+                if callable(reload_configuration):
+                    updated = await asyncio.to_thread(reload_configuration)
+                self.permission_mode = updated.permission_mode
+                self._update_footer()
+                summary = await asyncio.to_thread(configuration.summary)
+                await log.mount(Static(f"Configuration updated: {key}\n{summary}"))
         elif command.name == "permissions":
             if command.arguments and command.arguments[0] in {
                 "strict",
@@ -283,6 +424,226 @@ class CodingApp(App[None]):
                 await log.mount(Static(display))
         elif command.name == "quit":
             await self.action_quit()
+
+    async def _show_config_menu(self) -> None:
+        """Mount a keyboard menu for safe, frequently used configuration edits."""
+
+        log = self.query_one(ConversationLog)
+        existing = list(log.query(ConfigMenu))
+        for menu in existing:
+            await menu.remove()
+
+        options: list[tuple[str, str]] = [
+            ("Show full configuration", "show"),
+            ("Permission mode: strict", "mode:strict"),
+            ("Permission mode: balanced", "mode:balanced"),
+            ("Permission mode: autonomous", "mode:autonomous"),
+            ("Allow network: on", "policy:allow_network:true"),
+            ("Allow network: off", "policy:allow_network:false"),
+            ("Allow dependency install: on", "policy:allow_dependency_install:true"),
+            ("Allow dependency install: off", "policy:allow_dependency_install:false"),
+            ("Allow git writes: on", "policy:allow_git_writes:true"),
+            ("Allow git writes: off", "policy:allow_git_writes:false"),
+            ("Allow repository writes: on", "policy:allow_writes:true"),
+            ("Allow repository writes: off", "policy:allow_writes:false"),
+            ("Budget: 10 model calls", "budget:total_model_calls:10"),
+            ("Budget: 30 model calls", "budget:total_model_calls:30"),
+            ("Budget: 100 model calls", "budget:total_model_calls:100"),
+        ]
+        user_configuration = getattr(self.services, "user_configuration", None)
+        if user_configuration is not None:
+            try:
+                profiles = await asyncio.to_thread(user_configuration.profiles)
+            except Exception:
+                profiles = ()
+            for profile in profiles:
+                options.append(
+                    (
+                        f"Provider: {profile.name} ({profile.selected.model})",
+                        f"provider:{profile.name}",
+                    )
+                )
+                if profile.active:
+                    try:
+                        models = await asyncio.to_thread(user_configuration.models, profile.name)
+                    except Exception:
+                        models = ()
+                    for item in models:
+                        options.append(
+                            (
+                                f"Model: {item.alias} ({item.config.model}, reasoning={item.config.reasoning_effort})",
+                                f"model:{profile.name}:{item.alias}",
+                            )
+                        )
+                        for effort in _reasoning_levels(item.config.reasoning_effort):
+                            options.append(
+                                (
+                                    f"  Reasoning for {item.alias}: {effort}",
+                                    f"reasoning:{profile.name}:{item.alias}:{effort}",
+                                )
+                            )
+        menu = ConfigMenu(tuple(options))
+        await log.mount(menu)
+        menu.focus()
+        self.query_one(StatusFooter).update("Config menu · ↑/↓ select · Enter apply · Esc close")
+
+    async def _show_provider_menu(self) -> None:
+        user_configuration = getattr(self.services, "user_configuration", None)
+        if user_configuration is None:
+            return
+        try:
+            profiles = await asyncio.to_thread(user_configuration.profiles)
+        except Exception as error:
+            await self.query_one(ConversationLog).mount(render_error(error))
+            return
+        if not profiles:
+            await self.query_one(ConversationLog).mount(Static("No provider profiles configured"))
+            return
+        menu = ConfigMenu(
+            tuple(
+                (
+                    f"{'* ' if profile.active else ''}{profile.name} · {profile.selected.model}",
+                    f"provider:{profile.name}",
+                )
+                for profile in profiles
+            )
+        )
+        await self.query_one(ConversationLog).mount(menu)
+        menu.focus()
+        self.query_one(StatusFooter).update("Provider menu · ↑/↓ select · Enter apply · Esc close")
+
+    async def _show_model_menu(self) -> None:
+        user_configuration = getattr(self.services, "user_configuration", None)
+        if user_configuration is None:
+            return
+        try:
+            active = await asyncio.to_thread(user_configuration.active)
+            if active is None:
+                await self.query_one(ConversationLog).mount(Static("Model: not configured"))
+                return
+            models = await asyncio.to_thread(user_configuration.models, active.name)
+        except Exception as error:
+            await self.query_one(ConversationLog).mount(render_error(error))
+            return
+        if not models:
+            await self.query_one(ConversationLog).mount(
+                Static(f"Model: {active.selected.model} (legacy provider model)")
+            )
+            return
+        menu = ConfigMenu(
+            tuple(
+                (
+                    (
+                        f"{'* ' if item.active else ''}{item.alias} · {item.config.model} · "
+                        f"reasoning={item.config.reasoning_effort}"
+                    ),
+                    f"model:{active.name}:{item.alias}",
+                )
+                for item in models
+            )
+        )
+        for item in models:
+            menu.add_options(
+                [
+                    Option(
+                        f"  Reasoning for {item.alias}: {effort}",
+                        id=f"reasoning:{active.name}:{item.alias}:{effort}",
+                    )
+                    for effort in _reasoning_levels(item.config.reasoning_effort)
+                ]
+            )
+        await self.query_one(ConversationLog).mount(menu)
+        menu.focus()
+        self.query_one(StatusFooter).update("Model menu · ↑/↓ select · Enter apply · Esc close")
+
+    async def _close_config_menu(self) -> None:
+        for menu in list(self.query(ConfigMenu)):
+            await menu.remove()
+        self._update_footer()
+        self._update_input_state()
+
+    async def on_option_list_option_selected(self, message: Any) -> None:
+        option_list = getattr(message, "option_list", None)
+        if option_list is None or getattr(option_list, "id", None) != "config-menu":
+            return
+        option = getattr(message, "option", None)
+        action = getattr(option, "id", None)
+        if isinstance(action, str):
+            await self._apply_config_menu_action(action)
+
+    async def _apply_config_menu_action(self, action: str) -> None:
+        menu = self.query_one(ConfigMenu)
+        try:
+            if action == "show":
+                await menu.remove()
+                await self._execute_command(ParsedCommand("config", ("show",)))
+                return
+            if action.startswith("mode:"):
+                value = action.split(":", 1)[1]
+                await self._set_project_config_value("mode", value)
+            elif action.startswith("policy:"):
+                _, key, value = action.split(":", 2)
+                await self._set_project_config_value(key, value)
+            elif action.startswith("budget:"):
+                _, key, value = action.split(":", 2)
+                user_configuration = getattr(self.services, "user_configuration", None)
+                if user_configuration is None:
+                    raise ValueError("user configuration service is unavailable")
+                await asyncio.to_thread(user_configuration.set_budget_value, key, value)
+                reload_configuration = getattr(self.services, "reload_configuration", None)
+                if callable(reload_configuration):
+                    await asyncio.to_thread(reload_configuration)
+                await self.query_one(ConversationLog).mount(
+                    Static(f"User budget updated: {key}={value}")
+                )
+            elif action.startswith("provider:"):
+                name = action.split(":", 1)[1]
+                switch_provider = getattr(self.services, "switch_provider", None)
+                if not callable(switch_provider):
+                    raise ValueError("provider switching is unavailable")
+                await asyncio.to_thread(switch_provider, name)
+                self._update_footer()
+                await self.query_one(ConversationLog).mount(Static(f"Active provider: {name}"))
+            elif action.startswith("model:"):
+                _, provider, alias = action.split(":", 2)
+                switch_model = getattr(self.services, "switch_model", None)
+                if not callable(switch_model):
+                    raise ValueError("model switching is unavailable")
+                await asyncio.to_thread(switch_model, provider, alias)
+                self._update_footer()
+                await self.query_one(ConversationLog).mount(
+                    Static(f"Active model for {provider}: {alias}")
+                )
+            elif action.startswith("reasoning:"):
+                _, provider, alias, effort = action.split(":", 3)
+                switch_reasoning = getattr(self.services, "switch_model_reasoning", None)
+                if not callable(switch_reasoning):
+                    raise ValueError("model reasoning switching is unavailable")
+                await asyncio.to_thread(switch_reasoning, provider, alias, effort)
+                self._update_footer()
+                await self.query_one(ConversationLog).mount(
+                    Static(f"Reasoning for {provider}/{alias}: {effort}")
+                )
+        except Exception as error:
+            await self.query_one(ConversationLog).mount(render_error(error))
+        finally:
+            if menu.parent is not None:
+                await menu.remove()
+            self._update_footer()
+            self._update_input_state()
+
+    async def _set_project_config_value(self, key: str, value: str) -> None:
+        configuration = getattr(self.services, "configuration", None)
+        if configuration is None:
+            raise ValueError("configuration service is unavailable")
+        updated = await asyncio.to_thread(configuration.set_value, key, value)
+        reload_configuration = getattr(self.services, "reload_configuration", None)
+        if callable(reload_configuration):
+            updated = await asyncio.to_thread(reload_configuration)
+        self.permission_mode = updated.permission_mode
+        await self.query_one(ConversationLog).mount(
+            Static(f"Configuration updated: {key}={value}")
+        )
 
     async def action_approve_request(self) -> None:
         await self._resolve_approval(approve=True)
@@ -394,6 +755,14 @@ class CodingApp(App[None]):
                 self._set_active_operation("Receiving response")
             elif update.kind is ProgressKind.STATE:
                 state = update.payload.get("to", update.text) or "working"
+                if state == RunState.WAITING_MODEL.value:
+                    # Each model call is a fresh response.  Keep the live view
+                    # focused on the current turn instead of concatenating
+                    # repeated planning text from an earlier no-action turn.
+                    self._drafts.pop(update.run_id, None)
+                    previous = self._assistants.pop(update.run_id, None)
+                    if previous is not None:
+                        await previous.remove()
                 self._set_active_operation(str(state))
             elif update.kind is ProgressKind.TOOL_STARTED:
                 name = str(update.payload.get("tool", "tool"))
@@ -431,11 +800,13 @@ class CodingApp(App[None]):
                             ),
                         )
                     )
-                    finished_widget.display_text = result.display_text
-                    finished_widget.update(result.renderable)
+                    finished_widget.replace_with(result)
+                    self._last_tool_widget = finished_widget
             elif update.kind is ProgressKind.VALIDATION_STARTED:
-                self._validation_widget = Static(
-                    "Validation started", classes="conversation-entry"
+                self._validation_widget = DetailMessage(
+                    Static("Validation started"),
+                    "Validation started",
+                    classes="conversation-entry validation-result",
                 )
                 await log.mount(self._validation_widget)
             elif update.kind is ProgressKind.VALIDATION_FINISHED:
@@ -448,7 +819,8 @@ class CodingApp(App[None]):
                     result = render_validation(
                         ValidationResult.model_validate(result_data, strict=False)
                     )
-                    self._validation_widget.update(result.renderable)
+                    self._validation_widget.replace_with(result)
+                    self._last_tool_widget = self._validation_widget
                 else:
                     status = "passed" if update.payload.get("success") else "failed"
                     await log.mount(
@@ -469,6 +841,7 @@ class CodingApp(App[None]):
             self._tool_widgets.clear()
             self._tool_calls.clear()
             self._tool_keys_by_name.clear()
+            self._last_tool_widget = None
             self._summary_widgets.clear()
         for entry in snapshot.transcript:
             key = (entry.role, entry.run_id)
@@ -523,7 +896,14 @@ class CodingApp(App[None]):
         metadata = getattr(self.services, "llm_metadata", None)
         model = self.options.model if self.options is not None else None
         model = model or getattr(metadata, "model", None) or "default"
-        provider = getattr(metadata, "provider", None) or "unconfigured"
+        provider = None
+        user_configuration = getattr(self.services, "user_configuration", None)
+        if user_configuration is not None:
+            try:
+                provider = user_configuration.load().active_provider
+            except Exception:
+                provider = None
+        provider = provider or getattr(metadata, "provider", None) or "unconfigured"
         session = str(self._current_session_id)[:8] if self._current_session_id else "new"
         footer.update(
             "613 Coding"
@@ -533,6 +913,22 @@ class CodingApp(App[None]):
             f" | mode={self.permission_mode.value}"
             f" | provider={provider}"
         )
+
+    def _update_command_hints(self) -> None:
+        try:
+            composer = self.query_one(TaskComposer)
+            hints = self.query_one(CommandHints)
+        except Exception:
+            return
+        matches = self.command_catalog.complete(composer.text)
+        # Keep the original prefix choices while the user cycles through a
+        # completed item (for example ``/co`` -> ``/config`` -> ``/compact``).
+        # Once the text no longer names one of those choices, normal prefix
+        # matching resumes.
+        if composer.text in composer.completion_matches:
+            matches = composer.completion_matches
+        composer.set_completion_matches(matches)
+        hints.update_matches(matches, composer.completion_index)
 
     async def _render_summary(self, summary: Any) -> None:
         if not hasattr(summary, "run_id"):

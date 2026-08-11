@@ -26,6 +26,9 @@ from coding613.domain.redaction import redact_text
 from coding613.ports.tools import ToolResult
 
 _DETAIL_LIMIT = 8_000
+_TOOL_RESULT_LIMIT = 1_000_000
+_TOOL_PREVIEW_LIMIT = 200
+_VALIDATION_LINE_LIMIT = 10
 
 
 def _bounded(text: str, limit: int = _DETAIL_LIMIT) -> str:
@@ -33,6 +36,19 @@ def _bounded(text: str, limit: int = _DETAIL_LIMIT) -> str:
     if len(value) <= limit:
         return value
     return f"{value[:limit]}\n... output truncated ({len(value) - limit} characters omitted)"
+
+
+def _bounded_lines(text: str, limit: int = _VALIDATION_LINE_LIMIT) -> str:
+    """Bound human-facing command output by lines, with a byte-safe fallback."""
+
+    value = redact_text(text)
+    lines = value.splitlines()
+    if len(lines) > limit:
+        omitted = len(lines) - limit
+        return "\n".join(lines[:limit]) + f"\n... {omitted} lines omitted"
+    # A command can emit one very long line. Keep the existing character safety
+    # boundary for that pathological case while using line count for normal logs.
+    return _bounded(value)
 
 
 def _json(value: Any) -> str:
@@ -50,9 +66,49 @@ class AssistantMessage(Markdown):
 
 
 class DetailMessage(Static):
-    def __init__(self, visual: Any, display_text: str, *, classes: str) -> None:
+    def __init__(
+        self,
+        visual: Any,
+        display_text: str,
+        *,
+        classes: str,
+        expanded_visual: Any | None = None,
+        expanded_text: str | None = None,
+    ) -> None:
+        self._collapsed_visual = visual
+        self._expanded_visual = expanded_visual if expanded_visual is not None else visual
+        self._collapsed_text = display_text
+        self._expanded_text = expanded_text if expanded_text is not None else display_text
+        self.expanded = False
         self.display_text = display_text
         super().__init__(visual, classes=classes)
+
+    @property
+    def expandable(self) -> bool:
+        """Whether this detail has a larger view available."""
+
+        return self._expanded_visual is not self._collapsed_visual
+
+    def toggle_expanded(self) -> bool:
+        """Toggle the larger view and return the new expanded state."""
+
+        if not self.expandable:
+            return False
+        self.expanded = not self.expanded
+        self.display_text = self._expanded_text if self.expanded else self._collapsed_text
+        self.update(self._expanded_visual if self.expanded else self._collapsed_visual)
+        return self.expanded
+
+    def replace_with(self, other: DetailMessage) -> None:
+        """Replace content while retaining this widget's position in the log."""
+
+        self._collapsed_visual = other._collapsed_visual
+        self._expanded_visual = other._expanded_visual
+        self._collapsed_text = other._collapsed_text
+        self._expanded_text = other._expanded_text
+        self.expanded = other.expanded
+        self.display_text = other.display_text
+        self.update(other.renderable)
 
 
 class ApprovalView(VerticalScroll):
@@ -103,22 +159,56 @@ def render_tool_call(call: ToolCall) -> DetailMessage:
 
 def render_tool_result(result: ToolResult) -> DetailMessage:
     status = "passed" if result.success else "failed"
-    details: list[str] = []
-    if result.output:
-        details.append(_bounded(result.output))
-    if result.error:
-        details.append(f"error: {_bounded(result.error)}")
-    if result.changed_files:
-        details.append(f"changed: {', '.join(result.changed_files)}")
+    # Keep the terminal's expanded view separately bounded from the loop's
+    # larger internal progress cap; only the default view is shortened here.
+    full_output = _bounded(result.output, _TOOL_RESULT_LIMIT) if result.output else ""
+    preview_output, output_collapsed = _preview_tool_text(full_output)
+    full_error = _bounded(result.error, _TOOL_RESULT_LIMIT) if result.error else ""
+    preview_error, error_collapsed = _preview_tool_text(full_error)
+    full_details = _tool_result_details(full_output, full_error, result.changed_files)
+    preview_details = _tool_result_details(preview_output, preview_error, result.changed_files)
+    header = f"Tool {result.call.name}: {status}"
     content = Group(
-        Text(f"Tool {result.call.name}: {status}", style="green" if result.success else "red"),
-        Syntax("\n".join(details) or "(no output)", "text", word_wrap=True),
+        Text(header, style="green" if result.success else "red"),
+        Text(preview_details),
     )
+    expanded_content = Group(
+        Text(header, style="green" if result.success else "red"),
+        Text(full_details),
+    )
+    expandable = output_collapsed or error_collapsed
+    preview_text = f"{header}\n{preview_details}"
+    full_text = f"{header}\n{full_details}"
     return DetailMessage(
         content,
-        f"Tool {result.call.name}: {status}\n" + ("\n".join(details) or "(no output)"),
+        preview_text,
         classes="conversation-entry tool-result",
+        expanded_visual=expanded_content if expandable else None,
+        expanded_text=full_text if expandable else None,
     )
+
+
+def _preview_tool_text(text: str, limit: int = _TOOL_PREVIEW_LIMIT) -> tuple[str, bool]:
+    if len(text) <= limit:
+        return text, False
+    preview = text[:limit].rsplit("\n", 1)[0]
+    hidden = len(text) - len(preview)
+    return f"{preview}\n... {hidden} characters hidden; press Ctrl+T to expand", True
+
+
+def _tool_result_details(
+    output: str,
+    error: str,
+    changed_files: tuple[str, ...],
+) -> str:
+    details: list[str] = []
+    if output:
+        details.append(output)
+    if error:
+        details.append(f"error: {error}")
+    if changed_files:
+        details.append(f"changed: {', '.join(changed_files)}")
+    return "\n".join(details) or "(no output)"
 
 
 def render_unified_diff(diff: str) -> DetailMessage:
@@ -135,15 +225,23 @@ def render_validation(result: ValidationResult) -> DetailMessage:
     command = shlex.join(result.command)
     output = "\n".join(part for part in (result.stdout, result.stderr) if part)
     header = f"Validation: {command} | {exit_status} | {result.duration_seconds:.2f}s"
-    safe_output = _bounded(output) if output else "(no output)"
+    safe_output = _bounded_lines(output) if output else "(no output)"
     content = Group(
         Text(header, style="green" if result.passed else "red"),
-        Syntax(safe_output, "text", word_wrap=True),
+        Text(safe_output),
     )
+    expanded_output = _bounded(output, _TOOL_RESULT_LIMIT) if output else "(no output)"
+    expanded_content = Group(
+        Text(header, style="green" if result.passed else "red"),
+        Text(expanded_output),
+    )
+    expandable = expanded_output != safe_output
     return DetailMessage(
         content,
         f"{header}\n{safe_output}",
         classes="conversation-entry validation-result",
+        expanded_visual=expanded_content if expandable else None,
+        expanded_text=f"{header}\n{expanded_output}" if expandable else None,
     )
 
 
@@ -154,6 +252,7 @@ def render_run_summary(summary: RunSummary) -> DetailMessage:
     lines = [
         f"Run: {summary.status.value} | stop_reason={stop_reason}",
         f"validation={len(summary.validation_evidence)} | approvals={len(summary.approvals)}",
+        f"resource_profile={summary.resource_profile or 'standard'}",
         (
             "feedback="
             + (",".join(item.value for item in summary.completion_blockers) or "none")
@@ -192,7 +291,7 @@ def render_error(error: BaseException | str) -> DetailMessage:
 
 def render_budget(usage: ResourceUsage, limits: BudgetLimits) -> DetailMessage:
     items = (
-        _budget_item("turns", usage.agent_turns, limits.per_agent_turns),
+        _budget_item("turns", usage.agent_turns, None),
         _budget_item("calls", usage.model_calls, limits.total_model_calls),
         _budget_item("time", usage.wall_time_seconds, limits.wall_time_seconds, suffix="s"),
         _budget_item("cost", usage.provider_cost, limits.provider_cost, currency=True),

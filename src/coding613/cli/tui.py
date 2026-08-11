@@ -19,7 +19,7 @@ class TuiLaunchRequest:
     repo: Path
     initial_task: str | None
     resume: str | None
-    permission_mode: PermissionMode = PermissionMode.BALANCED
+    permission_mode: PermissionMode | None = None
     options: RunOptions = field(default_factory=RunOptions)
     continue_latest: bool = False
 

@@ -12,6 +12,12 @@ from coding613.tui.commands import CommandCatalog, SlashCommand
     [
         ("/help", "help", ()),
         ("/model", "model", ()),
+        ("/config", "config", ()),
+        ("/config show", "config", ("show",)),
+        ("/config set budgets.total_model_calls 5", "config", ("set", "budgets.total_model_calls", "5")),
+        ("/provider", "provider", ()),
+        ("/provider list", "provider", ("list",)),
+        ("/provider use ai2", "provider", ("use", "ai2")),
         ("/permissions", "permissions", ()),
         ("/permissions strict", "permissions", ("strict",)),
         ("/resume", "resume", ("latest",)),
@@ -33,7 +39,17 @@ def test_slash_command_parses_supported_commands(text, name, arguments) -> None:
 
 @pytest.mark.parametrize(
     "text",
-    ["help", "/unknown", "/help extra", "/permissions unsafe", "/resume nope", "/quit now"],
+    [
+        "help",
+        "/unknown",
+        "/help extra",
+        "/config invalid",
+        "/config set budgets.total_model_calls",
+        "/provider use",
+        "/permissions unsafe",
+        "/resume nope",
+        "/quit now",
+    ],
 )
 def test_slash_command_rejects_invalid_input(text: str) -> None:
     with pytest.raises(ValueError):
@@ -47,9 +63,11 @@ def test_catalog_lists_and_parses_all_commands() -> None:
         "clear",
         "compact",
         "context",
+        "config",
         "cost",
         "doctor",
         "model",
+        "provider",
         "permissions",
         "resume",
         "runs",
@@ -59,3 +77,24 @@ def test_catalog_lists_and_parses_all_commands() -> None:
     assert catalog.parse("/resume latest").arguments == ("latest",)
     with pytest.raises(ValueError, match="unknown slash command"):
         catalog.parse("/not-a-command")
+
+
+def test_catalog_completes_only_top_level_slash_prefixes() -> None:
+    catalog = CommandCatalog.default()
+
+    assert catalog.complete("/co") == (
+        "/config",
+        "/compact",
+        "/context",
+        "/cost",
+    )
+    assert catalog.complete("/") == tuple(f"/{name}" for name in catalog.names())
+    assert catalog.complete("/config ") == ()
+    assert catalog.complete("repair") == ()
+
+
+def test_help_explains_command_discovery_and_literal_slash_escape() -> None:
+    help_text = CommandCatalog.default().help()
+
+    assert "Tab" in help_text
+    assert "//" in help_text
