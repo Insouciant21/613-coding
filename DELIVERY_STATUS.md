@@ -960,4 +960,4 @@ Every completed plan task must link a commit and fresh verification output here.
 - Regression: selecting Add provider from the menu and saving now persists metadata without rendering
   the Textual worker-context error.
 - Verification: `uv run pytest -q --ignore=tmp` -> 596 passed with 379 warnings; Ruff, mypy, and
-  diff checks passed. Commit: pending.
+  diff checks passed. Commit: `698e0c0`.

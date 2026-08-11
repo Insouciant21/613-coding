@@ -2278,5 +2278,5 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   action, and the same test passes without the error text.
 - Verification: `uv run pytest -q --ignore=tmp` -> 596 passed with 379 warnings; `uv run ruff check
   src/coding613/tui tests/tui/test_app.py`, `uv run mypy src`, and `git diff --check` passed.
-- Commit: pending until this bug-fix commit is created. No provider request or credential mutation
-  was performed.
+- Commit: `698e0c0` (`fix: run provider menu actions in worker`). No provider request or credential
+  mutation was performed.

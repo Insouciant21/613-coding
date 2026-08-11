@@ -1041,4 +1041,4 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   handler was moved to `run_worker(..., group="config-menu")`.
 - Verification: `uv run pytest -q --ignore=tmp` -> 596 passed with 379 warnings; Ruff, mypy, and
   diff checks passed.
-- Commit: pending until this bug-fix commit is created.
+- Commit: `698e0c0` (`fix: run provider menu actions in worker`).
