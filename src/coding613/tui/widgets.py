@@ -83,6 +83,11 @@ class ProviderEditorScreen(ModalScreen[dict[str, str] | None]):
                     id="provider-streaming",
                 ),
                 Input(values.get("reasoning_effort", "low"), placeholder="Reasoning level", id="provider-reasoning"),
+                Input(
+                    values.get("responses_tools", ""),
+                    placeholder="Responses tools (comma-separated; e.g. web_search,code_interpreter)",
+                    id="provider-responses-tools",
+                ),
                 Input("", placeholder="API key (optional)", password=True, id="provider-api-key"),
                 Select(
                     (("Keep inactive", "false"), ("Make active", "true")),
@@ -117,6 +122,7 @@ class ProviderEditorScreen(ModalScreen[dict[str, str] | None]):
             "max_output_tokens": "max-output",
             "context_window_chars": "context",
             "reasoning_effort": "reasoning",
+            "responses_tools": "responses-tools",
             "api_key": "api-key",
         }
         for field, selector in input_fields.items():

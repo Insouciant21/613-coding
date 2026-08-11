@@ -159,6 +159,9 @@ class LoopDependencies:
     progress: ProgressSink = field(default_factory=NullProgressSink)
     cancellation: CancellationToken = field(default_factory=CancellationToken)
     tool_filter: ToolFilter = field(default_factory=ToolFilter)
+    # Provider-hosted tools are definitions only; their calls are executed by
+    # the Responses provider and therefore never enter ToolRegistry.dispatch.
+    provider_tools: tuple[ToolDefinition, ...] = ()
     max_output_tokens: int = 128_000
 
 
@@ -338,7 +341,23 @@ class AgentLoop:
                 budget_definition = (
                     (_TASK_BUDGET_TOOL,) if session.resource_profile is None else ()
                 )
-                definitions = budget_definition + repository_definitions + (_FINISH_TOOL,)
+                hosted_definitions = tuple(
+                    definition
+                    for definition in dependencies.provider_tools
+                    if (
+                        definition.name not in dependencies.tool_filter.disallowed
+                        and (
+                            not dependencies.tool_filter.allowed
+                            or definition.name in dependencies.tool_filter.allowed
+                        )
+                    )
+                )
+                definitions = (
+                    budget_definition
+                    + repository_definitions
+                    + hosted_definitions
+                    + (_FINISH_TOOL,)
+                )
             except Exception as error:
                 return self._dependency_failure(
                     run_id,

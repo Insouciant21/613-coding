@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-12 00:50:51 (Asia/Shanghai)
-Responsible actor: `/root` for provider model catalogs, Anthropic SDK support, slash-command menus, and local verification. No real provider request, deployment, or pipeline operation was performed.
+Last updated: 2026-08-12 02:16:57 (Asia/Shanghai)
+Responsible actor: `/root` for OpenAI tool support, local shell execution, patch-conflict recovery, and local verification. No real provider request, deployment, or pipeline operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -36,6 +36,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Provider model catalog and Anthropic SDK | implemented; offline verified | `ModelConfig`, `[providers.NAME.models.ALIAS]`, `613-coding providers models ...`, `AnthropicLLM`/`CredentialedAnthropicLLM`, injected composition tests, 568-test suite at 2026-08-12 00:40 | configure an Anthropic key and run an optional user-controlled smoke |
 | Selectable TUI configuration/provider/model menus | implemented; offline verified | `ConfigMenu`, `/config`, `/provider`, `/model`, keyboard-routing regression, TUI suite at 2026-08-12 00:40 | retain Pilot coverage and exercise interactively after restarting installed TUI |
 | Repository tool composition | implemented; offline verified | local `ToolRegistry`/validator wiring and `read_file` → validation → `finish` test; current task evidence below | run real provider-backed repository smoke |
+| Local shell and OpenAI hosted tools | implemented; offline verified | `run_command` argv executor; Responses hosted tool catalog/configuration; provider CLI/TUI opt-in; 601-test gate and current `AGENT_LOG.md` entry | run an optional user-controlled Responses smoke with a provider that implements the selected hosted tools |
 | Real-provider worker reliability | unblocked and integrated on `main` | descriptor-relative delete and patch mutation Tasks 1-4; merge `69caa09`; fresh main evidence below | retain regression gate |
 | GitHub source publication | complete | `git@github.com:Insouciant21/613-coding.git`; initial source snapshot `f4b9984`; CI repair `341d880`; publication evidence below | keep delivery records synchronized with pushed commits |
 | GitHub Actions CI | configured for artifact upload and tag release; not rerun for `4528bda` | `.github/workflows/ci.yml`; exact-main local equivalent passed | push/tag to obtain current remote run and release evidence |
@@ -76,6 +77,18 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
   usage are mapped to project values. Calls set `store=false` and never use an SDK agent runner.
 - Static gates: Ruff, mypy, `uv lock --check`, and `git diff --check` passed. Independent target
   verification passed 46 Web tests, 5 API tests, lint, typecheck, build, Ruff, and mypy.
+
+## OpenAI tool support evidence (2026-08-12 02:16 Asia/Shanghai)
+
+- Local shell: `run_command` is an injected registry tool with argv schema validation, repository
+  cwd confinement, allowlisted environment, `shell=False`, finite timeout, and a 10 MB output cap.
+- Responses hosted tools: opt-in `responses_tools` profiles forward `web_search`,
+  `web_search_preview`, `file_search`, `code_interpreter`, `image_generation`, remote `mcp`, and
+  server-side `tool_search` payloads. Chat Completions and Anthropic safely omit hosted definitions.
+- Patch recovery: stale `apply_patch` conflicts retain the stable error type while exposing a
+  redacted current-file excerpt and fresh-patch instruction to the next model turn.
+- Verification: `uv run pytest tests -q` -> 601 passed (379 warnings); Ruff and mypy passed; CLI
+  `providers add/remove --responses-tool web_search` smoke passed without a provider request.
 
 ## DELIVERY-01 Evidence
 

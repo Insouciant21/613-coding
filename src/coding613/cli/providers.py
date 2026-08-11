@@ -36,6 +36,7 @@ def list_providers() -> None:
         typer.echo(
             f"{marker} {profile.name} | api={selected.api} | model={selected.model} "
             f"| models={model_count or 'legacy'} | base_url={selected.base_url} | key={key}"
+            f" | responses_tools={','.join(selected.responses_tools) or 'none'}"
         )
 
 
@@ -62,6 +63,7 @@ def show_provider(name: str) -> None:
         f"context_window_chars={profile.selected.context_window_chars}\n"
         f"streaming={profile.selected.streaming}\n"
         f"reasoning_effort={profile.selected.reasoning_effort}\n"
+        f"responses_tools={','.join(profile.selected.responses_tools) or 'none'}\n"
         f"models={', '.join(sorted(profile.config.models)) or 'legacy'}\n"
         f"key_source={profile.credential.source if profile.credential.configured else 'missing'}"
     )
@@ -96,6 +98,9 @@ def add_provider(
     context_window_chars: int = typer.Option(256_000, min=1, max=4_000_000),
     streaming: bool = typer.Option(False, help="Enable provider streaming"),
     reasoning_effort: str = typer.Option("low", help="Provider-defined reasoning level"),
+    responses_tools: list[str] | None = typer.Option(  # noqa: B008
+        None, "--responses-tool", help="Opt into a Responses-hosted tool (repeatable)"
+    ),
     make_active: bool = typer.Option(False, "--active", help="Select after saving"),
 ) -> None:
     """Create or replace a user provider profile; use key-set for its secret."""
@@ -111,6 +116,7 @@ def add_provider(
         context_window_chars=context_window_chars,
         streaming=streaming,
         reasoning_effort=reasoning_effort,
+        responses_tools=tuple(responses_tools or ()),
     )
     try:
         get_user_configuration_service().upsert_provider(name, profile, make_active=make_active)

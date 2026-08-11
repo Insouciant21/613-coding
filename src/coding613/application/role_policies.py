@@ -16,9 +16,14 @@ _READ_TOOLS = frozenset({"read_file", "search_files", "list_files", "git_diff"})
 _WRITE_TOOLS = frozenset(
     {"delete_file", "edit_file", "write_file", "apply_patch", "install_dependency"}
 )
+_COMMAND_TOOLS = frozenset({"run_command"})
 
 
 def role_policy(role: WorkerRole) -> ToolPolicy:
     if role is WorkerRole.CODER:
-        return ToolPolicy(role=role, allowed_tools=_READ_TOOLS | _WRITE_TOOLS, allow_writes=True)
-    return ToolPolicy(role=role, allowed_tools=_READ_TOOLS | {"run_command"}, allow_writes=False)
+        return ToolPolicy(
+            role=role,
+            allowed_tools=_READ_TOOLS | _WRITE_TOOLS | _COMMAND_TOOLS,
+            allow_writes=True,
+        )
+    return ToolPolicy(role=role, allowed_tools=_READ_TOOLS | _COMMAND_TOOLS, allow_writes=False)

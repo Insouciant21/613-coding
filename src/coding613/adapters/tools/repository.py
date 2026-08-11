@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import shlex
 from collections.abc import Sequence
 from pathlib import Path
@@ -10,7 +12,7 @@ from pathlib import Path
 from coding613.adapters.tools.dependencies import DependencyInstaller, DependencyInstallResult
 from coding613.adapters.tools.filesystem import FilesystemTools
 from coding613.adapters.tools.git import GitTools
-from coding613.adapters.tools.patch import PatchCommitError, PatchError
+from coding613.adapters.tools.patch import PatchCommitError, PatchConflictError, PatchError
 from coding613.adapters.tools.validation import ValidatorRunner
 from coding613.application.tool_registry import ToolRegistry
 from coding613.application.validation import (
@@ -48,6 +50,46 @@ def _failure(call: ToolCall, error: Exception) -> ToolResult:
         if reason:
             detail += f": {reason}"
     return ToolResult(call=call, success=False, error=detail)
+
+
+def _patch_conflict_guidance(tools: FilesystemTools, error: Exception) -> str:
+    """Return bounded, redacted context that lets the model repair a stale patch."""
+
+    reason = redact_text(str(error)).strip()
+    path = _patch_error_path(str(error))
+    if path is None:
+        return (
+            "Patch rejected because repository context changed; re-read the affected file "
+            "with read_file and submit a fresh patch."
+        )
+    try:
+        current = redact_text(tools.read_file(path))
+    except Exception:  # noqa: BLE001 - the original conflict remains actionable
+        return (
+            f"Patch rejected for {path}: {reason}. Re-read {path} with read_file "
+            "and submit a fresh patch."
+        )
+    lines = current.splitlines()
+    excerpt = "\n".join(lines[:10])
+    if len(excerpt) > 2_000:
+        excerpt = excerpt[:2_000] + "..."
+    return (
+        f"Patch rejected for {path}: {reason}. re-read {path} and submit a fresh patch.\n"
+        "Current file excerpt (first 10 lines):\n"
+        f"{excerpt}"
+    )
+
+
+def _patch_error_path(message: str) -> str | None:
+    match = re.search(
+        r"(?:hunk context does not match|hunk context is ambiguous|hunk offset is out of range|"
+        r"missing patch source|add target already exists|delete patch does not consume source):\s*([^;]+)",
+        message,
+    )
+    if match is None:
+        return None
+    path = match.group(1).strip()
+    return path or None
 
 
 class _ListFilesExecutor:
@@ -148,7 +190,13 @@ class _ApplyPatchExecutor:
                 call=call,
                 success=False,
                 error=type(error).__name__,
+                output=f"{type(error).__name__}: {redact_text(str(error))}",
                 changed_files=error.changed_files,
+            )
+        except PatchConflictError as error:
+            failure = _failure(call, error)
+            return failure.model_copy(
+                update={"output": _patch_conflict_guidance(self._tools, error)}
             )
         except Exception as error:  # noqa: BLE001
             return _failure(call, error)
@@ -216,6 +264,99 @@ class _InstallDependencyExecutor:
                 changed_files=result.changed_files,
             )
         return _result(call, output=result.output, changed_files=result.changed_files)
+
+
+class _RunCommandExecutor:
+    """Execute one argv command inside the repository boundary.
+
+    This is intentionally not a shell interpreter: ``shell=False`` is enforced
+    by ``ValidatorRunner`` and the model cannot provide an environment map.
+    Policy decides whether an undeclared command needs approval before this
+    executor is reached.
+    """
+
+    _MAX_TIMEOUT_SECONDS = 300.0
+    _MAX_OUTPUT_BYTES = 10_000_000
+    _ENVIRONMENT_NAMES = frozenset({"PATH", "LANG", "LC_ALL", "TMPDIR"})
+
+    def __init__(self, root: Path) -> None:
+        self._root = root.resolve(strict=True)
+        self._runner = ValidatorRunner()
+
+    def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
+        argv = tuple(str(item) for item in call.arguments["argv"])
+        cwd_value = call.arguments.get("cwd")
+        try:
+            cwd = self._cwd(cwd_value)
+            timeout = self._bounded_number(
+                call.arguments.get("timeout_seconds", 300.0),
+                "timeout_seconds",
+                self._MAX_TIMEOUT_SECONDS,
+            )
+            output_bytes = self._bounded_integer(
+                call.arguments.get("max_output_bytes", self._MAX_OUTPUT_BYTES),
+                "max_output_bytes",
+                self._MAX_OUTPUT_BYTES,
+            )
+            environment = {
+                key: value
+                for key, value in {**self._process_environment(), **context.environment}.items()
+                if key in self._ENVIRONMENT_NAMES
+            }
+            result = self._runner.run(
+                argv,
+                cwd,
+                ValidationLimits(
+                    timeout_seconds=timeout,
+                    max_output_bytes=output_bytes,
+                    environment=environment,
+                ),
+                ValidationKind.OTHER,
+            )
+        except Exception as error:  # noqa: BLE001 - normalize executor failures
+            return _failure(call, error)
+        output = result.model_dump_json()
+        if result.passed:
+            return _result(call, output=output)
+        if result.timed_out:
+            command_error = "command_timeout"
+        elif result.resource_exhausted:
+            command_error = "command_resource_exhausted"
+        else:
+            command_error = f"command_exit_{result.exit_code}"
+        return ToolResult(call=call, success=False, output=output, error=command_error)
+
+    def _cwd(self, value: object) -> Path:
+        if value is None:
+            return self._root
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("cwd must be a non-empty repository-relative path")
+        path = Path(value)
+        if path.is_absolute() or ".." in path.parts:
+            raise ValueError("cwd must stay inside the repository")
+        resolved = (self._root / path).resolve(strict=True)
+        if not resolved.is_dir() or not resolved.is_relative_to(self._root):
+            raise ValueError("cwd must be an existing repository directory")
+        return resolved
+
+    @staticmethod
+    def _bounded_number(value: object, name: str, maximum: float) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError(f"{name} must be greater than zero and at most {maximum:g}")
+        number = float(value)
+        if number <= 0 or number > maximum:
+            raise ValueError(f"{name} must be greater than zero and at most {maximum:g}")
+        return number
+
+    @staticmethod
+    def _bounded_integer(value: object, name: str, maximum: int) -> int:
+        if type(value) is not int or value <= 0 or value > maximum:
+            raise ValueError(f"{name} must be greater than zero and at most {maximum}")
+        return value
+
+    @classmethod
+    def _process_environment(cls) -> dict[str, str]:
+        return {name: os.environ[name] for name in cls._ENVIRONMENT_NAMES if name in os.environ}
 
 
 class RepositoryValidator:
@@ -447,6 +588,37 @@ def build_repository_tools(
             },
         ),
         _RunValidationExecutor(validator),
+    )
+    registry.register(
+        ToolDefinition(
+            name="run_command",
+            description=(
+                "Run one argv command in the repository without a shell. "
+                "Commands not declared as validation require policy approval."
+            ),
+            input_schema={
+                "$id": "coding613.tool.run_command.v1",
+                "type": "object",
+                "properties": {
+                    "argv": {
+                        "type": "array",
+                        "items": {"type": "string", "minLength": 1},
+                        "minItems": 1,
+                        "maxItems": 128,
+                    },
+                    "cwd": {"type": "string", "minLength": 1},
+                    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 300},
+                    "max_output_bytes": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 10_000_000,
+                    },
+                },
+                "required": ["argv"],
+                "additionalProperties": False,
+            },
+        ),
+        _RunCommandExecutor(root),
     )
     return registry, validator, changed_files
 

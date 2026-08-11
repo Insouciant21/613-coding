@@ -1042,3 +1042,16 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Verification: `uv run pytest -q --ignore=tmp` -> 596 passed with 379 warnings; Ruff, mypy, and
   diff checks passed.
 - Commit: `698e0c0` (`fix: run provider menu actions in worker`).
+
+## OpenAI tools and patch-conflict recovery — complete (2026-08-12 02:16 Asia/Shanghai)
+
+- Scope: add a governed local `run_command` tool, Responses-hosted tool definitions, provider
+  configuration/CLI/TUI opt-in, and actionable recovery evidence for stale `apply_patch` hunks.
+- TDD: RED focused tests covered the missing tool catalog, missing hosted transport, and missing
+  conflict guidance; GREEN tests cover local execution, payload forwarding, metadata, configuration
+  persistence, and existing loop/provider behavior.
+- Verification: `uv run pytest tests -q` passed 601 tests with 379 warnings; `uv run ruff check src
+  tests`, `uv run mypy src`, and `git diff --check` passed. The full repository default includes
+  untracked `tmp/cube` tests with separate FastAPI dependencies, so the maintained offline gate is
+  the explicit `tests/` path.
+- Commit: `bc6b62d` (`feat: add governed shell and responses tools`).

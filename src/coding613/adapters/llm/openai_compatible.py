@@ -98,7 +98,7 @@ class OpenAICompatibleLLM:
             request: dict[str, Any] = {
                 "model": self._model_for(context),
                 "messages": self._messages(context),
-                "tools": [self._tool_payload(tool) for tool in tools],
+                "tools": [self._tool_payload(tool) for tool in tools if tool.transport == "function"],
                 "max_tokens": self._max_output_tokens_for(context),
             }
             if self._reasoning_effort != "low":
@@ -128,7 +128,7 @@ class OpenAICompatibleLLM:
             request = {
                 "model": self._model_for(context),
                 "messages": self._messages(context),
-                "tools": [self._tool_payload(tool) for tool in tools],
+                "tools": [self._tool_payload(tool) for tool in tools if tool.transport == "function"],
                 "max_tokens": self._max_output_tokens_for(context),
                 "stream": True,
                 "stream_options": {"include_usage": True},

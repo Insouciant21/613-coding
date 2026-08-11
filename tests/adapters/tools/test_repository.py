@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from uuid import uuid4
 
@@ -148,3 +149,24 @@ def test_apply_patch_reports_actionable_conflict_reason(tmp_path: Path) -> None:
     assert result.error.startswith("PatchConflictError:")
     assert "expected 'before'" in result.error
     assert "found 'current'" in result.error
+    assert "re-read" in result.output
+
+
+def test_run_command_executes_argv_without_shell_interpolation(tmp_path: Path) -> None:
+    registry, _, _ = build_repository_tools(tmp_path, ())
+
+    result = registry.dispatch(
+        ToolCall(
+            name="run_command",
+            arguments={"argv": [sys.executable, "-c", "print('$613_CODING_LITERAL')"]},
+        ),
+        ToolContext(
+            run_id=uuid4(),
+            repository_root=tmp_path,
+            permission_mode=PermissionMode.BALANCED,
+        ),
+    )
+
+    assert result.success
+    assert "$613_CODING_LITERAL" in result.output
+    assert "command" in result.output

@@ -24,6 +24,7 @@ from coding613.adapters.llm.credentialed import (
     CredentialedResponsesLLM,
     SDKClientFactory,
 )
+from coding613.adapters.llm.openai_tools import build_responses_tools
 from coding613.adapters.storage.lancedb_index import LanceMemoryIndex
 from coding613.adapters.storage.memory import MemoryRepository
 from coding613.adapters.storage.sqlite import SqliteEventStore
@@ -254,6 +255,7 @@ def build_services(
     )
 
     def dependencies(run: Run) -> LoopDependencies:
+        selected_provider = _active_provider(runtime.user_config)
         policy_config = runtime.config.policy.model_copy(
             update={"permission_rules": tuple(store.list_permission_rules(project.id))}
         )
@@ -282,6 +284,9 @@ def build_services(
                 allowed=run.options.allowed_tools,
                 disallowed=run.options.disallowed_tools,
             ),
+            provider_tools=build_responses_tools(selected_provider)
+            if selected_provider is not None
+            else (),
             max_output_tokens=_max_output_tokens(runtime.user_config),
         )
 

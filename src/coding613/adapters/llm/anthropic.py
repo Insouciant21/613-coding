@@ -128,8 +128,9 @@ class AnthropicLLM:
         }
         if system:
             request["system"] = system
-        if tools:
-            request["tools"] = [self._tool_payload(tool) for tool in tools]
+        function_tools = tuple(tool for tool in tools if tool.transport == "function")
+        if function_tools:
+            request["tools"] = [self._tool_payload(tool) for tool in function_tools]
         thinking = self._thinking()
         if thinking is not None:
             request["thinking"] = thinking

@@ -111,6 +111,39 @@ def test_responses_adapter_maps_messages_flat_tools_and_output_items() -> None:
     assert result.provider_metadata["tool_call_ids"] == ["call-1"]
 
 
+def test_responses_adapter_forwards_hosted_tool_payload_and_records_call() -> None:
+    hosted = ToolDefinition(
+        name="web_search",
+        description="Search the web using the provider-hosted tool",
+        input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+        transport="responses_hosted",
+        provider_payload={"type": "web_search", "search_context_size": "low"},
+    )
+    response = SimpleNamespace(
+        output=[
+            SimpleNamespace(type="web_search_call", id="ws-1", status="completed"),
+            SimpleNamespace(
+                type="message",
+                content=[SimpleNamespace(type="output_text", text="found it")],
+            ),
+        ],
+        output_text="found it",
+    )
+    client = _Client(response)
+
+    result = ResponsesLLM("https://api.openai.com/v1", "gpt-5.6", client).complete(
+        _context(), (hosted,)
+    )
+
+    assert client.responses.calls[0]["tools"] == [
+        {"type": "web_search", "search_context_size": "low"}
+    ]
+    assert result.content == "found it"
+    assert result.provider_metadata["hosted_tool_calls"] == [
+        {"type": "web_search_call", "id": "ws-1", "status": "completed"}
+    ]
+
+
 def test_responses_adapter_sends_configured_reasoning_effort() -> None:
     response = SimpleNamespace(output=[], output_text="")
     client = _Client(response)

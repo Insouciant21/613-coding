@@ -172,6 +172,8 @@ timeout_seconds = 60.0
 max_output_tokens = 128000
 context_window_chars = 256000
 streaming = false
+# Optional Responses-hosted tools (omit for a provider that does not implement them).
+responses_tools = ["web_search", "code_interpreter"]
 
 [providers.ai2.models.fast]
 model = "gpt-5.6-flash"
@@ -209,6 +211,17 @@ through `5/5` reconnect behavior (at most six total requests). Authentication an
 client-side HTTP 4xx request errors fail fast; rate limits, transport failures, and 5xx responses
 remain eligible for the five-retry window.
 
+The repository registry also exposes a local `run_command` shell tool. It accepts an argv array,
+never interpolates a shell, runs only inside the repository with an allowlisted environment, and
+is bounded by a 300-second timeout and 10 MB captured output. Undeclared commands are governed
+by the policy/approval engine. For a Responses provider, `responses_tools` can opt into OpenAI's
+provider-hosted tools: `web_search`, `web_search_preview`, `file_search` (requires
+`responses_tool_options.file_search.vector_store_ids`), `code_interpreter`, `image_generation`,
+`mcp`, and server-side `tool_search`. Hosted tools are forwarded only by the Responses adapter;
+Chat Completions and Anthropic continue to receive harness-owned function tools. Shell, patch, and
+computer-use calls stay local or are rejected until their client-side output protocol is wired
+through the governed loop.
+
 Store the key in the operating-system keyring:
 
 ```bash
@@ -237,7 +250,8 @@ wall time, and provider cost remain optional safety limits in the user configura
 must set a finite model-call or cost budget. The legacy `per_agent_turns` setting is retained for
 config compatibility but is informational only.
 
-MCP transport is not part of this parity slice. The tool registry is injectable and versioned;
+Remote MCP can be enabled as a Responses-hosted tool through the provider profile; the tool
+registry remains injectable and versioned;
 future MCP integration must pass through the same schema, policy, approval, and redaction
 boundaries rather than bypassing the owned AgentLoop.
 

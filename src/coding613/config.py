@@ -77,6 +77,10 @@ class LLMConfig(DomainModel):
     )
     streaming: bool = False
     reasoning_effort: str = Field(default="low", min_length=1, max_length=64)
+    # Responses hosted tools are opt-in per user provider.  Local shell and
+    # patch execution remain harness-owned tools and are not listed here.
+    responses_tools: tuple[str, ...] = ()
+    responses_tool_options: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     @field_validator("model")
     @classmethod
@@ -93,6 +97,32 @@ class LLMConfig(DomainModel):
         if not normalized:
             raise ValueError("reasoning_effort must not be blank")
         return normalized
+
+    @field_validator("responses_tools", mode="before")
+    @classmethod
+    def validate_responses_tools(cls, value: object) -> tuple[str, ...]:
+        if not isinstance(value, (list, tuple)):
+            raise TypeError("responses_tools must be an array")
+        if not all(isinstance(item, str) for item in value):
+            raise TypeError("responses_tools entries must be strings")
+        normalized = tuple(item.strip() for item in value)
+        if any(not item for item in normalized):
+            raise ValueError("responses_tools entries must not be blank")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("responses_tools entries must be unique")
+        return normalized
+
+    @field_validator("responses_tool_options")
+    @classmethod
+    def validate_responses_tool_options(
+        cls, value: dict[str, dict[str, Any]]
+    ) -> dict[str, dict[str, Any]]:
+        for name, options in value.items():
+            if not name.strip():
+                raise ValueError("responses_tool_options names must not be blank")
+            if not isinstance(options, dict):
+                raise TypeError("responses_tool_options entries must be tables")
+        return value
 
     @field_validator("active_model")
     @classmethod
@@ -387,6 +417,15 @@ def _toml_value(value: Any) -> str:
         return "true" if value else "false"
     if isinstance(value, (int, float)):
         return str(value)
+    if isinstance(value, (list, tuple)):
+        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+    if isinstance(value, dict):
+        # Inline tables keep provider tool options compact while remaining
+        # valid TOML and avoiding a second hand-written serializer.
+        entries = ", ".join(
+            f"{key} = {_toml_value(item)}" for key, item in sorted(value.items())
+        )
+        return "{" + entries + "}"
     raise TypeError(f"unsupported user configuration value: {type(value).__name__}")
 
 

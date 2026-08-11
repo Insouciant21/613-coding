@@ -470,6 +470,7 @@ class CodingApp(App[None]):
                 "context_window_chars": "256000",
                 "streaming": "false",
                 "reasoning_effort": "low",
+                "responses_tools": "",
                 "make_active": "true",
             }
         selected = profile.selected
@@ -485,6 +486,7 @@ class CodingApp(App[None]):
             "context_window_chars": str(selected.context_window_chars),
             "streaming": str(selected.streaming).lower(),
             "reasoning_effort": selected.reasoning_effort,
+            "responses_tools": ", ".join(selected.responses_tools),
             "make_active": str(profile.active).lower(),
         }
 
@@ -518,6 +520,11 @@ class CodingApp(App[None]):
                 context_window_chars=int(values.get("context_window_chars", "256000")),
                 streaming=values.get("streaming", "false").lower() == "true",
                 reasoning_effort=values.get("reasoning_effort", "low"),
+                responses_tools=tuple(
+                    item.strip()
+                    for item in values.get("responses_tools", "").split(",")
+                    if item.strip()
+                ),
             )
             api_key = values.get("api_key", "").strip() or None
             make_active = values.get("active", "false").lower() == "true"

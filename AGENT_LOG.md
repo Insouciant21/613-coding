@@ -2280,3 +2280,32 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   src/coding613/tui tests/tui/test_app.py`, `uv run mypy src`, and `git diff --check` passed.
 - Commit: `698e0c0` (`fix: run provider menu actions in worker`). No provider request or credential
   mutation was performed.
+
+## 2026-08-12 02:16:57 Asia/Shanghai - OpenAI tool support and patch recovery
+
+- Human request: add broad OpenAI Responses tool support, answer the shell/web-search capability
+  question, and repair the repeated `apply_patch` context-conflict failure shown in the TUI.
+- Triggered skill: `openai-docs` only, because the task concerns OpenAI SDK/Responses tool
+  contracts. Superpowers skills were intentionally not invoked per the user's instruction.
+- TDD evidence: new RED tests first failed because `openai_tools` and the hosted transport field did
+  not exist. GREEN coverage now exercises argv-only `run_command`, bounded conflict guidance,
+  Responses hosted payload forwarding/metadata, hosted-tool configuration round trips, and the
+  provider catalog. The existing suite remains green.
+- Implementation: `run_command` is registered with schema validation, repository-relative cwd,
+  allowlisted environment, `shell=False`, 300-second timeout, and 10,000,000-byte output cap.
+  `ToolDefinition` now distinguishes harness function tools from Responses-hosted payloads;
+  Responses forwards configured web search, preview search, file search, code interpreter, image
+  generation, remote MCP, and server-side tool search definitions, while Chat/Anthropic omit them.
+  The provider CLI/TUI can opt into hosted tools. Shell/patch/computer-use hosted protocols are
+  not falsely advertised because their client-side output handshake is not implemented.
+- Patch conflicts now preserve commit failure details and return a redacted first-ten-line current
+  file excerpt plus a fresh-patch instruction, allowing the next model turn to recover instead of
+  repeating a stale hunk.
+- Verification: `uv run pytest tests -q` -> 601 passed with 379 warnings; `uv run ruff check src
+  tests` and `uv run mypy src` passed. A CLI provider add/remove smoke with `--responses-tool
+  web_search` also passed without a provider request. The repository-wide default `uv run pytest`
+  still discovers the unrelated untracked `tmp/cube` tests, which lack that app's dependencies;
+  the maintained suite is explicitly `tests/`.
+- Human intervention: no provider request, credential read/write, remote push, or target cube edit.
+- Lesson: Responses hosted tools and local shell must be modeled as different transports; blindly
+  exposing hosted shell/apply-patch payloads would bypass the harness's governed client loop.

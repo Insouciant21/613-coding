@@ -123,6 +123,8 @@ GitHub Actions uploads these files on successful push and publishes them for `v*
 retains the same verified `dist/` artifact. Docker Engine is separately required when the agent
 starts isolated worker sandboxes.
 
-The current parity implementation deliberately leaves MCP transport for a later adapter. New
-tools must remain behind the versioned registry, deterministic policy, approvals, and redaction
-interfaces.
+Responses-hosted web search, file search, code interpreter, image generation, remote MCP, and
+server-side tool search are opt-in provider definitions. Local `run_command` is argv-only and
+bounded; shell, patch, and computer-use hosted calls remain unavailable until their client-side
+output protocols can be routed through the governed loop. New tools must remain behind the
+versioned registry, deterministic policy, approvals, and redaction interfaces.

@@ -345,6 +345,14 @@ class ResponsesLLM:
 
     @staticmethod
     def _tool_payload(tool: ToolDefinition) -> dict[str, Any]:
+        if tool.transport == "responses_hosted":
+            # Copy the payload so a provider/client cannot mutate the domain
+            # definition retained by the loop or a later retry.
+            if tool.provider_payload is None:
+                raise ProviderResponseError(
+                    f"hosted tool {tool.name} has no provider payload"
+                )
+            return dict(tool.provider_payload)
         parameters = {
             key: value for key, value in tool.input_schema.items() if key != "$id"
         }
@@ -364,12 +372,20 @@ class ResponsesLLM:
         content_parts: list[str] = []
         actions: list[ActionEnvelope] = []
         call_ids: list[str] = []
+        hosted_calls: list[dict[str, str]] = []
         for item in output:
             item_type = cls._field(item, "type")
             if item_type == "message":
                 content_parts.extend(cls._message_text(item))
                 continue
             if item_type != "function_call":
+                if isinstance(item_type, str) and item_type.endswith("_call"):
+                    hosted: dict[str, str] = {"type": item_type}
+                    for field in ("id", "call_id", "status"):
+                        value = cls._field(item, field)
+                        if isinstance(value, str) and value:
+                            hosted[field] = value
+                    hosted_calls.append(hosted)
                 continue
             try:
                 call_id = cls._field(item, "call_id")
@@ -401,6 +417,8 @@ class ResponsesLLM:
             if isinstance(output_text, str):
                 content_parts.append(output_text)
         metadata: dict[str, Any] = {"tool_call_ids": call_ids}
+        if hosted_calls:
+            metadata["hosted_tool_calls"] = hosted_calls
         response_id = cls._field(response, "id")
         if isinstance(response_id, str) and response_id:
             metadata["response_id"] = response_id

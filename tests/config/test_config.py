@@ -153,6 +153,26 @@ streaming = true
     assert provider.streaming is True
 
 
+def test_responses_hosted_tool_options_round_trip_in_user_config(tmp_path: Path) -> None:
+    path = tmp_path / "user.toml"
+    path.write_text(
+        'active_provider = "openai"\n'
+        '[providers.openai]\napi = "responses"\nresponses_tools = ["web_search"]\n'
+        '[providers.openai.responses_tool_options.web_search]\n'
+        'search_context_size = "high"\n',
+        encoding="utf-8",
+    )
+
+    config = load_user_config(path)
+    assert config.providers["openai"].responses_tools == ("web_search",)
+    assert config.providers["openai"].responses_tool_options == {
+        "web_search": {"search_context_size": "high"}
+    }
+    save_user_config(config, path)
+    loaded = load_user_config(path)
+    assert loaded.providers["openai"].responses_tool_options["web_search"]["search_context_size"] == "high"
+
+
 def test_llm_provider_url_cannot_contain_credentials(tmp_path: Path) -> None:
     path = tmp_path / "user.toml"
     path.write_text(
