@@ -985,3 +985,18 @@ Every completed plan task must link a commit and fresh verification output here.
 - Verification: `uv run pytest tests -q` -> 604 passed with 379 warnings; `uv run ruff check src
   tests`, `uv run mypy src`, and `git diff --check` passed.
 - Commit: `45b3ef3` (`fix: bound repeated patch conflicts`).
+
+### Expanded Responses tool catalog and continuation — delivered (2026-08-12 02:58 Asia/Shanghai)
+
+- Status: verified locally; responsible actor: `/root`.
+- Delivery: Responses profiles can opt into web search/preview, file search, code interpreter,
+  image generation, MCP, tool search, programmatic calling, shell/local-shell, apply-patch,
+  computer, custom, and namespace payloads. Shell and patch calls are translated into governed
+  local actions and their typed outputs are continued on the next stateless Responses request.
+- Boundary: local commands remain argv-only with policy/approval, shell output is internally capped
+  at 10 MB and context continuation is bounded by the configured context window. Computer/custom/
+  client tool-search calls remain explicit adapter-not-configured failures until an interactive
+  adapter is injected.
+- Verification: `uv run pytest tests -q` -> 618 passed with 379 warnings; `uv run ruff check src
+  tests`, `uv run mypy src`, and `git diff --check` passed.
+- Commit: `6ed2e58` (`feat: expand responses tool catalog and continuation`).

@@ -1066,3 +1066,19 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Verification: `uv run pytest tests -q` -> 604 passed with 379 warnings; `uv run ruff check src
   tests`, `uv run mypy src`, and `git diff --check` passed.
 - Commit: `45b3ef3` (`fix: bound repeated patch conflicts`).
+
+## Expanded Responses tool catalog and client continuation — complete (2026-08-12 02:58 Asia/Shanghai)
+
+- Status: implemented and offline verified locally; responsible actor: `/root`.
+- Scope: expose the current OpenAI Responses tool catalog through provider configuration,
+  including web search/preview, file search, code interpreter, image generation, MCP, tool
+  search, programmatic calling, shell/local-shell, apply-patch, computer, custom, and namespace.
+  Shell and patch calls remain harness-governed: provider items become validated local actions,
+  policy/approval is applied, and typed output items are reconstructed for the next stateless
+  Responses request. Unsupported interactive adapters return an explicit deterministic failure.
+- Additional safety: Responses shell command strings are parsed with `shlex.split` into argv
+  without shell interpolation; continuation output is bounded by the configured context window.
+- TDD/verification: focused RED tests covered the missing catalog and continuation behavior;
+  final `uv run pytest tests -q` -> 618 passed with 379 warnings. `uv run ruff check src tests`,
+  `uv run mypy src`, and `git diff --check` passed.
+- Commit: `6ed2e58` (`feat: expand responses tool catalog and continuation`).

@@ -2330,3 +2330,26 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Lesson: bounded, fingerprinted repair is safer than letting the model replay an unchanged patch;
   renderer fallbacks keep old event logs actionable after an upgrade.
 - Commit: `45b3ef3` (`fix: bound repeated patch conflicts`).
+
+## 2026-08-12 02:58:21 Asia/Shanghai - Expanded Responses tool catalog and continuation
+
+- Human request: expand OpenAI tool support substantially and repair the screenshot-shaped
+  repeated `apply_patch` failure while preserving the harness-owned loop and governance.
+- Triggered skill: `openai-docs` only for the current SDK/Responses tool contracts; Superpowers
+  skills were intentionally not invoked because the user explicitly prohibited them.
+- TDD evidence: catalog tests were first run RED against the previous limited definitions; GREEN
+  tests now cover the complete configured catalog, client-side shell/apply-patch mapping, typed
+  continuation reconstruction, output bounds, and local repository dispatch. The shell parser was
+  corrected after SDK inspection showed Responses `shell_call.action.commands` are command strings,
+  not argv arrays; `shlex.split` now produces argv without interpolation.
+- Implementation: `ToolDefinition` payloads now cover all current SDK Responses tool variants;
+  `run_shell`, `run_command`, and `apply_patch` stay behind the repository registry and policy.
+  Responses output items are persisted as redacted provider events, then shell/patch outputs are
+  sent back as typed input items. Computer/custom/client tool-search calls receive an explicit
+  adapter-not-configured result and are not replayed as malformed continuation items.
+- Verification: `uv run pytest tests -q` -> 618 passed with 379 warnings; `uv run ruff check src
+  tests`, `uv run mypy src`, and `git diff --check` passed. No provider request, credential access,
+  target source edit, deployment, remote push, or destructive Git operation occurred.
+- Commit: `6ed2e58` (`feat: expand responses tool catalog and continuation`).
+- Lesson: provider-hosted tools, client-side protocol calls, and harness-local tools need distinct
+  transport metadata and explicit continuation rules; forwarding a tool name alone is not enough.
