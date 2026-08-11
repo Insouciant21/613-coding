@@ -2329,3 +2329,4 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   destructive Git operation.
 - Lesson: bounded, fingerprinted repair is safer than letting the model replay an unchanged patch;
   renderer fallbacks keep old event logs actionable after an upgrade.
+- Commit: `45b3ef3` (`fix: bound repeated patch conflicts`).

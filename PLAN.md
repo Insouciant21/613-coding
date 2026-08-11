@@ -1065,4 +1065,4 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   `no_progress` feedback. A different patch or an intervening read is still allowed to continue.
 - Verification: `uv run pytest tests -q` -> 604 passed with 379 warnings; `uv run ruff check src
   tests`, `uv run mypy src`, and `git diff --check` passed.
-- Commit: pending this follow-up commit.
+- Commit: `45b3ef3` (`fix: bound repeated patch conflicts`).

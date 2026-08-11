@@ -984,4 +984,4 @@ Every completed plan task must link a commit and fresh verification output here.
   now show the same re-read guidance in the renderer.
 - Verification: `uv run pytest tests -q` -> 604 passed with 379 warnings; `uv run ruff check src
   tests`, `uv run mypy src`, and `git diff --check` passed.
-- Commit: pending this follow-up commit.
+- Commit: `45b3ef3` (`fix: bound repeated patch conflicts`).
