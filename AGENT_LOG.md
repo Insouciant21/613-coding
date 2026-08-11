@@ -2264,4 +2264,4 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   `uv run mypy src`, `uv lock --check`, and `git diff --check` passed. No provider request,
   credential mutation, target source edit, deployment, remote push, or destructive Git operation
   occurred.
-- Commit: pending until the feature and delivery-record commits are created.
+- Commit: `280817f` (`feat: add tui provider management`).

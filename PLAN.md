@@ -1030,4 +1030,4 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   verifies active-provider replacement and explicit credential clearing.
 - Verification: `uv run pytest -q --ignore=tmp` -> 595 passed with 370 warnings; Ruff, mypy, lock,
   and diff checks passed.
-- Commit: pending until the feature and delivery-record commits are created.
+- Commit: `280817f` (`feat: add tui provider management`).

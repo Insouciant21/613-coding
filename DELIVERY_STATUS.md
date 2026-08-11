@@ -950,4 +950,4 @@ Every completed plan task must link a commit and fresh verification output here.
   profile does not silently erase its credential; the explicit clear-key action does that.
 - Verification: `uv run pytest -q --ignore=tmp` -> 595 passed with 370 warnings; `uv run ruff check .`,
   `uv run mypy src`, `uv lock --check`, and `git diff --check` passed.
-- Latest verification timestamp: 2026-08-12 01:36 Asia/Shanghai. Commit: pending.
+- Latest verification timestamp: 2026-08-12 01:36 Asia/Shanghai. Commit: `280817f`.
