@@ -1082,3 +1082,16 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   final `uv run pytest tests -q` -> 618 passed with 379 warnings. `uv run ruff check src tests`,
   `uv run mypy src`, and `git diff --check` passed.
 - Commit: `6ed2e58` (`feat: expand responses tool catalog and continuation`).
+
+## Remove unsupported Responses tools — complete (2026-08-12 10:16 Asia/Shanghai)
+
+- Status: implemented and offline verified locally; responsible actor: `/root`.
+- Scope: remove `tool_search`, computer tools, custom tools, namespaces, and programmatic tool
+  calling because this installation did not provide their complete execution and continuation
+  adapters. The configuration catalog, Responses parser, local registry, policy, context logic,
+  tests, and documentation now expose only end-to-end supported tools.
+- Retained tools: web search/preview, file search, code interpreter, image generation, remote MCP,
+  governed shell/local-shell, and governed apply-patch.
+- Verification: `uv run pytest tests -q` -> 620 passed with 379 warnings; `uv run ruff check src
+  tests`, `uv run mypy src`, and `git diff --check` passed.
+- Commit: `16401b1` (`fix: remove unsupported responses tools`).

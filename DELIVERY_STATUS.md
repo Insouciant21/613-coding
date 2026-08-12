@@ -1000,3 +1000,14 @@ Every completed plan task must link a commit and fresh verification output here.
 - Verification: `uv run pytest tests -q` -> 618 passed with 379 warnings; `uv run ruff check src
   tests`, `uv run mypy src`, and `git diff --check` passed.
 - Commit: `6ed2e58` (`feat: expand responses tool catalog and continuation`).
+
+### Removed unsupported Responses tools — delivered (2026-08-12 10:16 Asia/Shanghai)
+
+- Status: verified locally; responsible actor: `/root`.
+- Delivery: removed `tool_search`, computer, custom, namespace, and programmatic-calling from
+  configuration, parsing, local registration, policy, context fixtures, and documentation.
+  Only end-to-end supported Responses tools remain: web search/preview, file search, code
+  interpreter, image generation, MCP, governed shell/local-shell, and governed apply-patch.
+- Verification: `uv run pytest tests -q` -> 620 passed with 379 warnings; `uv run ruff check src
+  tests`, `uv run mypy src`, and `git diff --check` passed.
+- Commit: `16401b1` (`fix: remove unsupported responses tools`).

@@ -2353,3 +2353,21 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commit: `6ed2e58` (`feat: expand responses tool catalog and continuation`).
 - Lesson: provider-hosted tools, client-side protocol calls, and harness-local tools need distinct
   transport metadata and explicit continuation rules; forwarding a tool name alone is not enough.
+
+## 2026-08-12 10:16:01 Asia/Shanghai - Removed unsupported Responses tools
+
+- Human request: remove `tool_search` and computer; then clarified that every unimplemented tool
+  must be removed rather than exposed with a fallback error.
+- Triggered skill: `openai-docs` was used for the preceding tool-semantics explanation; no
+  Superpowers skills were invoked, per the user's explicit instruction.
+- Implementation: removed tool-search, computer, custom, namespace, and programmatic-calling
+  aliases, payload builders, client-call parsing, local unsupported executors, policy categories,
+  context fixtures, and documentation. The remaining catalog consists only of tools with a
+  complete request/dispatch/continuation path.
+- TDD/verification: removed-tool regressions assert configuration rejects all six removed names;
+  `uv run pytest tests -q` -> 620 passed with 379 warnings; Ruff, mypy, and diff checks passed.
+- Human intervention: no provider request, credential access, target source edit, deployment,
+  remote push, or destructive Git operation occurred.
+- Commit: `16401b1` (`fix: remove unsupported responses tools`).
+- Lesson: a tool should not be advertised merely because the SDK accepts its definition; the
+  harness must own the entire execution and typed continuation lifecycle first.
