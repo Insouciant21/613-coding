@@ -22,16 +22,7 @@ from .openai_compatible import (
     ProviderTimeoutError,
 )
 
-_CLIENT_SIDE_OUTPUT_TYPES = frozenset(
-    {
-        "shell_call",
-        "local_shell_call",
-        "apply_patch_call",
-        "computer_call",
-        "custom_tool_call",
-        "tool_search_call",
-    }
-)
+_CLIENT_SIDE_OUTPUT_TYPES = frozenset({"shell_call", "local_shell_call", "apply_patch_call"})
 
 
 class ResponsesClient(Protocol):
@@ -488,28 +479,6 @@ class ResponsesLLM:
             return ToolCall(
                 name="apply_patch",
                 arguments={"operation": operation},
-                provider_metadata=metadata,
-            )
-        if item_type == "computer_call":
-            action = cls._jsonable(cls._field(item, "action"))
-            return ToolCall(
-                name="computer_use",
-                arguments={"action": action if isinstance(action, dict) else {}},
-                provider_metadata=metadata,
-            )
-        if item_type == "custom_tool_call":
-            value = cls._field(item, "input")
-            if value is None:
-                value = cls._field(item, "arguments")
-            return ToolCall(
-                name="custom_tool",
-                arguments={"input": cls._jsonable(value)},
-                provider_metadata=metadata,
-            )
-        if item_type == "tool_search_call":
-            return ToolCall(
-                name="tool_search_client",
-                arguments={"arguments": cls._jsonable(cls._field(item, "arguments"))},
                 provider_metadata=metadata,
             )
         raise ProviderResponseError(f"unsupported client-side Responses item: {item_type}")

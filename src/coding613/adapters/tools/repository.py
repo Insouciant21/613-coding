@@ -429,23 +429,6 @@ class _RunShellExecutor:
         return _result(call, output=_json(results))
 
 
-class _UnsupportedClientToolExecutor:
-    def __init__(self, tool_name: str) -> None:
-        self._tool_name = tool_name
-
-    def execute(self, call: ToolCall, context: ToolContext) -> ToolResult:
-        del context
-        return ToolResult(
-            call=call,
-            success=False,
-            error=f"{self._tool_name}_executor_not_configured",
-            output=(
-                f"Responses client tool {self._tool_name} was received, but this installation "
-                "has no interactive client adapter configured."
-            ),
-        )
-
-
 class RepositoryValidator:
     """Run declared validation commands and expose the latest result to the loop."""
 
@@ -776,45 +759,6 @@ def build_repository_tools(
             },
         ),
         _RunCommandExecutor(root),
-    )
-    registry.register(
-        ToolDefinition(
-            name="computer_use",
-            description="Execute a Responses computer action through an injected interactive adapter",
-            input_schema={
-                "type": "object",
-                "properties": {"action": {"type": "object"}},
-                "required": ["action"],
-                "additionalProperties": False,
-            },
-        ),
-        _UnsupportedClientToolExecutor("computer_use"),
-    )
-    registry.register(
-        ToolDefinition(
-            name="custom_tool",
-            description="Execute a configured Responses custom tool through an injected adapter",
-            input_schema={
-                "type": "object",
-                "properties": {"input": {}},
-                "required": ["input"],
-                "additionalProperties": False,
-            },
-        ),
-        _UnsupportedClientToolExecutor("custom_tool"),
-    )
-    registry.register(
-        ToolDefinition(
-            name="tool_search_client",
-            description="Resolve a client-side Responses tool-search request",
-            input_schema={
-                "type": "object",
-                "properties": {"arguments": {}},
-                "required": ["arguments"],
-                "additionalProperties": False,
-            },
-        ),
-        _UnsupportedClientToolExecutor("tool_search_client"),
     )
     return registry, validator, changed_files
 

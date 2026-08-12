@@ -539,10 +539,8 @@ def _responses_continuation_items(
 
     Built-in hosted tools complete entirely on OpenAI. Shell and apply-patch
     calls instead require the original output item plus a typed output item on
-    the next ``responses.create`` call. Interactive calls without an injected
-    adapter are omitted after their deterministic local failure. Only the latest
-    provider response is eligible, preventing stale call items from leaking
-    into later turns.
+    the next ``responses.create`` call. Only the latest provider response is
+    eligible, preventing stale call items from leaking into later turns.
     """
 
     latest_index = -1
@@ -557,10 +555,6 @@ def _responses_continuation_items(
         latest_index = index
     if latest_index < 0:
         return []
-    # Only include calls for which this installation can produce a valid typed
-    # output item. Unsupported interactive calls are intentionally omitted from
-    # the next stateless request; their deterministic adapter failure remains in
-    # the run ledger instead of sending an incomplete Responses conversation.
     client_types = {
         "shell_call",
         "local_shell_call",

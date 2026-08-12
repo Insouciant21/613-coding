@@ -62,9 +62,6 @@ class PolicyEngine:
     )
     _NETWORK_TOOLS: ClassVar[frozenset[str]] = frozenset({"network_request"})
     _VALIDATION_TOOLS: ClassVar[frozenset[str]] = frozenset({"run_validation"})
-    _CLIENT_TOOLS: ClassVar[frozenset[str]] = frozenset(
-        {"computer_use", "custom_tool", "tool_search_client"}
-    )
     _INSTALL_TOOLS: ClassVar[frozenset[str]] = frozenset({"install_dependency"})
     _GIT_WRITE_TOOLS: ClassVar[frozenset[str]] = frozenset(
         {"git_add", "git_commit", "git_push"}
@@ -123,13 +120,6 @@ class PolicyEngine:
             return self._decision(effect, f"mode.{mode.value}.write", "repository write", call)
         if call.name in {"run_command", "run_shell"}:
             return self._command_decision(call, config, mode)
-        if call.name in self._CLIENT_TOOLS:
-            return self._decision(
-                PolicyEffect.ASK,
-                f"mode.{mode.value}.client_tool",
-                "client-side provider tool requires explicit adapter approval",
-                call,
-            )
         if call.name in self._VALIDATION_TOOLS:
             return self._command_decision(call, config, mode)
         if call.name in self._INSTALL_TOOLS:

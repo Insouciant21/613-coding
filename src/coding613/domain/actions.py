@@ -15,7 +15,7 @@ class ToolCall(DomainModel):
     arguments: dict[str, Any]
     # Provider-specific continuation metadata is kept outside ``arguments`` so
     # local tool schemas stay strict. Responses client-side tools (shell,
-    # apply_patch, computer) use this to correlate a governed result with the
+    # local_shell, apply_patch) use this to correlate a governed result with the
     # provider's call id without exposing transport fields to the model.
     provider_metadata: dict[str, Any] = Field(default_factory=dict)
 

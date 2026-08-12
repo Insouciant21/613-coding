@@ -23,12 +23,8 @@ _ALIASES = {
     "code-interpreter": "code_interpreter",
     "file-search": "file_search",
     "image-generation": "image_generation",
-    "computer-use": "computer_use_preview",
-    "computer-use-preview": "computer_use_preview",
     "local-shell": "local_shell",
     "apply-patch": "apply_patch",
-    "programmatic-tool-calling": "programmatic_tool_calling",
-    "custom-tool": "custom",
 }
 
 _SUPPORTED = frozenset(
@@ -39,15 +35,9 @@ _SUPPORTED = frozenset(
         "code_interpreter",
         "image_generation",
         "mcp",
-        "tool_search",
-        "computer_use_preview",
-        "computer",
         "shell",
         "local_shell",
         "apply_patch",
-        "custom",
-        "namespace",
-        "programmatic_tool_calling",
     }
 )
 _EMPTY_SCHEMA = {
@@ -165,14 +155,6 @@ def _build_one(name: str, options: Mapping[str, Any]) -> ToolDefinition:
             },
         )
         return _hosted(name, "Call a configured remote Model Context Protocol server", payload)
-    if name == "tool_search":
-        payload = _pick(
-            {"type": "tool_search", "execution": "server"},
-            options,
-            {"description", "parameters"},
-        )
-        _choice(payload, "execution", {"server", "client"})
-        return _hosted(name, "Search the provider's deferred tool catalogue", payload)
     if name == "shell":
         environment = options.get("environment", {"type": "local"})
         if not isinstance(environment, dict):
@@ -192,68 +174,6 @@ def _build_one(name: str, options: Mapping[str, Any]) -> ToolDefinition:
         payload = _pick({"type": "apply_patch"}, options, {"allowed_callers"})
         _callers(payload.get("allowed_callers"))
         return _hosted(name, "Apply a governed repository patch through Responses", payload)
-    if name == "computer_use_preview":
-        payload = _pick(
-            {
-                "type": "computer_use_preview",
-                "display_width": 1280,
-                "display_height": 720,
-                "environment": "linux",
-            },
-            options,
-            {"display_width", "display_height", "environment"},
-        )
-        _positive_int(payload, "display_width")
-        _positive_int(payload, "display_height")
-        _choice(payload, "environment", {"windows", "mac", "linux", "ubuntu", "browser"})
-        return _hosted(name, "Control a configured computer with screenshot feedback", payload)
-    if name == "computer":
-        return _hosted(name, "Control a configured computer with screenshot feedback", {"type": "computer"})
-    if name == "programmatic_tool_calling":
-        return _hosted(
-            name,
-            "Compose and execute multiple configured tools programmatically",
-            {"type": "programmatic_tool_calling"},
-        )
-    if name == "custom":
-        custom_name = options.get("name")
-        description = options.get("description", "")
-        custom_format = options.get("format", {"type": "text"})
-        if not isinstance(custom_name, str) or not custom_name.strip():
-            raise ValueError("custom requires a non-empty name")
-        if not isinstance(description, str):
-            raise ValueError("custom description must be a string")
-        if not isinstance(custom_format, dict):
-            raise ValueError("custom format must be a table")
-        payload = _pick(
-            {
-                "type": "custom",
-                "name": custom_name,
-                "description": description,
-                "format": dict(custom_format),
-            },
-            options,
-            {"allowed_callers", "defer_loading"},
-        )
-        _callers(payload.get("allowed_callers"))
-        return _hosted(custom_name, "Invoke a configured custom Responses tool", payload)
-    if name == "namespace":
-        namespace_name = options.get("name")
-        description = options.get("description")
-        tools = options.get("tools")
-        if not isinstance(namespace_name, str) or not namespace_name.strip():
-            raise ValueError("namespace requires a non-empty name")
-        if not isinstance(description, str) or not description.strip():
-            raise ValueError("namespace requires a non-empty description")
-        if not isinstance(tools, list) or not tools or not all(isinstance(item, dict) for item in tools):
-            raise ValueError("namespace requires a non-empty tools array")
-        payload = {
-            "type": "namespace",
-            "name": namespace_name,
-            "description": description,
-            "tools": [dict(item) for item in tools],
-        }
-        return _hosted(namespace_name, "Expose a configured Responses tool namespace", payload)
     raise AssertionError(f"unhandled Responses tool: {name}")
 
 
@@ -292,12 +212,6 @@ def _callers(value: Any) -> None:
         for item in value
     ):
         raise ValueError("allowed_callers must contain only direct or programmatic")
-
-
-def _positive_int(payload: Mapping[str, Any], key: str) -> None:
-    value = payload.get(key)
-    if type(value) is not int or value <= 0:
-        raise ValueError(f"{key} must be a positive integer")
 
 
 __all__ = ["build_responses_tools"]

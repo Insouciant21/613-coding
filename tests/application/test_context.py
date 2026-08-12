@@ -420,50 +420,6 @@ def test_context_builds_responses_shell_continuation_from_provider_and_tool_even
     }
 
 
-def test_context_omits_unsupported_interactive_responses_calls(tmp_path: Path) -> None:
-    repository, _, run, _, _ = setup_memory(tmp_path)
-    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
-    events = (
-        Event.new(
-            "provider.response",
-            run.id,
-            {
-                "output_items": [
-                    {
-                        "type": "computer_call",
-                        "id": "computer-item",
-                        "call_id": "computer-call",
-                        "action": {"type": "screenshot"},
-                    }
-                ]
-            },
-            datetime.now(UTC),
-        ),
-        Event.new(
-            "tool.completed",
-            run.id,
-            {
-                "success": False,
-                "call": {
-                    "name": "computer_use",
-                    "arguments": {"action": {"type": "screenshot"}},
-                    "provider_metadata": {
-                        "provider": "responses",
-                        "call_id": "computer-call",
-                        "item_type": "computer_call",
-                    },
-                },
-                "output": "adapter unavailable",
-            },
-            datetime.now(UTC),
-        ),
-    )
-
-    context = assembler.build(run.id, "inspect the screen", events)
-
-    assert "responses_input_items" not in context.metadata
-
-
 def test_context_adds_explicit_repair_prompt_after_actionless_response(
     tmp_path: Path,
 ) -> None:

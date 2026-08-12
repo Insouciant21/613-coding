@@ -217,14 +217,12 @@ is bounded by a 300-second timeout and 10 MB captured output. Undeclared command
 by the policy/approval engine. For a Responses provider, `responses_tools` can opt into OpenAI's
 tool catalog: `web_search`, `web_search_preview`, `file_search` (requires
 `responses_tool_options.file_search.vector_store_ids`), `code_interpreter`, `image_generation`,
-`mcp`, `tool_search`, `programmatic_tool_calling`, `shell`, `local_shell`, `apply_patch`,
-`computer_use_preview`, `computer`, `custom`, and `namespace`. Hosted tools are forwarded only
+`mcp`, `shell`, `local_shell`, and `apply_patch`. Hosted tools are forwarded only
 by the Responses adapter; Chat Completions and Anthropic continue to receive harness-owned
 function tools. Responses `shell`/`local_shell` calls are converted to governed argv execution,
 and `apply_patch` operations are converted to the repository's validated patch executor. Their
-typed output items are sent back on the next Responses request. Computer, custom, and client-side
-tool-search calls are surfaced with an explicit adapter-not-configured result until an interactive
-adapter is injected; they are never executed implicitly.
+typed output items are sent back on the next Responses request. Tools without a complete harness
+execution and continuation path are intentionally not exposed by the catalog.
 
 Store the key in the operating-system keyring:
 
