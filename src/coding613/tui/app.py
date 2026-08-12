@@ -1016,7 +1016,7 @@ class CodingApp(App[None]):
                     self._last_tool_widget = finished_widget
             elif update.kind is ProgressKind.VALIDATION_STARTED:
                 self._validation_widget = DetailMessage(
-                    Static("Validation started"),
+                    "Validation started",
                     "Validation started",
                     classes="conversation-entry validation-result",
                 )

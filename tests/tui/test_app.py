@@ -316,6 +316,24 @@ async def test_tui_renders_markdown_links_without_corrupting_textual_style_metad
 
 
 @pytest.mark.asyncio
+async def test_tui_validation_started_renders_without_nested_static_content() -> None:
+    app = CodingApp()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await app._render_progress(
+            (
+                RunProgress(
+                    run_id=uuid4(),
+                    kind=ProgressKind.VALIDATION_STARTED,
+                ),
+            )
+        )
+        await pilot.pause()
+
+        widget = app.query_one(DetailMessage)
+        assert widget.display_text == "Validation started"
+
+
+@pytest.mark.asyncio
 async def test_tui_history_restores_previous_prompt_without_submitting() -> None:
     fake = FakeUiServices()
     app = CodingApp(controller=_controller(fake))
