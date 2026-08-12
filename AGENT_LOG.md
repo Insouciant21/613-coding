@@ -2371,3 +2371,24 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Commit: `16401b1` (`fix: remove unsupported responses tools`).
 - Lesson: a tool should not be advertised merely because the SDK accepts its definition; the
   harness must own the entire execution and typed continuation lifecycle first.
+
+## 2026-08-12 10:32:00 Asia/Shanghai - Fixed nested Static validation rendering
+
+- Human report: the TUI crashed during layout with `VisualError: unable to display 'Static' type`.
+- Triggered skill: none; the user explicitly requested that Superpowers skills not be invoked.
+- TDD evidence: a focused `VALIDATION_STARTED` TUI regression first reproduced the traceback, then
+  passed after the content boundary was corrected.
+- Root cause: `CodingApp._render_progress` passed `Static("Validation started")` as the content of
+  `DetailMessage`, causing Textual to try to visualize a widget instance instead of a string or
+  Rich renderable.
+- Implementation: pass the plain validation text directly; the existing `DetailMessage` remains
+  the sole mounted widget and can still be replaced by the completed validation renderer.
+- Verification: `uv run pytest tests/tui -q` -> 88 passed; `uv run pytest tests -q` -> 621 passed
+  with 388 warnings; Ruff, mypy, and `git diff --check` passed. One concurrent TUI test invocation
+  exposed an existing startup timing race; the focused test and the complete TUI suite passed on
+  rerun.
+- Human intervention: no provider request, credential access, target source edit, deployment,
+  remote push, or destructive Git operation occurred.
+- Lesson: Textual widgets must never be used as `Static` content; renderables belong inside a
+  widget, not as its content value.
+- Commit: `34a2986` (`fix: avoid nested static validation content`).

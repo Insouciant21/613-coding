@@ -1011,3 +1011,14 @@ Every completed plan task must link a commit and fresh verification output here.
 - Verification: `uv run pytest tests -q` -> 620 passed with 379 warnings; `uv run ruff check src
   tests`, `uv run mypy src`, and `git diff --check` passed.
 - Commit: `16401b1` (`fix: remove unsupported responses tools`).
+
+### TUI nested Static rendering fix — delivered (2026-08-12 10:32 Asia/Shanghai)
+
+- Status: verified locally; responsible actor: `/root`.
+- Fix: validation-start progress now supplies a plain string to `DetailMessage` instead of a
+  nested `Static` widget, eliminating the Textual `VisualError` during layout/reflow.
+- Regression evidence: focused TUI test failed with the reported `unable to display 'Static' type`
+  traceback before implementation and passed afterward.
+- Verification: `uv run pytest tests/tui -q` -> 88 passed; `uv run pytest tests -q` -> 621 passed
+  with 388 warnings; Ruff, mypy, and `git diff --check` passed.
+- Latest verification timestamp: 2026-08-12 10:32 CST. Commit: `34a2986` (`fix: avoid nested static validation content`).

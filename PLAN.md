@@ -1095,3 +1095,14 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Verification: `uv run pytest tests -q` -> 620 passed with 379 warnings; `uv run ruff check src
   tests`, `uv run mypy src`, and `git diff --check` passed.
 - Commit: `16401b1` (`fix: remove unsupported responses tools`).
+
+## TUI nested Static rendering fix — complete (2026-08-12 10:32 Asia/Shanghai)
+
+- Status: implemented and offline verified locally; responsible actor: `/root`.
+- Scope: fix the validation-progress rendering crash caused by passing a `Static` widget as the
+  content of another `Static`-based `DetailMessage`.
+- Regression: `test_tui_validation_started_renders_without_nested_static_content` reproduces the
+  `VisualError` before the fix and verifies the mounted detail remains renderable afterward.
+- Verification: `uv run pytest tests/tui -q` -> 88 passed; `uv run pytest tests -q` -> 621 passed
+  with 388 warnings; Ruff, mypy, and `git diff --check` passed.
+- Commit: `34a2986` (`fix: avoid nested static validation content`).
