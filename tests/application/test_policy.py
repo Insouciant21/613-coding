@@ -29,6 +29,7 @@ def config(tmp_path: Path) -> RepositoryPolicyConfig:
         (PermissionMode.STRICT, PolicyEffect.ASK),
         (PermissionMode.BALANCED, PolicyEffect.ALLOW),
         (PermissionMode.AUTONOMOUS, PolicyEffect.ALLOW),
+        (PermissionMode.BYPASS, PolicyEffect.ALLOW),
     ],
 )
 def test_write_policy_varies_by_mode(
@@ -67,6 +68,9 @@ def test_declared_validation_is_allowed_except_in_strict_mode(
     engine = PolicyEngine()
     assert engine.evaluate(call, config, PermissionMode.STRICT).effect is PolicyEffect.ASK
     assert engine.evaluate(call, config, PermissionMode.BALANCED).effect is PolicyEffect.ALLOW
+    bypass = engine.evaluate(call, config, PermissionMode.BYPASS)
+    assert bypass.effect is PolicyEffect.ALLOW
+    assert bypass.rule_id == "mode.bypass.validation"
 
 
 @pytest.mark.parametrize(

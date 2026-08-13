@@ -35,6 +35,16 @@ _ROOT_VALUE_OPTIONS = frozenset(
         "--append-system-prompt",
     }
 )
+_ROOT_FLAG_OPTIONS = frozenset(
+    {
+        "-p",
+        "--print",
+        "--continue",
+        "--dangerously-skip-permissions",
+        "--verbose",
+    }
+)
+_ROOT_WORKFLOW_VALUE_OPTIONS = _ROOT_VALUE_OPTIONS - {"--repo"}
 
 
 def _first_command(argv: Sequence[str]) -> str | None:
@@ -54,6 +64,28 @@ def _first_command(argv: Sequence[str]) -> str | None:
     return None
 
 
+def _selects_root_workflow(argv: Sequence[str]) -> bool:
+    """Return whether a root-only selector appears before the first command."""
+
+    skip_value = False
+    for value in argv:
+        if skip_value:
+            skip_value = False
+            continue
+        if value == "--":
+            return True
+        if value in _ROOT_VALUE_OPTIONS:
+            if value in _ROOT_WORKFLOW_VALUE_OPTIONS:
+                return True
+            skip_value = True
+            continue
+        if value in _ROOT_FLAG_OPTIONS:
+            return True
+        if not value.startswith("-"):
+            return False
+    return False
+
+
 def run_management(argv: Sequence[str]) -> int:
     try:
         app(args=list(argv), prog_name="613-coding", standalone_mode=False)
@@ -69,7 +101,10 @@ def dispatch(argv: Sequence[str]) -> int:
             parse_root_args(values)
         except SystemExit as error:
             return int(error.code or 0)
-    if _first_command(values) in _MANAGEMENT_COMMANDS:
+    if (
+        _first_command(values) in _MANAGEMENT_COMMANDS
+        and not _selects_root_workflow(values)
+    ):
         return run_management(values)
     request = parse_root_args(values)
     if request.print_mode:

@@ -46,6 +46,39 @@ def test_dispatch_forwards_dangerous_alias_to_tui(monkeypatch, tmp_path: Path) -
 
 
 @pytest.mark.parametrize(
+    "selector",
+    [
+        ("--permission-mode", "bypass"),
+        ("--dangerously-skip-permissions",),
+    ],
+)
+def test_explicit_root_bypass_selector_wins_over_reserved_prompt_word(
+    monkeypatch, tmp_path: Path, selector: tuple[str, ...]
+) -> None:
+    requests = []
+    delegated: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        entrypoint, "run_print", lambda request: requests.append(request) or 0
+    )
+    monkeypatch.setattr(
+        entrypoint,
+        "run_management",
+        lambda argv: delegated.append(tuple(argv)) or 0,
+    )
+
+    assert (
+        entrypoint.dispatch(
+            ["-p", "--repo", str(tmp_path), *selector, "run", "checks"]
+        )
+        == 0
+    )
+
+    assert delegated == []
+    assert requests[0].prompt == "run checks"
+    assert requests[0].permission_mode is PermissionMode.BYPASS
+
+
+@pytest.mark.parametrize(
     "command", ["credentials", "providers", "config", "run", "runs", "demo"]
 )
 def test_reserved_management_commands_use_typer(monkeypatch, command) -> None:

@@ -8,6 +8,7 @@ import typer
 
 from coding613.application.user_configuration import UserConfigurationService
 from coding613.config import load_config
+from coding613.domain.models import PermissionMode
 
 app = typer.Typer(no_args_is_help=True)
 _REPO_OPTION = typer.Option(
@@ -29,7 +30,10 @@ def check(
         typer.echo(f"invalid configuration: {error}", err=True)
         raise typer.Exit(code=1) from error
     typer.echo(f"configuration valid: {config.repository_root}")
-    typer.echo(f"mode={config.permission_mode.value}")
+    mode_line = f"mode={config.permission_mode.value}"
+    if config.permission_mode is PermissionMode.BYPASS:
+        mode_line += " (DANGEROUS: BYPASS)"
+    typer.echo(mode_line)
     typer.echo("scope=project-policy-only")
     typer.echo(
         "validation="
