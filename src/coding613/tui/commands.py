@@ -45,7 +45,7 @@ def _help_arguments(arguments: tuple[str, ...]) -> tuple[str, ...]:
 def _permission_arguments(arguments: tuple[str, ...]) -> tuple[str, ...]:
     if not arguments:
         return ()
-    if arguments[0] in {"strict", "balanced", "autonomous", "list"}:
+    if arguments[0] in {"strict", "balanced", "autonomous", "bypass", "list"}:
         if len(arguments) != 1:
             raise ValueError("/permissions mode/list accepts no extra arguments")
         return arguments

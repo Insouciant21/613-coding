@@ -74,6 +74,19 @@ def test_configuration_service_summary_shows_safe_metadata(tmp_path: Path) -> No
     assert "scope=project-policy-only" in summary
 
 
+def test_configuration_summary_warns_when_bypass_is_persisted(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "harness.toml").write_text(
+        '[policy]\nmode = "bypass"\n', encoding="utf-8"
+    )
+
+    summary = ConfigurationService(tmp_path).summary()
+
+    assert "mode=bypass" in summary
+    assert "DANGEROUS: BYPASS" in summary
+
+
 def test_configuration_service_rejects_user_scoped_sections(tmp_path: Path) -> None:
     service = ConfigurationService(tmp_path)
 

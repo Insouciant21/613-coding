@@ -58,6 +58,10 @@ def _reasoning_levels(current: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys((*_REASONING_LEVEL_SUGGESTIONS, current)))
 
 
+def _permission_mode_display(mode: PermissionMode) -> str:
+    return "DANGEROUS: BYPASS" if mode is PermissionMode.BYPASS else mode.value
+
+
 if TYPE_CHECKING:
     from coding613.application.composition import LocalServices
 
@@ -355,6 +359,7 @@ class CodingApp(App[None]):
                 "strict",
                 "balanced",
                 "autonomous",
+                "bypass",
             }:
                 self.permission_mode = PermissionMode(command.arguments[0])
                 self._update_footer()
@@ -369,7 +374,7 @@ class CodingApp(App[None]):
                     ]
                     await log.mount(
                         Static(
-                            f"Mode: {self.permission_mode.value}\n"
+                            f"Mode: {_permission_mode_display(self.permission_mode)}\n"
                             + ("\n".join(lines) or "No project permission rules")
                         )
                     )
@@ -409,6 +414,7 @@ class CodingApp(App[None]):
             await log.mount(
                 Static(
                     f"Status: {status}; active_run={self.controller.active_run_id or 'none'}; "
+                    f"mode={_permission_mode_display(self.permission_mode)}; "
                     f"approval={approval}; validation={validation}; feedback={blockers}; "
                     f"budget={usage}"
                 )
@@ -604,6 +610,7 @@ class CodingApp(App[None]):
             ("Permission mode: strict", "mode:strict"),
             ("Permission mode: balanced", "mode:balanced"),
             ("Permission mode: autonomous", "mode:autonomous"),
+            ("Permission mode: bypass", "mode:bypass"),
             ("Allow network: on", "policy:allow_network:true"),
             ("Allow network: off", "policy:allow_network:false"),
             ("Allow dependency install: on", "policy:allow_dependency_install:true"),
@@ -1122,7 +1129,7 @@ class CodingApp(App[None]):
             f" | repo={repository}"
             f" | session={session}"
             f" | model={model}"
-            f" | mode={self.permission_mode.value}"
+            f" | mode={_permission_mode_display(self.permission_mode)}"
             f" | provider={provider}"
         )
 

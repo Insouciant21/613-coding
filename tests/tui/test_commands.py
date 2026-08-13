@@ -26,6 +26,7 @@ from coding613.tui.commands import CommandCatalog, SlashCommand
         ("/provider clear-key ai2", "provider", ("clear-key", "ai2")),
         ("/permissions", "permissions", ()),
         ("/permissions strict", "permissions", ("strict",)),
+        ("/permissions bypass", "permissions", ("bypass",)),
         ("/resume", "resume", ("latest",)),
         ("/resume latest", "resume", ("latest",)),
         (f"/resume {uuid4()}", "resume", None),

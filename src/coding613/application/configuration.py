@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Literal
 
 from coding613.config import HarnessConfig, load_config, load_config_text
+from coding613.domain.models import PermissionMode
 from coding613.domain.redaction import redact_text
 
 _ValueKind = Literal["string", "bool", "int", "float"]
@@ -75,9 +76,12 @@ class ConfigurationService:
 
     def summary(self) -> str:
         config = self.load()
+        mode_line = f"mode={config.permission_mode.value}"
+        if config.permission_mode is PermissionMode.BYPASS:
+            mode_line += " (DANGEROUS: BYPASS)"
         lines = [
             f"Configuration: {self.path}",
-            f"mode={config.permission_mode.value}",
+            mode_line,
             "validation="
             + ("; ".join(shlex.join(command) for command in config.validation_commands) or "none"),
             f"allow_network={config.allow_network}",

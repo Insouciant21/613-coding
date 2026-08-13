@@ -832,6 +832,44 @@ async def test_tui_permissions_slash_command_changes_next_run_mode() -> None:
 
 
 @pytest.mark.asyncio
+async def test_tui_bypass_mode_is_selectable_and_visibly_dangerous() -> None:
+    fake = FakeUiServices()
+    app = CodingApp(controller=_controller(fake))
+    async with app.run_test(size=(100, 28)) as pilot:
+        app.query_one(TaskComposer).load_text("/permissions bypass")
+        await pilot.press("enter")
+        for _ in range(50):
+            await pilot.pause(0.01)
+            if "DANGEROUS: BYPASS" in str(app.query_one(StatusFooter).renderable):
+                break
+
+        assert app.permission_mode is PermissionMode.BYPASS
+        assert "DANGEROUS: BYPASS" in str(
+            app.query_one(StatusFooter).renderable
+        )
+
+
+@pytest.mark.asyncio
+async def test_tui_bypass_status_and_permission_list_show_warning() -> None:
+    fake = FakeUiServices()
+    rules = FakePermissionRules()
+    app = CodingApp(
+        controller=_controller(fake),
+        services=SimpleNamespace(permission_rules=rules),
+        permission_mode=PermissionMode.BYPASS,
+    )
+    async with app.run_test(size=(100, 28)) as pilot:
+        await app._handle_command("/status")
+        await app._handle_command("/permissions list")
+        await pilot.pause()
+
+        texts = [str(item.renderable) for item in app.query(Static)]
+        assert any("mode=DANGEROUS: BYPASS" in text for text in texts)
+        assert any("Mode: DANGEROUS: BYPASS" in text for text in texts)
+        assert any("approval=" in text for text in texts)
+
+
+@pytest.mark.asyncio
 async def test_tui_provider_command_switches_user_profile() -> None:
     fake = FakeUiServices()
 
@@ -1187,6 +1225,9 @@ async def test_tui_config_without_arguments_opens_selectable_menu() -> None:
                 break
         menu = app.query_one(ConfigMenu)
         assert menu.options[1].prompt == "Permission mode: strict"
+        bypass = [option for option in menu.options if option.id == "mode:bypass"]
+        assert len(bypass) == 1
+        assert str(bypass[0].prompt) == "Permission mode: bypass"
         await pilot.press("down", "enter")
         await pilot.pause()
         assert not app.query(ConfigMenu)
