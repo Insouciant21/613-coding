@@ -49,6 +49,7 @@ def test_dispatch_forwards_dangerous_alias_to_tui(monkeypatch, tmp_path: Path) -
     "selector",
     [
         ("--permission-mode", "bypass"),
+        ("--permission-mode=bypass",),
         ("--dangerously-skip-permissions",),
     ],
 )
@@ -76,6 +77,36 @@ def test_explicit_root_bypass_selector_wins_over_reserved_prompt_word(
     assert delegated == []
     assert requests[0].prompt == "run checks"
     assert requests[0].permission_mode is PermissionMode.BYPASS
+
+
+def test_equals_form_bypass_selector_wins_without_another_root_flag(
+    monkeypatch, tmp_path: Path
+) -> None:
+    launched: list[TuiLaunchRequest] = []
+    delegated: list[tuple[str, ...]] = []
+    monkeypatch.setattr(entrypoint, "launch_tui", launched.append)
+    monkeypatch.setattr(
+        entrypoint,
+        "run_management",
+        lambda argv: delegated.append(tuple(argv)) or 0,
+    )
+
+    assert (
+        entrypoint.dispatch(
+            [
+                "--repo",
+                str(tmp_path),
+                "--permission-mode=bypass",
+                "run",
+                "checks",
+            ]
+        )
+        == 0
+    )
+
+    assert delegated == []
+    assert launched[0].initial_task == "run checks"
+    assert launched[0].permission_mode is PermissionMode.BYPASS
 
 
 @pytest.mark.parametrize(

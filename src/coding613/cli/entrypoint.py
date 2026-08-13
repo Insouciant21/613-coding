@@ -55,8 +55,9 @@ def _first_command(argv: Sequence[str]) -> str | None:
             continue
         if value == "--":
             return None
-        if value in _ROOT_VALUE_OPTIONS:
-            skip_value = True
+        option, separator, _inline_value = value.partition("=")
+        if option in _ROOT_VALUE_OPTIONS:
+            skip_value = not separator
             continue
         if value.startswith("-"):
             continue
@@ -74,10 +75,11 @@ def _selects_root_workflow(argv: Sequence[str]) -> bool:
             continue
         if value == "--":
             return True
-        if value in _ROOT_VALUE_OPTIONS:
-            if value in _ROOT_WORKFLOW_VALUE_OPTIONS:
+        option, separator, _inline_value = value.partition("=")
+        if option in _ROOT_VALUE_OPTIONS:
+            if option in _ROOT_WORKFLOW_VALUE_OPTIONS:
                 return True
-            skip_value = True
+            skip_value = not separator
             continue
         if value in _ROOT_FLAG_OPTIONS:
             return True

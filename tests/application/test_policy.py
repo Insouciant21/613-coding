@@ -79,6 +79,10 @@ def test_declared_validation_is_allowed_except_in_strict_mode(
         ToolCall(name="run_command", arguments={"argv": ["python", "-V"]}),
         ToolCall(
             name="run_shell",
+            arguments={"commands": [{"argv": ["python", "-V"]}]},
+        ),
+        ToolCall(
+            name="run_shell",
             arguments={
                 "commands": [
                     {"argv": ["python", "-V"]},
