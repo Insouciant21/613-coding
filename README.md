@@ -34,7 +34,9 @@ the full command catalog. Large tool results show a bounded preview; press `Ctrl
 collapse the latest result. Use `//` when a normal prompt should begin with a literal slash.
 
 `/permissions list` displays project rules; `/permissions allow TOOL`, `/permissions deny TOOL`,
-and `/permissions clear TOOL` update them through the application service. `/provider` opens a
+and `/permissions clear TOOL` update them through the application service. `/permissions bypass`
+selects dangerous bypass for subsequent runs; the footer then displays `DANGEROUS: BYPASS`.
+`/provider` opens a
 management menu with Add, Use, Edit, Delete, Set API key, and Clear API key actions for every
 user-wide provider profile. The same operations are available directly as `/provider add`,
 `/provider edit NAME`, `/provider remove NAME`, `/provider key NAME`, and
@@ -44,7 +46,8 @@ remain available for inspection and quick switching.
 `/cost` shows resource usage, and `/doctor` runs injected local diagnostics. `/config` opens a
 keyboard-selectable menu for policy toggles, safety-budget presets, providers, and the active
 provider's model/reasoning choices; `/config show` remains available for the full text summary.
-`/config set mode autonomous` and `/config set budgets.total_model_calls 20` are still available
+`/config set mode autonomous`, `/config set mode bypass`, and
+`/config set budgets.total_model_calls 20` are still available
 for scripted use. `/provider` and `/model` without arguments open the corresponding selection
 menus. Changes are validated and atomically persisted, then reloaded for subsequent runs.
 Compaction never deletes the authoritative transcript. Prefix a slash with `//` when it should be
@@ -75,6 +78,8 @@ opening Textual, `--continue` selects the latest session, and `--resume SESSION_
 613-coding -p --repo . --output-format text "repair the tests"
 613-coding -p --continue --output-format json "run validation"
 613-coding -p --resume latest --permission-mode strict "inspect the approval"
+613-coding -p --permission-mode bypass "run the requested local command"
+613-coding -p --dangerously-skip-permissions "run the requested local command"
 ```
 
 Prompts can come from stdin. Text input is the default; stream input is one JSON object per line
@@ -135,7 +140,14 @@ and validation always remain ordered through the policy-controlled loop.
 The options `--model`, `--system-prompt`, `--append-system-prompt`, `--allowed-tools` /
 `--allowedTools`, `--disallowed-tools` / `--disallowedTools`, `--add-dir`, and budget flags are
 passed through the same `PromptRequest` used by the TUI. `--permission-mode` accepts `strict`,
-`balanced`, or `autonomous`; hard safety rules always remain active.
+`balanced`, `autonomous`, or `bypass`. `--dangerously-skip-permissions` is an explicit alias for
+`--permission-mode bypass`; combining it with another mode is rejected.
+
+Bypass is intentionally dangerous: it converts policy decisions that would be `ASK` into
+`ALLOW`, so commands and other approval-eligible actions run without human confirmation. It never
+converts `DENY`. Repository/credential boundaries, explicit deny rules, validated argv schemas,
+timeouts, output/resource limits, redaction, budgets, and the worker sandbox remain active.
+Existing pending approvals belong to their persisted run and are not retroactively bypassed.
 
 ## Provider Configuration
 

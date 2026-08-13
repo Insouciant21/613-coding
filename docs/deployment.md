@@ -22,6 +22,18 @@ Run a repository task with `uv run 613-coding --repo PATH "task"`, resume with
 config, runs,
 and deterministic demos.
 
+## Dangerous Bypass Operation
+
+`--permission-mode bypass` and its explicit alias `--dangerously-skip-permissions` remove human
+review for actions whose final policy result would otherwise be `ASK`. The TUI exposes the same
+choice through `/permissions bypass` and `/config set mode bypass` and labels it
+`DANGEROUS: BYPASS`.
+
+Use bypass only in the configured short-lived worker container and task workspace. It changes
+`ASK` to `ALLOW`, never `DENY`: hard repository and credential boundaries, explicit deny rules,
+validated argv arrays, redaction, time/output/resource budgets, and sandbox isolation remain
+active. Existing pending approvals remain attached to their original persisted run.
+
 ## Credentials And Configuration
 
 Configure non-secret provider profiles and user-wide budgets in the per-user

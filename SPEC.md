@@ -11,7 +11,8 @@ The central engineering contribution is a deterministic feedback loop that remai
 1. As a developer, I can start a Claude Code-like TUI in a local repository, submit tasks, and
    continue a persisted interactive session.
 2. As a developer, I can see tests, lint, and type-check results classified into actionable feedback.
-3. As a safety-conscious developer, I can choose strict, balanced, or autonomous permissions.
+3. As a safety-conscious developer, I can choose strict, balanced, autonomous, or explicitly
+   dangerous bypass permissions.
 4. As a developer, I can approve or reject a concrete risky action and resume the run.
 5. As a developer, I can run worker agents in isolated containers with resource and network limits.
 6. As a developer, I can ask a Supervisor to split work among planner, coder, tester, reviewer, and security workers.
@@ -55,7 +56,7 @@ Interactive runs do not impose a low fixed five-turn limit. Configurable per-age
 
 ### 3.4 Governance
 
-Policy precedence is hard safety rules, validated repository configuration, permission mode, and one-time approval for the exact action. `strict` asks before writes/commands/external access; `balanced` permits repository edits and declared validation while asking for installs, network, repository-outside paths, and Git writes; `autonomous` permits declared in-scope actions but never bypasses hard denial rules.
+Policy precedence is hard safety rules, validated repository configuration, permission mode, and one-time approval for the exact action. `strict` asks before writes/commands/external access; `balanced` permits repository edits and declared validation while asking for installs, network, and Git writes; `autonomous` permits configured in-scope actions but never bypasses hard denial rules. The explicitly selected `bypass` mode converts only final `ASK` decisions to `ALLOW`; every `DENY` remains denied. The canonical selector is `--permission-mode bypass`, with `--dangerously-skip-permissions` as an explicit dangerous alias. Human-facing TUI surfaces display `DANGEROUS: BYPASS` while persisted values remain `bypass`.
 
 Hard denial covers repository escape, symlink escape, destructive system/database/disk commands, Docker socket access, credential directories, privileged container changes, and unredacted secret transfer.
 
@@ -149,7 +150,7 @@ Unit tests cover loop transitions, tool schemas, policy, approvals, classifiers,
 
 The initial package-scaffold test uses only the Python standard-library `unittest` runner so a fresh environment can verify the source layout before third-party development tools are installed. Pydantic, pytest, Ruff, mypy, Textual, LanceDB, Docker, and provider adapters begin only after the documented dependency-provisioning check succeeds.
 
-The offline demo must reproduce: planner task graph creation; wrong coder patch; tester `test_failure`; feedback-driven repair; reviewer approval; Supervisor integration; dangerous-action blocking; strict/balanced/autonomous differences; vector-memory retrieval; and worker cleanup. A real LLM run is supplementary evidence only.
+The offline demo must reproduce: planner task graph creation; wrong coder patch; tester `test_failure`; feedback-driven repair; reviewer approval; Supervisor integration; dangerous-action blocking; strict/balanced/autonomous/bypass differences; bypass allowing an approval-eligible argv command while hard denial remains active; vector-memory retrieval; and worker cleanup. A real LLM run is supplementary evidence only.
 
 ## 10. Acceptance Criteria
 

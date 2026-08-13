@@ -89,3 +89,21 @@ def test_readme_documents_print_stream_and_resume_contract() -> None:
         "permission-mode",
     ):
         assert marker in text
+
+
+def test_current_docs_define_dangerous_bypass_boundary() -> None:
+    text = "\n".join(
+        (ROOT / path).read_text(encoding="utf-8")
+        for path in ("README.md", "SPEC.md", "docs/deployment.md")
+    )
+
+    for marker in (
+        "--permission-mode bypass",
+        "--dangerously-skip-permissions",
+        "DANGEROUS: BYPASS",
+        "ASK",
+        "DENY",
+        "argv",
+        "sandbox",
+    ):
+        assert marker.lower() in text.lower()

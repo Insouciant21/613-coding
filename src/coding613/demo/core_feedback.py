@@ -40,6 +40,7 @@ class CoreFeedbackDemoResult(DomainModel):
     summary: RunSummary
     feedback_observed: bool
     guardrail_blocked: bool
+    bypass_command_allowed: bool
     memory_retrieved: bool
     changed_file_text: str
 
@@ -203,7 +204,12 @@ def run_core_feedback_demo(workspace: Path) -> CoreFeedbackDemoResult:
     guardrail = policy.evaluate(
         ToolCall(name="edit_file", arguments={"path": "../escape", "content": "x"}),
         policy_config,
-        PermissionMode.AUTONOMOUS,
+        PermissionMode.BYPASS,
+    )
+    bypass_command = policy.evaluate(
+        ToolCall(name="run_command", arguments={"argv": ["python", "-V"]}),
+        policy_config,
+        PermissionMode.BYPASS,
     )
     def dependency_factory(run: Run) -> LoopDependencies:
         return LoopDependencies(
@@ -240,6 +246,7 @@ def run_core_feedback_demo(workspace: Path) -> CoreFeedbackDemoResult:
             any("feedback.test_failure" in context.model_dump_json() for context in provider.contexts)
         ),
         guardrail_blocked=guardrail.effect is PolicyEffect.DENY,
+        bypass_command_allowed=bypass_command.effect is PolicyEffect.ALLOW,
         memory_retrieved=bool(provider.contexts[0].metadata.get("memory_ids")),
         changed_file_text=target.read_text(encoding="utf-8"),
     )
