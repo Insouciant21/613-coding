@@ -40,6 +40,17 @@ def test_configuration_service_updates_mode_and_parses_booleans(tmp_path: Path) 
     assert load_config(tmp_path).allow_network is True
 
 
+def test_configuration_service_persists_bypass_mode(tmp_path: Path) -> None:
+    service = ConfigurationService(tmp_path)
+
+    updated = service.set_value("mode", "bypass")
+
+    assert updated.permission_mode is PermissionMode.BYPASS
+    assert 'mode = "bypass"' in (tmp_path / "harness.toml").read_text(
+        encoding="utf-8"
+    )
+
+
 def test_configuration_service_rejects_invalid_value_without_writing(tmp_path: Path) -> None:
     path = tmp_path / "harness.toml"
     path.write_text('[policy]\nmode = "balanced"\n', encoding="utf-8")

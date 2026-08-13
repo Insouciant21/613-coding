@@ -69,6 +69,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-format", choices=[item.value for item in OutputFormat], default=OutputFormat.TEXT.value)
     parser.add_argument("--model")
     parser.add_argument("--permission-mode", choices=[item.value for item in PermissionMode])
+    parser.add_argument(
+        "--dangerously-skip-permissions",
+        action="store_true",
+        help="Skip approval prompts; deterministic denials and sandbox limits remain active",
+    )
     parser.add_argument("--allowed-tools", "--allowedTools", action="append", default=[])
     parser.add_argument("--disallowed-tools", "--disallowedTools", action="append", default=[])
     parser.add_argument("--max-turns", type=int)
@@ -100,6 +105,19 @@ def parse_root_args(argv: Sequence[str]) -> RootLaunchRequest:
     namespace = parser.parse_args(list(argv))
     if namespace.continue_latest and namespace.resume is not None:
         parser.error("--continue and --resume cannot be selected together")
+    if (
+        namespace.dangerously_skip_permissions
+        and namespace.permission_mode not in {None, PermissionMode.BYPASS.value}
+    ):
+        parser.error(
+            "--dangerously-skip-permissions conflicts with a non-bypass "
+            "--permission-mode"
+        )
+    permission_mode_value = (
+        PermissionMode.BYPASS.value
+        if namespace.dangerously_skip_permissions
+        else namespace.permission_mode
+    )
     if namespace.resume is not None and namespace.resume != "latest":
         try:
             UUID(namespace.resume)
@@ -150,8 +168,8 @@ def parse_root_args(argv: Sequence[str]) -> RootLaunchRequest:
         output_format=OutputFormat(namespace.output_format),
         model=namespace.model,
         permission_mode=(
-            PermissionMode(namespace.permission_mode)
-            if namespace.permission_mode is not None
+            PermissionMode(permission_mode_value)
+            if permission_mode_value is not None
             else None
         ),
         options=options,
@@ -257,6 +275,7 @@ def run_print(
                     type=terminal_type,
                     data={
                         "status": summary.status.value,
+                        "permission_mode": run.permission_mode.value,
                         "stop_reason": summary.stop_reason.value
                         if summary.stop_reason
                         else None,
@@ -268,6 +287,7 @@ def run_print(
                 summary,
                 session_id,
                 assistant_text_from_events(events),
+                permission_mode=run.permission_mode,
                 diagnostics=diagnostic_report,
             )
             events_by_run.append((envelope, events))

@@ -490,6 +490,15 @@ def test_run_and_events_round_trip_in_append_order(tmp_path: Path) -> None:
     assert store.list_for_run(run.id) == [second, first]
 
 
+def test_run_bypass_mode_survives_sqlite_round_trip(tmp_path: Path) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+    run = Run(task="unattended command", permission_mode=PermissionMode.BYPASS)
+
+    store.create_run(run)
+
+    assert store.get_run(run.id) == run
+
+
 def test_store_redacts_payload_even_for_direct_event_construction(tmp_path: Path) -> None:
     store = SqliteEventStore(tmp_path / "state.db")
     run = Run(task="inspect config")

@@ -10,7 +10,14 @@ from uuid import UUID, uuid4
 from pydantic import ConfigDict, Field, field_validator
 
 from .conversation import DiagnosticReport
-from .models import FeedbackKind, ResourceUsage, RunState, RunSummary, StopReason
+from .models import (
+    FeedbackKind,
+    PermissionMode,
+    ResourceUsage,
+    RunState,
+    RunSummary,
+    StopReason,
+)
 from .models_base import DomainModel
 
 
@@ -61,6 +68,7 @@ class RunEnvelope(DomainModel):
     session_id: UUID
     run_id: UUID
     status: RunState
+    permission_mode: PermissionMode = PermissionMode.BALANCED
     stop_reason: StopReason | None = None
     assistant_text: str = ""
     changed_files: tuple[str, ...] = ()
@@ -76,12 +84,14 @@ class RunEnvelope(DomainModel):
         summary: RunSummary,
         session_id: UUID,
         assistant_text: str,
+        permission_mode: PermissionMode = PermissionMode.BALANCED,
         diagnostics: DiagnosticReport | None = None,
     ) -> RunEnvelope:
         return cls(
             session_id=session_id,
             run_id=summary.run_id,
             status=summary.status,
+            permission_mode=permission_mode,
             stop_reason=summary.stop_reason,
             assistant_text=assistant_text,
             changed_files=summary.changed_files,

@@ -20,7 +20,12 @@ from coding613.domain.models import (
 
 
 def test_enums_expose_governance_and_feedback_values() -> None:
-    assert {mode.value for mode in PermissionMode} == {"strict", "balanced", "autonomous"}
+    assert {mode.value for mode in PermissionMode} == {
+        "strict",
+        "balanced",
+        "autonomous",
+        "bypass",
+    }
     assert {state.value for state in RunState} == {
         "running",
         "waiting_model",

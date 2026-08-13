@@ -13,7 +13,14 @@ from coding613.domain.conversation import (
     RunOptions,
 )
 from coding613.domain.interactive import InteractiveSession
-from coding613.domain.models import Project, Run, RunState, RunSummary, StopReason
+from coding613.domain.models import (
+    PermissionMode,
+    Project,
+    Run,
+    RunState,
+    RunSummary,
+    StopReason,
+)
 
 
 class RecordingConversation:
@@ -29,6 +36,7 @@ class RecordingConversation:
             session_id=request.session_id or self.session.id,
             task=request.text,
             options=request.options,
+            permission_mode=request.permission_mode or PermissionMode.BALANCED,
         )
 
     def execute(self, run_id, sink, cancellation):
@@ -103,6 +111,28 @@ def test_stream_output_contains_session_and_user_lifecycle_events(tmp_path: Path
     assert events[-1]["type"] == "run.completed"
     assert [event["sequence"] for event in events] == list(range(1, len(events) + 1))
     assert "secret-value" not in output.getvalue()
+
+
+def test_stream_terminal_event_reports_dangerous_alias_mode(tmp_path: Path) -> None:
+    services = Services(tmp_path)
+    request = parse_root_args(
+        [
+            "-p",
+            "--repo",
+            str(tmp_path),
+            "--dangerously-skip-permissions",
+            "--output-format",
+            "stream-json",
+            "inspect",
+        ]
+    )
+
+    output = StringIO()
+    assert run_print(request, services_factory=lambda _: services, stdout=output) == 0
+
+    terminal = json.loads(output.getvalue().splitlines()[-1])
+    assert terminal["type"] == "run.completed"
+    assert terminal["data"]["permission_mode"] == "bypass"
 
 
 def test_verbose_stream_output_wraps_diagnostics_as_versioned_event(tmp_path: Path) -> None:

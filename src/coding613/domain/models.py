@@ -33,6 +33,7 @@ class PermissionMode(StrEnum):
     STRICT = "strict"
     BALANCED = "balanced"
     AUTONOMOUS = "autonomous"
+    BYPASS = "bypass"
 
 
 class FeedbackKind(StrEnum):

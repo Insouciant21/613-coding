@@ -44,6 +44,14 @@ def test_default_mode_is_safe_for_interactive_runs(tmp_path: Path) -> None:
     assert user.providers == {}
 
 
+def test_load_config_accepts_bypass_mode(tmp_path: Path) -> None:
+    (tmp_path / "harness.toml").write_text(
+        '[policy]\nmode = "bypass"\n', encoding="utf-8"
+    )
+
+    assert load_config(tmp_path).permission_mode is PermissionMode.BYPASS
+
+
 def test_default_provider_context_window_is_256k_and_reasoning_is_provider_defined(
     tmp_path: Path,
 ) -> None:

@@ -81,6 +81,32 @@ def test_root_parser_rejects_conflicting_session_selectors(tmp_path: Path) -> No
         parse_root_args(["--repo", str(tmp_path), "--continue", "--resume", "latest"])
 
 
+def test_root_parser_accepts_bypass_and_dangerous_alias(tmp_path: Path) -> None:
+    canonical = parse_root_args(
+        ["--repo", str(tmp_path), "--permission-mode", "bypass", "inspect"]
+    )
+    alias = parse_root_args(
+        ["--repo", str(tmp_path), "--dangerously-skip-permissions", "inspect"]
+    )
+
+    assert canonical.permission_mode is PermissionMode.BYPASS
+    assert alias.permission_mode is PermissionMode.BYPASS
+
+
+def test_root_parser_rejects_conflicting_dangerous_mode(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit):
+        parse_root_args(
+            [
+                "--repo",
+                str(tmp_path),
+                "--permission-mode",
+                "strict",
+                "--dangerously-skip-permissions",
+                "inspect",
+            ]
+        )
+
+
 def test_root_parser_rejects_invalid_resume_before_service_creation(tmp_path: Path) -> None:
     with pytest.raises(SystemExit):
         parse_root_args(["--repo", str(tmp_path), "--resume", "not-a-session", "inspect"])

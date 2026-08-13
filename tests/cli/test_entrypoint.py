@@ -6,6 +6,7 @@ import pytest
 
 from coding613.cli import entrypoint
 from coding613.cli.tui import TuiLaunchRequest, parse_tui_args
+from coding613.domain.models import PermissionMode
 
 
 @pytest.mark.parametrize(
@@ -28,6 +29,20 @@ def test_dispatch_leaves_permission_mode_unspecified_for_repository_config(
     assert entrypoint.dispatch(["--repo", str(tmp_path)]) == 0
 
     assert launched[0].permission_mode is None
+
+
+def test_dispatch_forwards_dangerous_alias_to_tui(monkeypatch, tmp_path: Path) -> None:
+    launched: list[TuiLaunchRequest] = []
+    monkeypatch.setattr(entrypoint, "launch_tui", launched.append)
+
+    assert (
+        entrypoint.dispatch(
+            ["--repo", str(tmp_path), "--dangerously-skip-permissions", "inspect"]
+        )
+        == 0
+    )
+
+    assert launched[0].permission_mode is PermissionMode.BYPASS
 
 
 @pytest.mark.parametrize(

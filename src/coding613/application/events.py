@@ -126,7 +126,8 @@ class TextOutputSerializer:
             lines.append(envelope.assistant_text)
         lines.append(
             f"status={envelope.status.value} "
-            f"stop_reason={envelope.stop_reason.value if envelope.stop_reason else 'none'}"
+            f"stop_reason={envelope.stop_reason.value if envelope.stop_reason else 'none'} "
+            f"permission_mode={envelope.permission_mode.value}"
         )
         if verbose:
             if envelope.changed_files:

@@ -4,8 +4,18 @@ import json
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from coding613.application.events import StreamJsonSerializer, TextOutputSerializer
-from coding613.domain.models import FeedbackKind, ResourceUsage, RunState, StopReason
+from coding613.application.events import (
+    JsonOutputSerializer,
+    StreamJsonSerializer,
+    TextOutputSerializer,
+)
+from coding613.domain.models import (
+    FeedbackKind,
+    PermissionMode,
+    ResourceUsage,
+    RunState,
+    StopReason,
+)
 from coding613.domain.session_events import EventType, RunEnvelope, SessionEvent
 
 
@@ -47,3 +57,17 @@ def test_verbose_text_includes_validation_feedback_approvals_and_usage() -> None
     assert "completion_blockers=test_failure" in rendered
     assert "approvals=1" in rendered
     assert "model_calls" in rendered
+
+
+def test_run_serializers_report_bypass_mode() -> None:
+    envelope = RunEnvelope(
+        session_id=uuid4(),
+        run_id=uuid4(),
+        status=RunState.COMPLETED,
+        stop_reason=StopReason.SUCCESS,
+        permission_mode=PermissionMode.BYPASS,
+        resource_usage=ResourceUsage(),
+    )
+
+    assert '"permission_mode":"bypass"' in JsonOutputSerializer().render(envelope)
+    assert "permission_mode=bypass" in TextOutputSerializer().render(envelope)
