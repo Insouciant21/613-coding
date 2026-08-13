@@ -1026,6 +1026,54 @@ def test_strict_approval_pauses_then_resumes_exact_action(tmp_path: Path) -> Non
     assert len(executor.calls) == 1
 
 
+def test_bypass_executes_undeclared_command_without_approval(tmp_path: Path) -> None:
+    provider = Provider(
+        (
+            response(
+                ToolCall(
+                    name="run_command", arguments={"argv": ["python", "-V"]}
+                )
+            ),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, records, executor, _ = dependencies(
+        tmp_path,
+        provider,
+        Validator(()),
+        mode=PermissionMode.BYPASS,
+    )
+    deps.tools.register(
+        ToolDefinition(
+            name="run_command",
+            description="Run one argv command",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "argv": {"type": "array", "items": {"type": "string"}}
+                },
+                "required": ["argv"],
+                "additionalProperties": False,
+            },
+        ),
+        executor,
+    )
+    run_id = uuid4()
+
+    summary = AgentLoop().run(run_id, "run local command", deps)
+
+    assert summary.status is RunState.COMPLETED
+    assert summary.approvals == ()
+    assert [call.name for call in executor.calls] == ["run_command"]
+    assert records.approval_requests == {}
+    assert any(
+        record.policy_decision is not None
+        and record.policy_decision.rule_id == "mode.bypass.command"
+        and record.policy_decision.effect == "allow"
+        for record in records.iterations
+    )
+
+
 def test_policy_denial_is_feedback_and_budget_stops_loop(tmp_path: Path) -> None:
     denied = response(
         ToolCall(name="edit_file", arguments={"path": "../escape", "content": "x"})
@@ -1514,6 +1562,55 @@ def test_sqlite_reconstruction_rejects_pending_action(tmp_path: Path) -> None:
 
     assert rejected.status is RunState.FAILED
     assert rejected.stop_reason is StopReason.APPROVAL_REJECTED
+
+
+def test_pending_strict_approval_is_not_retroactively_bypassed(
+    tmp_path: Path,
+) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+
+    def make_service(responses: Sequence[Any]) -> RunService:
+        def factory(run: Run) -> LoopDependencies:
+            deps, _, _, _ = dependencies(
+                tmp_path,
+                Provider(responses),
+                Validator(()),
+                mode=run.permission_mode,
+            )
+            return replace(
+                deps,
+                approvals=ApprovalService(run_id=run.id, store=store),
+                events=store,
+                iterations=store,
+                sessions=store,
+            )
+
+        return RunService(store, AgentLoop(), factory)
+
+    first = make_service(
+        (
+            response(
+                ToolCall(
+                    name="edit_file", arguments={"path": "a.py", "content": "x"}
+                )
+            ),
+        )
+    )
+    run = first.create_run(
+        RunRequest(task="strict pending", permission_mode=PermissionMode.STRICT)
+    )
+    request_id = first.resume(run.id).approvals[-1]
+
+    second = make_service(())
+    second.create_run(
+        RunRequest(task="new bypass run", permission_mode=PermissionMode.BYPASS)
+    )
+    resumed = second.resume(run.id)
+
+    assert store.get_run(run.id).permission_mode is PermissionMode.STRICT  # type: ignore[union-attr]
+    assert resumed.status is RunState.WAITING_APPROVAL
+    assert resumed.approvals == (request_id,)
+    assert store.get_approval(request_id).status is ApprovalStatus.PENDING  # type: ignore[union-attr]
 
 
 def test_reconstructed_approval_rechecks_current_hard_and_repository_policy(

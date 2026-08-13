@@ -72,6 +72,43 @@ def test_declared_validation_is_allowed_except_in_strict_mode(
 @pytest.mark.parametrize(
     "call",
     [
+        ToolCall(name="run_command", arguments={"argv": ["python", "-V"]}),
+        ToolCall(
+            name="run_shell",
+            arguments={
+                "commands": [
+                    {"argv": ["python", "-V"]},
+                    {"argv": ["git", "status"]},
+                ]
+            },
+        ),
+        ToolCall(
+            name="network_request", arguments={"url": "https://example.invalid"}
+        ),
+        ToolCall(name="install_dependency", arguments={"name": "example"}),
+        ToolCall(name="git_commit", arguments={"message": "checkpoint"}),
+    ],
+)
+def test_bypass_allows_every_soft_approval(
+    call: ToolCall, config: RepositoryPolicyConfig
+) -> None:
+    restricted = config.model_copy(
+        update={
+            "allow_network": False,
+            "allow_dependency_install": False,
+            "allow_git_writes": False,
+        }
+    )
+
+    decision = PolicyEngine().evaluate(call, restricted, PermissionMode.BYPASS)
+
+    assert decision.effect is PolicyEffect.ALLOW
+    assert decision.rule_id.startswith("mode.bypass.")
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
         ToolCall(name="read_file", arguments={"path": "../secret"}),
         ToolCall(name="read_file", arguments={"path": "/etc/passwd"}),
         ToolCall(name="read_file", arguments={"path": "/var/run/docker.sock"}),
@@ -83,7 +120,7 @@ def test_declared_validation_is_allowed_except_in_strict_mode(
 def test_hard_denials_cannot_be_bypassed(
     config: RepositoryPolicyConfig, call: ToolCall
 ) -> None:
-    decision = PolicyEngine().evaluate(call, config, PermissionMode.AUTONOMOUS)
+    decision = PolicyEngine().evaluate(call, config, PermissionMode.BYPASS)
     assert decision.effect is PolicyEffect.DENY
     assert decision.rule_id.startswith("hard.")
 
@@ -188,6 +225,33 @@ def test_project_deny_rule_is_applied_after_hard_checks(
         PermissionMode.AUTONOMOUS,
     )
 
+    assert decision.effect is PolicyEffect.DENY
+    assert decision.rule_id == "config.permission_rule_denied"
+
+
+def test_bypass_preserves_repository_denials(config: RepositoryPolicyConfig) -> None:
+    write = ToolCall(
+        name="edit_file", arguments={"path": "a.py", "content": "x"}
+    )
+    no_writes = config.model_copy(update={"allow_writes": False})
+    assert (
+        PolicyEngine().evaluate(write, no_writes, PermissionMode.BYPASS).effect
+        is PolicyEffect.DENY
+    )
+
+    command = ToolCall(
+        name="run_command", arguments={"argv": ["python", "-V"]}
+    )
+    denied = config.model_copy(
+        update={
+            "permission_rules": (
+                PermissionRule(
+                    scope="tool", pattern="run_command", effect="deny"
+                ),
+            )
+        }
+    )
+    decision = PolicyEngine().evaluate(command, denied, PermissionMode.BYPASS)
     assert decision.effect is PolicyEffect.DENY
     assert decision.rule_id == "config.permission_rule_denied"
 

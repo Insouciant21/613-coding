@@ -40,7 +40,7 @@ def test_default_policy_denies_network_and_records_hard_defaults(tmp_path: Path)
 
 def test_allowlisted_network_requires_exact_approved_entries(tmp_path: Path) -> None:
     spec = _spec(tmp_path, network_policy=NetworkPolicy.ALLOWLIST)
-    denied = SandboxPolicy().validate(spec, PermissionMode.AUTONOMOUS, SandboxPolicyConfig())
+    denied = SandboxPolicy().validate(spec, PermissionMode.BYPASS, SandboxPolicyConfig())
     approved = SandboxPolicy().validate(
         spec,
         PermissionMode.AUTONOMOUS,
@@ -53,12 +53,13 @@ def test_allowlisted_network_requires_exact_approved_entries(tmp_path: Path) -> 
     assert approved.approved_networks == ("pypi.org",)
 
 
+@pytest.mark.parametrize("mode", [PermissionMode.AUTONOMOUS, PermissionMode.BYPASS])
 @pytest.mark.parametrize(
     "field, value",
     [("run_as_user", 0), ("capabilities", ("SYS_ADMIN",)), ("read_only_root", False)],
 )
-def test_autonomous_mode_cannot_override_hard_worker_constraints(
-    tmp_path: Path, field: str, value: object
+def test_permission_mode_cannot_override_hard_worker_constraints(
+    tmp_path: Path, mode: PermissionMode, field: str, value: object
 ) -> None:
     spec = SandboxSpec.model_construct(
         image_digest="sha256:" + "a" * 64,
@@ -70,7 +71,7 @@ def test_autonomous_mode_cannot_override_hard_worker_constraints(
     )
     object.__setattr__(spec, field, value)
 
-    decision = SandboxPolicy().validate(spec, PermissionMode.AUTONOMOUS, SandboxPolicyConfig())
+    decision = SandboxPolicy().validate(spec, mode, SandboxPolicyConfig())
 
     assert decision.allowed is False
     assert decision.rule_id.startswith("hard.")
@@ -93,7 +94,7 @@ def test_policy_rejects_unpinned_image_and_over_budget_resources(tmp_path: Path)
     assert SandboxPolicy().validate(unpinned, PermissionMode.BALANCED, SandboxPolicyConfig()).rule_id == "hard.image_digest"
     assert SandboxPolicy().validate(
         over_budget,
-        PermissionMode.AUTONOMOUS,
+        PermissionMode.BYPASS,
         SandboxPolicyConfig(max_limits=ResourceLimits(memory_bytes=512)),
     ).rule_id == "hard.resource_limit"
 
@@ -101,7 +102,7 @@ def test_policy_rejects_unpinned_image_and_over_budget_resources(tmp_path: Path)
 def test_policy_rejects_credential_environment_names(tmp_path: Path) -> None:
     spec = _spec(tmp_path, environment_allowlist=("AWS_SECRET_ACCESS_KEY",))
 
-    decision = SandboxPolicy().validate(spec, PermissionMode.AUTONOMOUS, SandboxPolicyConfig())
+    decision = SandboxPolicy().validate(spec, PermissionMode.BYPASS, SandboxPolicyConfig())
 
     assert decision.allowed is False
     assert decision.rule_id == "hard.credential_environment"

@@ -39,6 +39,24 @@ def test_allowlist_denies_unlisted_safe_tool() -> None:
     assert filtered.rule_id == "invocation.tool_not_allowed"
 
 
+def test_bypass_cannot_override_invocation_disallow(tmp_path: Path) -> None:
+    call = ToolCall(
+        name="run_command", arguments={"argv": ["python", "-V"]}
+    )
+    allowed = PolicyEngine().evaluate(
+        call,
+        RepositoryPolicyConfig(repository_root=tmp_path),
+        PermissionMode.BYPASS,
+    )
+
+    filtered = ToolFilter(disallowed=frozenset({"run_command"})).apply(
+        call, allowed
+    )
+
+    assert filtered.effect is PolicyEffect.DENY
+    assert filtered.rule_id == "invocation.tool_disallowed"
+
+
 @pytest.mark.parametrize("pattern", ["/etc/passwd", "../secret", "src;rm -rf *", ".ssh/id_rsa"])
 def test_path_permission_rule_rejects_escape_shell_and_credentials(pattern: str) -> None:
     with pytest.raises(ValueError):

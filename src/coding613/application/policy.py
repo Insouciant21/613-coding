@@ -95,12 +95,20 @@ class PolicyEngine:
                 call,
             )
         if rule is not None and rule.effect == "allow" and decision.effect is PolicyEffect.ASK:
-            return self._decision(
+            decision = self._decision(
                 PolicyEffect.ALLOW,
                 "config.permission_rule_allowed",
                 "project permission rule allowed action",
                 call,
             )
+        return self._apply_permission_mode(decision, mode)
+
+    @staticmethod
+    def _apply_permission_mode(
+        decision: PolicyDecision, mode: PermissionMode
+    ) -> PolicyDecision:
+        if mode is PermissionMode.BYPASS and decision.effect is PolicyEffect.ASK:
+            return decision.model_copy(update={"effect": PolicyEffect.ALLOW})
         return decision
 
     def _repository_decision(
