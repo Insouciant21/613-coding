@@ -2506,3 +2506,16 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Delivery source records were committed as `c946b30` (`docs: record bypass permission delivery`).
 - Handoff remains pending the user's branch-integration selection; no merge, push, PR, deployment,
   or remote CI action was performed.
+
+## 2026-08-14 12:31:06 Asia/Shanghai - Dangerous bypass final branch gate
+
+- Triggered skills: `verification-before-completion` and `finishing-a-development-branch`.
+- The first restricted-sandbox full-suite run stopped progressing after 63 test points at the
+  previously diagnosed LanceDB event-loop boundary and was interrupted without an assertion
+  failure. The identical offline command was rerun outside that restriction after approval.
+- Current branch gate at `04d2d49`: `UV_CACHE_DIR=/tmp/coding613-uv-cache uv run pytest tests -q`
+  -> 655 passed in 12.46s; Ruff passed; mypy reported no issues in 110 source files; `uv lock
+  --check`, documentation tests (7 passed), CLI help, `git diff --check`, and clean-status checks
+  passed.
+- Environment detection confirmed a named linked worktree, branch `feat/dangerous-bypass`, and
+  base `main@e7206d6`. Integration remains a user decision; no remote action was performed.
