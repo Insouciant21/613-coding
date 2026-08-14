@@ -100,11 +100,27 @@ class TuiController:
         self._cancellation = CancellationToken()
         self._session_id: UUID | None = None
         self._snapshot: InteractiveSnapshot | None = None
+        self._progress_stream_run_id: UUID | None = None
+        self._event_stream_run_id: UUID | None = None
+        self._progress_stream_terminal = False
+        self._event_stream_terminal = False
+        self._stream_generation = 0
         self._execution_lock = asyncio.Lock()
         self._pause_lock = asyncio.Lock()
         self._pause_requested_for: UUID | None = None
         self.active_run_id: UUID | None = None
         self.last_summary: RunSummary | None = None
+
+    @property
+    def session_id(self) -> UUID | None:
+        """Return the session whose transcript and live streams are visible."""
+
+        return self._session_id
+
+    def accepts_progress(self, run_id: UUID) -> bool:
+        """Return whether a progress update belongs to the currently visible run."""
+
+        return self._progress_stream_run_id == run_id
 
     async def submit(
         self,
@@ -116,22 +132,27 @@ class TuiController:
             if self._session_id is None:
                 session = await asyncio.to_thread(self._interactive.create)
                 self._session_id = session.id
+            self._reset_streams()
+            session_id = self._session_id
+            generation = self._stream_generation
             if options is None or options == RunOptions():
                 run = await asyncio.to_thread(
                     self._interactive.submit,
-                    self._session_id,
+                    session_id,
                     message,
                     permission_mode,
                 )
             else:
                 run = await asyncio.to_thread(
                     self._interactive.submit,
-                    self._session_id,
+                    session_id,
                     message,
                     permission_mode,
                     options,
                 )
             self.active_run_id = run.id
+            self._progress_stream_run_id = run.id
+            self._event_stream_run_id = run.id
             self._pause_requested_for = None
             self._cancellation.reset()
             event_sink = self._progress_bridge(run.id)
@@ -141,13 +162,17 @@ class TuiController:
                 event_sink,
                 self._cancellation,
             )
+            if generation != self._stream_generation or self._session_id != session_id:
+                return await self.snapshot()
             self.last_summary = summary
             if summary.status.is_terminal:
+                self._progress_stream_terminal = True
+                self._event_stream_terminal = True
                 self.active_run_id = None
-            self._snapshot = await asyncio.to_thread(
-                self._interactive.resume_session, self._session_id
+            snapshot = await asyncio.to_thread(
+                self._interactive.resume_session, session_id
             )
-            return self._snapshot
+            return self._set_snapshot(snapshot)
 
     async def pause(self) -> RunSummary | None:
         async with self._pause_lock:
@@ -186,19 +211,23 @@ class TuiController:
             if selected is None:
                 raise KeyError(f"unknown interactive session: {selector}")
             session = selected
+        self._reset_streams()
         self._session_id = session.id
-        self._snapshot = await asyncio.to_thread(
+        snapshot = await asyncio.to_thread(
             self._interactive.resume_session, session.id
         )
+        self._set_snapshot(snapshot)
         self.active_run_id = (
-            self._snapshot.active_run.id if self._snapshot.active_run is not None else None
+            snapshot.active_run.id if snapshot.active_run is not None else None
         )
+        self._progress_stream_run_id = self.active_run_id
+        self._event_stream_run_id = self.active_run_id
         self.last_summary = None
-        if self._snapshot.active_run is not None:
+        if snapshot.active_run is not None:
             self.last_summary = await asyncio.to_thread(
-                self._runs.get_summary, self._snapshot.active_run.id
+                self._runs.get_summary, snapshot.active_run.id
             )
-            if self._snapshot.active_run.state in {
+            if snapshot.active_run.state in {
                 RunState.PAUSED,
                 RunState.RUNNING,
                 RunState.WAITING_MODEL,
@@ -206,29 +235,38 @@ class TuiController:
                 continued = await self._continue_active()
                 assert continued is not None
                 return continued
-        return self._snapshot
+        if snapshot.active_run is None:
+            self._progress_stream_run_id = None
+            self._event_stream_run_id = None
+        return snapshot
 
     async def list_sessions(self) -> list[InteractiveSession]:
         return await asyncio.to_thread(self._interactive.list_sessions)
+
+    async def session_snapshot(self, session_id: UUID) -> InteractiveSnapshot:
+        """Read one session for menu metadata without changing the selection."""
+
+        return await asyncio.to_thread(self._interactive.resume_session, session_id)
 
     async def snapshot(self) -> InteractiveSnapshot:
         if self._session_id is None:
             session = await asyncio.to_thread(self._interactive.create)
             self._session_id = session.id
-        self._snapshot = await asyncio.to_thread(
+        snapshot = await asyncio.to_thread(
             self._interactive.resume_session, self._session_id
         )
-        return self._snapshot
+        return self._set_snapshot(snapshot)
 
     async def clear(self) -> InteractiveSnapshot:
+        self._reset_streams()
         session = await asyncio.to_thread(self._interactive.create)
         self._session_id = session.id
         self.active_run_id = None
         self.last_summary = None
-        self._snapshot = await asyncio.to_thread(
+        snapshot = await asyncio.to_thread(
             self._interactive.resume_session, session.id
         )
-        return self._snapshot
+        return self._set_snapshot(snapshot)
 
     async def context_report(self) -> ContextSummary:
         if self._context is None:
@@ -255,16 +293,30 @@ class TuiController:
         updates: list[RunProgress] = []
         while True:
             try:
-                updates.append(self._queue.get_nowait())
+                update = self._queue.get_nowait()
+                if self.accepts_progress(update.run_id):
+                    updates.append(update)
             except Empty:
+                if self._progress_stream_terminal:
+                    self._progress_stream_run_id = None
+                    self._progress_stream_terminal = False
                 return tuple(updates)
 
     def drain_events(self) -> tuple[SessionEvent, ...]:
         events: list[SessionEvent] = []
         while True:
             try:
-                events.append(self._event_queue.get_nowait())
+                event = self._event_queue.get_nowait()
+                if (
+                    self._session_id is not None
+                    and event.session_id == self._session_id
+                    and event.run_id == self._event_stream_run_id
+                ):
+                    events.append(event)
             except Empty:
+                if self._event_stream_terminal:
+                    self._event_stream_run_id = None
+                    self._event_stream_terminal = False
                 return tuple(events)
 
     async def _continue_active(self) -> InteractiveSnapshot | None:
@@ -272,6 +324,8 @@ class TuiController:
             return self._snapshot
         self._pause_requested_for = None
         self._cancellation.reset()
+        session_id = self._session_id
+        generation = self._stream_generation
         event_sink = self._progress_bridge(self.active_run_id)
         summary = await asyncio.to_thread(
             self._interactive.execute,
@@ -279,13 +333,17 @@ class TuiController:
             event_sink,
             self._cancellation,
         )
+        if generation != self._stream_generation or self._session_id != session_id:
+            return await self.snapshot()
         self.last_summary = summary
         if summary.status.is_terminal:
+            self._progress_stream_terminal = True
+            self._event_stream_terminal = True
             self.active_run_id = None
-        self._snapshot = await asyncio.to_thread(
-            self._interactive.resume_session, self._session_id
+        snapshot = await asyncio.to_thread(
+            self._interactive.resume_session, session_id
         )
-        return self._snapshot
+        return self._set_snapshot(snapshot)
 
     async def _ensure_session(self) -> UUID:
         if self._session_id is None:
@@ -303,3 +361,24 @@ class TuiController:
             self._event_sink,
             progress=self._sink,
         )
+
+    def _set_snapshot(self, snapshot: InteractiveSnapshot) -> InteractiveSnapshot:
+        self._snapshot = snapshot
+        return snapshot
+
+    def _reset_streams(self) -> None:
+        """Detach producers for the previous session from the visible queues."""
+
+        self._cancellation.cancel()
+        self._cancellation = CancellationToken()
+        self._stream_generation += 1
+        self.active_run_id = None
+        self._pause_requested_for = None
+        self._queue = SimpleQueue()
+        self._sink = QueueProgressSink(self._queue)
+        self._event_queue = SimpleQueue()
+        self._event_sink = SequencedEventSink(QueueEventSink(self._event_queue))
+        self._progress_stream_run_id = None
+        self._event_stream_run_id = None
+        self._progress_stream_terminal = False
+        self._event_stream_terminal = False

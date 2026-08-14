@@ -1258,6 +1258,77 @@ async def test_tui_config_without_arguments_opens_selectable_menu() -> None:
 
 
 @pytest.mark.asyncio
+async def test_tui_resume_without_selector_opens_session_menu() -> None:
+    fake = FakeUiServices()
+    run = fake.submit(fake.session.id, "repair parser")
+    fake.runs[-1] = run.model_copy(
+        update={
+            "state": RunState.COMPLETED,
+            "stop_reason": StopReason.SUCCESS,
+            "updated_at": datetime.now(UTC),
+        }
+    )
+    app = CodingApp(controller=_controller(fake))
+    async with app.run_test(size=(100, 30)) as pilot:
+        await app._handle_command("/resume")
+        await pilot.pause()
+
+        menu = app.query_one(ConfigMenu)
+        labels = [str(option.prompt) for option in menu.options]
+        assert any("Resume" in label for label in labels)
+        assert any("repair parser" in label and "completed" in label for label in labels)
+        assert any("New conversation" in label for label in labels)
+
+
+@pytest.mark.asyncio
+async def test_tui_clear_opens_session_action_menu() -> None:
+    fake = FakeUiServices()
+    app = CodingApp(controller=_controller(fake))
+    async with app.run_test(size=(100, 30)) as pilot:
+        await app._handle_command("/clear")
+        await pilot.pause()
+
+        menu = app.query_one(ConfigMenu)
+        labels = [str(option.prompt) for option in menu.options]
+        assert labels == [
+            "Start a new conversation",
+            "Switch conversation",
+            "Cancel",
+        ]
+
+
+@pytest.mark.asyncio
+async def test_tui_switch_snapshot_clears_previous_transcript_and_caches() -> None:
+    app = CodingApp()
+    first_run = Run(project_id=uuid4(), task="first prompt")
+    second_run = first_run.model_copy(update={"id": uuid4(), "task": "second prompt"})
+    first_session = InteractiveSession(project_id=first_run.project_id, title="first")
+    second_session = InteractiveSession(project_id=first_run.project_id, title="second")
+
+    async with app.run_test(size=(100, 30)):
+        await app._render_snapshot(
+            InteractiveSnapshot(
+                session=first_session,
+                runs=(first_run,),
+                transcript=(TranscriptEntry(role="user", text="first prompt", run_id=first_run.id),),
+            ),
+            clear=True,
+        )
+        await app._render_snapshot(
+            InteractiveSnapshot(
+                session=second_session,
+                runs=(second_run,),
+                transcript=(TranscriptEntry(role="user", text="second prompt", run_id=second_run.id),),
+            ),
+            clear=True,
+        )
+
+        rendered = "\n".join(str(widget.renderable) for widget in app.query(Static))
+        assert "second prompt" in rendered
+        assert "first prompt" not in rendered
+
+
+@pytest.mark.asyncio
 async def test_tui_permissions_slash_commands_use_application_rule_service() -> None:
     fake = FakeUiServices()
     rules = FakePermissionRules()

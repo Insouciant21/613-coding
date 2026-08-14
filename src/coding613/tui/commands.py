@@ -85,7 +85,7 @@ def _provider_arguments(arguments: tuple[str, ...]) -> tuple[str, ...]:
 
 def _resume_arguments(arguments: tuple[str, ...]) -> tuple[str, ...]:
     if not arguments:
-        return ("latest",)
+        return ()
     if len(arguments) != 1:
         raise ValueError("/resume expects latest or one session UUID")
     if arguments[0] != "latest":

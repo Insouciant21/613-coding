@@ -19,6 +19,7 @@ from coding613.config import LLMConfig
 from coding613.domain.actions import ToolCall
 from coding613.domain.conversation import RunOptions
 from coding613.domain.models import PermissionMode, RunState
+from coding613.domain.redaction import redact_text
 from coding613.ports.progress import ProgressKind, RunProgress
 from coding613.ports.tools import ToolResult
 
@@ -395,11 +396,12 @@ class CodingApp(App[None]):
             lines = [f"{run.id}  {run.state.value}  {run.task}" for run in snapshot.runs]
             await log.mount(Static("\n".join(lines) or "No runs"))
         elif command.name == "resume":
-            snapshot = await self.controller.resume(command.arguments[0])
-            await self._render_snapshot(snapshot, clear=True)
+            if command.arguments:
+                await self._switch_session(command.arguments[0])
+            else:
+                await self._show_session_menu()
         elif command.name == "clear":
-            snapshot = await self.controller.clear()
-            await self._render_snapshot(snapshot, clear=True)
+            await self._show_clear_session_menu()
         elif command.name == "status":
             summary = self.controller.last_summary
             status = summary.status.value if summary is not None else "idle"
@@ -660,6 +662,107 @@ class CodingApp(App[None]):
         menu.focus()
         self.query_one(StatusFooter).update("Config menu · ↑/↓ select · Enter apply · Esc close")
 
+    async def _show_session_menu(self) -> None:
+        """Show persisted sessions without changing the selected transcript."""
+
+        if self.controller is None:
+            return
+        log = self.query_one(ConversationLog)
+        for menu in list(log.query(ConfigMenu)):
+            await menu.remove()
+        sessions = await self.controller.list_sessions()
+        current = self._current_session_id or self.controller.session_id
+        options: list[tuple[str, str]] = []
+        for session in sessions:
+            marker = "* " if session.id == current else "  "
+            title = redact_text(session.title or "Untitled session").replace("\n", " ")[:64]
+            updated = session.updated_at.astimezone().strftime("%Y-%m-%d %H:%M")
+            latest = await self.controller.session_snapshot(session.id)
+            latest_run = latest.runs[-1] if latest.runs else None
+            latest_task = (
+                redact_text(latest_run.task).replace("\n", " ")[:96]
+                if latest_run is not None
+                else "no runs"
+            )
+            latest_status = latest_run.state.value if latest_run is not None else "new"
+            options.append(
+                (
+                    (
+                        f"{marker}Resume {title} · {str(session.id)[:8]} · "
+                        f"{latest_status}: {latest_task} · {updated}"
+                    ),
+                    f"session:resume:{session.id}",
+                )
+            )
+        options.extend(
+            [
+                ("New conversation", "session:new"),
+                ("Cancel", "session:cancel"),
+            ]
+        )
+        menu = ConfigMenu(tuple(options))
+        await log.mount(menu)
+        menu.focus()
+        self.query_one(StatusFooter).update(
+            "Session menu · ↑/↓ select · Enter apply · Esc close"
+        )
+
+    async def _show_clear_session_menu(self) -> None:
+        """Require an explicit choice before replacing the current conversation."""
+
+        log = self.query_one(ConversationLog)
+        for menu in list(log.query(ConfigMenu)):
+            await menu.remove()
+        menu = ConfigMenu(
+            (
+                ("Start a new conversation", "session:new"),
+                ("Switch conversation", "session:choose"),
+                ("Cancel", "session:cancel"),
+            )
+        )
+        await log.mount(menu)
+        menu.focus()
+        self.query_one(StatusFooter).update(
+            "Clear menu · ↑/↓ select · Enter apply · Esc close"
+        )
+
+    async def _switch_session(self, selector: str) -> None:
+        if self.controller is None:
+            return
+        self._executing = True
+        self._operation_started_at = time.monotonic()
+        self._update_input_state()
+        self._set_active_operation("Switching session")
+        try:
+            snapshot = await self.controller.resume(selector)
+            await self._render_snapshot(snapshot, clear=True)
+            if self.controller.last_summary is not None:
+                await self._render_summary(self.controller.last_summary)
+        except Exception as error:
+            await self.query_one(ConversationLog).mount(render_error(error))
+        finally:
+            self._executing = False
+            self._update_input_state()
+            if self._approval_id is None:
+                self._set_active_operation("Idle", reset=True)
+
+    async def _start_new_session(self) -> None:
+        if self.controller is None:
+            return
+        self._executing = True
+        self._operation_started_at = time.monotonic()
+        self._update_input_state()
+        self._set_active_operation("Starting new session")
+        try:
+            snapshot = await self.controller.clear()
+            await self._render_snapshot(snapshot, clear=True)
+        except Exception as error:
+            await self.query_one(ConversationLog).mount(render_error(error))
+        finally:
+            self._executing = False
+            self._update_input_state()
+            self._set_active_operation("Idle", reset=True)
+
     async def _show_provider_menu(self) -> None:
         user_configuration = getattr(self.services, "user_configuration", None)
         if user_configuration is None:
@@ -754,6 +857,20 @@ class CodingApp(App[None]):
     async def _apply_config_menu_action(self, action: str) -> None:
         menu = self.query_one(ConfigMenu)
         try:
+            if action == "session:cancel":
+                return
+            if action == "session:new":
+                await menu.remove()
+                await self._start_new_session()
+                return
+            if action == "session:choose":
+                await menu.remove()
+                await self._show_session_menu()
+                return
+            if action.startswith("session:resume:"):
+                await menu.remove()
+                await self._switch_session(action.split(":", 2)[2])
+                return
             if action == "show":
                 await menu.remove()
                 await self._execute_command(ParsedCommand("config", ("show",)))
@@ -969,6 +1086,10 @@ class CodingApp(App[None]):
             return
         log = self.query_one(ConversationLog)
         for update in updates:
+            if self.controller is not None:
+                accepts_progress = getattr(self.controller, "accepts_progress", None)
+                if callable(accepts_progress) and not accepts_progress(update.run_id):
+                    continue
             if update.kind is ProgressKind.TEXT_DELTA:
                 draft = self._drafts.get(update.run_id, "") + update.text
                 self._drafts[update.run_id] = draft
@@ -1062,6 +1183,7 @@ class CodingApp(App[None]):
         self._current_session_id = snapshot.session.id
         if clear:
             await log.remove_children()
+            self._pending_user = None
             self._entries.clear()
             self._assistants.clear()
             self._drafts.clear()
@@ -1070,6 +1192,7 @@ class CodingApp(App[None]):
             self._tool_keys_by_name.clear()
             self._last_tool_widget = None
             self._summary_widgets.clear()
+            self._validation_widget = None
         for entry in snapshot.transcript:
             key = (entry.role, entry.run_id)
             if key in self._entries:

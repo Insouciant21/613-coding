@@ -67,6 +67,48 @@ class FakeInteractive:
         )
 
 
+class MultiSessionInteractive:
+    def __init__(self) -> None:
+        project_id = uuid4()
+        self.sessions = [
+            InteractiveSession(project_id=project_id, title="first"),
+            InteractiveSession(project_id=project_id, title="second"),
+        ]
+        self.runs = {
+            session.id: [
+                Run(
+                    project_id=project_id,
+                    session_id=session.id,
+                    task=session.title or "task",
+                    state=RunState.COMPLETED,
+                    stop_reason=StopReason.SUCCESS,
+                )
+            ]
+            for session in self.sessions
+        }
+
+    def create(self, title=None):
+        session = InteractiveSession(project_id=self.sessions[0].project_id, title=title)
+        self.sessions.append(session)
+        self.runs[session.id] = []
+        return session
+
+    def list_sessions(self):
+        return list(self.sessions)
+
+    def resume_session(self, session_id):
+        session = next(item for item in self.sessions if item.id == session_id)
+        runs = self.runs[session.id]
+        return InteractiveSnapshot(
+            session=session,
+            runs=tuple(runs),
+            active_run=next((run for run in reversed(runs) if not run.state.is_terminal), None),
+            transcript=tuple(
+                TranscriptEntry(role="user", text=run.task, run_id=run.id) for run in runs
+            ),
+        )
+
+
 class FakeRuns:
     def __init__(self) -> None:
         self.pause_calls: list[object] = []
@@ -248,3 +290,57 @@ async def test_controller_exposes_context_and_diagnostic_services() -> None:
     assert context.compact_calls == [interactive.session.id]
     assert diagnostic_report.checks[0].name == "provider"
     assert diagnostic_report.project_id == interactive.session.project_id
+
+
+@pytest.mark.asyncio
+async def test_controller_drops_late_progress_when_switching_sessions() -> None:
+    interactive = MultiSessionInteractive()
+    controller = TuiController(interactive, FakeRuns())
+    first, second = interactive.sessions
+    first_run = interactive.runs[first.id][0]
+    second_run = interactive.runs[second.id][0]
+
+    await controller.resume(str(first.id))
+    old_queue = controller._queue
+    old_queue.put(RunProgress(run_id=first_run.id, kind=ProgressKind.TEXT_DELTA, text="old"))
+
+    snapshot = await controller.resume(str(second.id))
+
+    assert snapshot.session.id == second.id
+    assert controller.session_id == second.id
+    assert controller.drain_progress() == ()
+    assert not controller.accepts_progress(first_run.id)
+    assert not controller.accepts_progress(second_run.id)
+
+
+@pytest.mark.asyncio
+async def test_controller_drops_completed_run_progress_before_new_run() -> None:
+    interactive = FakeInteractive()
+    controller = TuiController(interactive, FakeRuns())
+
+    snapshot = await controller.submit("first")
+    first_run = snapshot.runs[-1]
+    controller._queue.put(
+        RunProgress(run_id=first_run.id, kind=ProgressKind.TEXT_DELTA, text="late")
+    )
+
+    await controller.submit("second")
+
+    updates = controller.drain_progress()
+    assert updates
+    assert all(update.run_id != first_run.id for update in updates)
+
+
+@pytest.mark.asyncio
+async def test_controller_drops_progress_late_after_completed_stream_is_drained() -> None:
+    interactive = FakeInteractive()
+    controller = TuiController(interactive, FakeRuns())
+
+    snapshot = await controller.submit("first")
+    first_run = snapshot.runs[-1]
+    assert controller.drain_progress()
+    controller._queue.put(
+        RunProgress(run_id=first_run.id, kind=ProgressKind.TEXT_DELTA, text="late")
+    )
+
+    assert controller.drain_progress() == ()

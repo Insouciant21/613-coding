@@ -27,7 +27,7 @@ from coding613.tui.commands import CommandCatalog, SlashCommand
         ("/permissions", "permissions", ()),
         ("/permissions strict", "permissions", ("strict",)),
         ("/permissions bypass", "permissions", ("bypass",)),
-        ("/resume", "resume", ("latest",)),
+        ("/resume", "resume", ()),
         ("/resume latest", "resume", ("latest",)),
         (f"/resume {uuid4()}", "resume", None),
         ("/runs", "runs", ()),
