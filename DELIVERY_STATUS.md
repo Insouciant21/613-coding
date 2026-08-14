@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-14 13:09:53 (Asia/Shanghai)
-Responsible actor: `/root` for review recovery, local integration, verification, GitHub publication, and delivery evidence. No real provider request, credential access, or deployment operation was performed.
+Last updated: 2026-08-14 13:52:11 (Asia/Shanghai)
+Responsible actor: `/root` for review recovery, local integration, verification, GitHub publication, release recovery, and delivery evidence. No real provider request, credential access, or deployment operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -12,8 +12,8 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Claude-Code-like TUI/CLI parity | Tasks 1-7 implemented and offline verified in `feature/claude-code-parity`; handoff pending user integration choice | design `3a07f09`; plan; implementation `fd8871e`; evidence below and in `PLAN.md`/`AGENT_LOG.md` | merge or retain the isolated branch; configure a provider for a real coding run |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
-| Dangerous bypass permission mode | published on GitHub `main`, review-clean, and locally/remotely verified | design `8df9151`; plan `e7206d6`; Tasks 1-4 `7c8f333`..`dde5383`; review repairs `a48e565`, `5b788f7`, `206881e`; lifecycle repair `e54a31c`; exact published commit `2e8c3c0`; maintained local gate 681 passed; GitHub run `31771935622` passed | retain regression coverage; complete submission metadata and release |
-| Binary/wheel/sdist artifact builder | Docker-exported, smoke-tested, and uploaded by GitHub Actions | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; run `31771935622`; artifact `613-coding-2e8c3c0268304282e0ea8084785e0f820c8d6064` | create a version tag and GitHub Release for the final submission URL |
+| Dangerous bypass permission mode | published on GitHub `main`, review-clean, locally/remotely verified, and included in release `v0.1.0` | design `8df9151`; plan `e7206d6`; Tasks 1-4 `7c8f333`..`dde5383`; review repairs `a48e565`, `5b788f7`, `206881e`; lifecycle repair `e54a31c`; exact published commit `2e8c3c0`; maintained local gate 681 passed; GitHub run `31771935622`; release `v0.1.0` | retain regression coverage and complete remaining student metadata |
+| Binary/wheel/sdist artifact builder | Docker-exported, smoke-tested, and published in GitHub Release `v0.1.0` | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; run `31771935622`; [release `v0.1.0`](https://github.com/Insouciant21/613-coding/releases/tag/v0.1.0); four uploaded assets | retain checksums and rebuild from the release tag for a future runtime-changing release |
 | Main Web/HTTP removal | complete and verified on main | import/dependency/manifest absence contracts; merge `4528bda` | retain removal regression checks |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
 | Approved design | complete | `docs/superpowers/specs/2026-08-07-613-coding-design.md`; commits `6ad0eec`, `c4fd219`, `ba03b70` | none |
@@ -1148,3 +1148,21 @@ Every completed plan task must link a commit and fresh verification output here.
   release URL are still example values.
 - CI annotation: GitHub warns that Node.js 20 actions are being forced onto Node.js 24. This is a
   deprecation warning, not a failed job; current run conclusion is `success`.
+
+### GitHub Release v0.1.0 — published (2026-08-14 13:51 Asia/Shanghai)
+
+- Release: [613 Coding v0.1.0](https://github.com/Insouciant21/613-coding/releases/tag/v0.1.0),
+  published as a non-draft, non-prerelease release. Annotated tag `v0.1.0` resolves to
+  `60cf2727ff70b3c1d32a442d28c845c7f1c93562`.
+- Recovery evidence: the tag target commit contains `[skip ci]`, so the tag push did not create a
+  GitHub Actions run. No tag or history was rewritten. The release reused the unexpired artifact
+  from successful run `31771935622`, whose runtime/package inputs match the tag; the intervening
+  `60cf272` commit changes delivery records only.
+- Uploaded assets: `613-coding-linux-x86_64` (163,249,584 bytes),
+  `613_coding-0.1.0-py3-none-any.whl` (201,325 bytes), `613_coding-0.1.0.tar.gz` (150,318 bytes),
+  and `SHA256SUMS` (280 bytes).
+- Integrity: local `sha256sum -c SHA256SUMS` passed for the executable, wheel, and sdist. GitHub's
+  uploaded-asset SHA-256 digests match the checksum file: executable `9e1202f2...e877`, wheel
+  `9bfa992e...a13a`, and sdist `a52af34c...9885`.
+- Local-only boundary: the student's modified `REFLECTION.md`, local reflection design/plan, and
+  `submissions/` archive were not staged, tagged, uploaded, or included in this release.

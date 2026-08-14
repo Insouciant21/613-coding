@@ -1211,6 +1211,11 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   [31771935622](https://github.com/Insouciant21/613-coding/actions/runs/31771935622)
   passed `unit-test`, `quality`, `demo`, and `package-and-artifacts`; the artifact
   `613-coding-2e8c3c0268304282e0ea8084785e0f820c8d6064` was uploaded. The tag-only `release` job was
-  correctly skipped because no release tag was pushed. Submission metadata remains incomplete:
-  the GitHub repository is private, no GitHub Release exists, and `submission.jsonc` still needs
-  the student's real ID, name, and release URL.
+  correctly skipped because no release tag was pushed at that gate.
+- GitHub Release — complete. Annotated tag `v0.1.0` points to `60cf272`; the published release is
+  [613 Coding v0.1.0](https://github.com/Insouciant21/613-coding/releases/tag/v0.1.0) with the Linux
+  executable, wheel, sdist, and checksums. Because the tag target contains `[skip ci]`, no tag
+  workflow started; the release recovered by reusing and re-verifying the successful
+  `package-and-artifacts` output from run `31771935622`. No tag/history rewrite occurred.
+- Submission metadata remains incomplete: the GitHub repository is private and
+  `submission.jsonc` still needs the student's real ID and name. The release URL is now available.

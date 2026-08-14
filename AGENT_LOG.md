@@ -2754,3 +2754,35 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   destructive Git action occurred.
 - Lesson: a successful branch CI artifact is not yet a submission release. Repository access and a
   stable release URL are separate final-delivery gates.
+
+## 2026-08-14 13:52:11 Asia/Shanghai - GitHub Release v0.1.0 publication
+
+- Human request: publish a GitHub Release. The project version is `0.1.0`, and no prior tags or
+  releases existed, so `/root` created annotated tag `v0.1.0` at remote `main@60cf272` and pushed
+  only that tag. Local `REFLECTION.md` and `submissions/` remained unstaged and outside the tag.
+- Triggered skills: `using-superpowers`, GitHub repository workflow, `systematic-debugging`, and
+  `verification-before-completion`.
+- Unexpected behavior and root cause: the tag push created no Actions run and no release. Read-only
+  inspection confirmed that the tag resolved correctly, the release was absent, and the tag target
+  commit message contained `[skip ci]`; GitHub therefore skipped the tag workflow as well as the
+  earlier branch workflow.
+- Recovery: no force push, tag move, or history rewrite was used. The unexpired artifact from
+  successful GitHub Actions run `31771935622` was downloaded. It contained the Linux x86_64
+  executable, wheel, sdist, and checksum file produced from runtime-equivalent commit `2e8c3c0`;
+  the intervening tagged commit `60cf272` changes delivery records only.
+- Integrity evidence: `sha256sum -c SHA256SUMS` passed for all three distribution files. The
+  executable digest is `9e1202f268ad162776ce206b3e9aeb483d6992e37736ca29a934fcc59ac8e877`,
+  the wheel digest is `9bfa992e05806ffda3500705e75f3b88adfca000dbf1033451d4d48da50ba13a`,
+  and the sdist digest is `a52af34cee34d8c33e2065009c133c7c4bea639c8e3c39c4e3f693e0928e9885`.
+- Published result: [613 Coding v0.1.0](https://github.com/Insouciant21/613-coding/releases/tag/v0.1.0)
+  is non-draft and non-prerelease, with all four assets uploaded. GitHub asset digests match the
+  verified checksum file.
+- Workflow deviation: the release was created manually from an already CI-built and smoke-tested
+  artifact because the approved evidence-only `[skip ci]` commit prevented the tag automation.
+  This preserves the verified distribution without rewriting public Git history.
+- Security and local boundary: GitHub CLI authentication was used without printing token material.
+  No provider, deployment, credential mutation, source modification, reflection upload, or
+  destructive Git action occurred.
+- Lesson: a skip marker on a tagged commit affects release automation as well as branch CI; release
+  tags should normally point to a non-skipped build commit or the workflow should expose an
+  explicit manual dispatch path.
