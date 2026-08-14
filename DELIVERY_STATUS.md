@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-14 13:03:31 (Asia/Shanghai)
-Responsible actor: `/root` for review recovery, local integration, verification, and delivery evidence. No real provider request, credential access, deployment, push, or pipeline operation was performed.
+Last updated: 2026-08-14 13:09:53 (Asia/Shanghai)
+Responsible actor: `/root` for review recovery, local integration, verification, GitHub publication, and delivery evidence. No real provider request, credential access, or deployment operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -12,8 +12,8 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Claude-Code-like TUI/CLI parity | Tasks 1-7 implemented and offline verified in `feature/claude-code-parity`; handoff pending user integration choice | design `3a07f09`; plan; implementation `fd8871e`; evidence below and in `PLAN.md`/`AGENT_LOG.md` | merge or retain the isolated branch; configure a provider for a real coding run |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
-| Dangerous bypass permission mode | locally integrated into `main`, review-clean, and offline verified; GitHub push pending | design `8df9151`; plan `e7206d6`; Tasks 1-4 `7c8f333`..`dde5383`; review repairs `a48e565`, `5b788f7`, `206881e`; lifecycle repair `e54a31c`; integrated tip `9aac5e5`; exact local tip `83f65b0`; maintained gate 681 passed | push `main`, then require GitHub artifact/unit-test jobs to pass |
-| Binary/wheel/sdist artifact builder | Docker-exported and runtime-smoked on main; CI/release configuration present | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08/TUI-09 evidence | push/tag when an operator wants remote CI artifacts or a GitHub release |
+| Dangerous bypass permission mode | published on GitHub `main`, review-clean, and locally/remotely verified | design `8df9151`; plan `e7206d6`; Tasks 1-4 `7c8f333`..`dde5383`; review repairs `a48e565`, `5b788f7`, `206881e`; lifecycle repair `e54a31c`; exact published commit `2e8c3c0`; maintained local gate 681 passed; GitHub run `31771935622` passed | retain regression coverage; complete submission metadata and release |
+| Binary/wheel/sdist artifact builder | Docker-exported, smoke-tested, and uploaded by GitHub Actions | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; run `31771935622`; artifact `613-coding-2e8c3c0268304282e0ea8084785e0f820c8d6064` | create a version tag and GitHub Release for the final submission URL |
 | Main Web/HTTP removal | complete and verified on main | import/dependency/manifest absence contracts; merge `4528bda` | retain removal regression checks |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
 | Approved design | complete | `docs/superpowers/specs/2026-08-07-613-coding-design.md`; commits `6ad0eec`, `c4fd219`, `ba03b70` | none |
@@ -1130,4 +1130,21 @@ Every completed plan task must link a commit and fresh verification output here.
 - Restored-work commits: deterministic patch recovery `00d9e9e`; TUI conversation isolation
   `83f65b0`. The exact local tip passed 681 maintained tests, 129 patch-recovery tests, 99 TUI
   tests, and 3 deterministic demo tests, plus Ruff, mypy, lock, documentation, and diff checks.
-  GitHub push and CI remain pending.
+  GitHub push and CI were pending at this local gate.
+
+### GitHub publication gate — passed (2026-08-14 13:09 Asia/Shanghai)
+
+- Published commit: `2e8c3c0268304282e0ea8084785e0f820c8d6064` on `main` at
+  `https://github.com/Insouciant21/613-coding`.
+- GitHub Actions: run
+  [31771935622](https://github.com/Insouciant21/613-coding/actions/runs/31771935622)
+  completed successfully. `unit-test`, `quality`, `demo`, and `package-and-artifacts` all passed;
+  the tag-only `release` job was correctly skipped on the branch push.
+- Artifact evidence: `613-coding-2e8c3c0268304282e0ea8084785e0f820c8d6064`, 162,616,121 bytes,
+  uploaded by job `94679488959` and not expired at inspection time.
+- Submission boundary: GitHub reports the repository as `PRIVATE`; the course requirement therefore
+  requires the teaching assistant to be added as a collaborator unless visibility is changed. No
+  GitHub Release exists. `submission.jsonc` remains untracked because its student ID, name, and
+  release URL are still example values.
+- CI annotation: GitHub warns that Node.js 20 actions are being forced onto Node.js 24. This is a
+  deprecation warning, not a failed job; current run conclusion is `success`.

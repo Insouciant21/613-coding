@@ -2725,3 +2725,32 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Lesson: publication review must validate both implementation behavior and submission metadata;
   an invalid required-form template should remain outside the commit until its authoritative human
   values are available.
+
+## 2026-08-14 13:09:53 Asia/Shanghai - GitHub main publication and remote CI evidence
+
+- Human authorization: the user explicitly requested commit and push, and previously confirmed
+  GitHub as the submission repository. The reviewed delivery records and course source documents
+  were committed as `2e8c3c0` (`docs: record reviewed delivery state`).
+- Pre-push exact-tip evidence: `UV_CACHE_DIR=/tmp/coding613-uv-cache uv run pytest tests -q` -> 681
+  passed; patch-recovery selection -> 129 passed; TUI suite -> 99 passed; deterministic demos -> 3
+  passed; Ruff passed; mypy found no issues in 110 source files; `uv lock --check` and Git checks
+  passed. Only the invalid placeholder `submission.jsonc` remained untracked.
+- Publication: `git push origin main` advanced GitHub `main` from `e7206d6` to
+  `2e8c3c0268304282e0ea8084785e0f820c8d6064` without force or history rewriting.
+- Remote verification: GitHub Actions run
+  `https://github.com/Insouciant21/613-coding/actions/runs/31771935622` concluded `success`.
+  `unit-test`, `quality`, `demo`, and `package-and-artifacts` passed. The artifact job built,
+  smoke-tested, and uploaded `613-coding-2e8c3c0268304282e0ea8084785e0f820c8d6064`
+  (162,616,121 bytes). The `release` job was skipped as designed because this was not a tag push.
+- Remote submission audit: the repository is currently private and no GitHub Release exists. The
+  student must either make the repository public or add the teaching assistant as collaborator,
+  create the final release/tag, and provide the real ID/name/release URL before
+  `submission.jsonc` can be committed.
+- Workflow note: the follow-up evidence-only commit uses `[skip ci]` so recording a completed CI
+  run does not recursively trigger another full artifact pipeline. The verified product/source tip
+  remains `2e8c3c0`; this documentation-only exception is recorded here as required.
+- Security boundary: GitHub CLI authentication was used for repository metadata and Actions reads;
+  no token value was printed or persisted. No provider request, deployment, force push, or
+  destructive Git action occurred.
+- Lesson: a successful branch CI artifact is not yet a submission release. Repository access and a
+  stable release URL are separate final-delivery gates.

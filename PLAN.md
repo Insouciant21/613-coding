@@ -1207,3 +1207,10 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   tip passed 681 maintained tests, 129 patch-recovery tests, 99 TUI tests, and 3 deterministic demo
   tests, plus Ruff, mypy, lock, documentation, and diff checks. GitHub push and remote CI remain
   pending.
+- GitHub publication — complete for commit `2e8c3c0`. Push run
+  [31771935622](https://github.com/Insouciant21/613-coding/actions/runs/31771935622)
+  passed `unit-test`, `quality`, `demo`, and `package-and-artifacts`; the artifact
+  `613-coding-2e8c3c0268304282e0ea8084785e0f820c8d6064` was uploaded. The tag-only `release` job was
+  correctly skipped because no release tag was pushed. Submission metadata remains incomplete:
+  the GitHub repository is private, no GitHub Release exists, and `submission.jsonc` still needs
+  the student's real ID, name, and release URL.
