@@ -1130,4 +1130,4 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   `lancedb.connect()`; faulthandler captured the boundary and the same offline tests passed outside
   that restriction without network or credentials. The teardown fix `e54a31c` passed four focused
   lifecycle/restore regressions and a scoped re-review. Final spec-compliance and code-quality
-  reviews reported no Critical, Important, or Minor findings. Delivery-record commit: pending.
+  reviews reported no Critical, Important, or Minor findings. Delivery-record commit: `c946b30`.

@@ -12,7 +12,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Claude-Code-like TUI/CLI parity | Tasks 1-7 implemented and offline verified in `feature/claude-code-parity`; handoff pending user integration choice | design `3a07f09`; plan; implementation `fd8871e`; evidence below and in `PLAN.md`/`AGENT_LOG.md` | merge or retain the isolated branch; configure a provider for a real coding run |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
-| Dangerous bypass permission mode | feature branch complete, review-clean, and offline verified; integration pending | design `8df9151`; plan `e7206d6`; Tasks 1-4 `7c8f333`..`dde5383`; review repairs `a48e565`, `5b788f7`, `206881e`; lifecycle repair `e54a31c`; 655-test final gate | integrate `feat/dangerous-bypass` only after the user selects the branch-finishing option, then rerun exact-main CI |
+| Dangerous bypass permission mode | feature branch complete, review-clean, and offline verified; integration pending | design `8df9151`; plan `e7206d6`; Tasks 1-4 `7c8f333`..`dde5383`; review repairs `a48e565`, `5b788f7`, `206881e`; lifecycle repair `e54a31c`; delivery record `c946b30`; 655-test final gate | integrate `feat/dangerous-bypass` only after the user selects the branch-finishing option, then rerun exact-main CI |
 | Binary/wheel/sdist artifact builder | Docker-exported and runtime-smoked on main; CI/release configuration present | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08/TUI-09 evidence | push/tag when an operator wants remote CI artifacts or a GitHub release |
 | Main Web/HTTP removal | complete and verified on main | import/dependency/manifest absence contracts; merge `4528bda` | retain removal regression checks |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
@@ -1047,6 +1047,7 @@ Every completed plan task must link a commit and fresh verification output here.
   replaced it with explicit lifecycle guards and the scoped re-review marked it addressed. Final
   spec-compliance and code-quality reviews both passed with no Critical, Important, or Minor
   findings.
-- Handoff: branch `feat/dangerous-bypass` is complete through `e54a31c`; merge, push, and exact-main
-  CI remain pending the user's `finishing-a-development-branch` choice. GitHub is the confirmed
-  submission repository; no NJU Git remote is required.
+- Handoff: branch `feat/dangerous-bypass` contains implementation through `e54a31c` and delivery
+  evidence in `c946b30`; merge, push, and exact-main CI remain pending the user's
+  `finishing-a-development-branch` choice. GitHub is the confirmed submission repository; no NJU
+  Git remote is required.

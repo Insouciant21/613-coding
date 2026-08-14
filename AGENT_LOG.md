@@ -2497,3 +2497,12 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Lesson: lifecycle error handling must distinguish shutdown from a malformed mounted UI. A broad
   exception catch made teardown green but hid a real invariant; an explicit app-state guard keeps
   both reliability and observability.
+
+## 2026-08-14 12:20:33 Asia/Shanghai - Dangerous bypass delivery evidence commit
+
+- Triggered skills: `verification-before-completion` and `finishing-a-development-branch`.
+- Verification before evidence commit: `UV_CACHE_DIR=/tmp/coding613-uv-cache uv run pytest
+  tests/test_docs.py -q` -> 7 passed; `git diff --check` passed.
+- Delivery source records were committed as `c946b30` (`docs: record bypass permission delivery`).
+- Handoff remains pending the user's branch-integration selection; no merge, push, PR, deployment,
+  or remote CI action was performed.
