@@ -5,3 +5,6 @@ docs/superpowers
 __pycache__/
 *.py[cod]
 .613-coding/
+node_modules/
+.claude/
+tmp/

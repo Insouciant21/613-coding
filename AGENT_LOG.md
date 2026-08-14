@@ -2393,6 +2393,162 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   widget, not as its content value.
 - Commit: `34a2986` (`fix: avoid nested static validation content`).
 
+## 2026-08-12 11:02 Asia/Shanghai - Recovered paused cube LLM run
+
+- Human request: repair the LLM run that paused while validating the 3D cube painting change.
+- Log diagnosis: `tmp/cube` frontend validation failed in Three.js because its jsdom canvas
+  WebGL stub returned an invalid `gl.VERSION`; the resulting `glVersion.indexOf` exception
+  cascaded into 16 frontend test failures. The original TUI `Static` visual error was already
+  fixed by `34a2986` and its 88-test TUI suite remains green.
+- Target repair: removed the incomplete WebGL stub from `tmp/cube/apps/web/src/test/setup.ts`
+  and made `CubeViewport` skip renderer initialization when WebGL is unavailable or cannot be
+  constructed, while preserving the canvas/UI fallback. Existing preview-label regression now
+  passes.
+- Verification: target `bash scripts/verify.sh` passed (web 76 passed; API 67 passed, 1 skipped;
+  lint, typecheck, build, Ruff, and mypy). Root `uv run pytest tests -q` passed 621 tests.
+- Human intervention: no credentials, provider requests, remote changes, or destructive Git
+  operations. The target worktree retains its pre-existing unrelated changes; only the relevant
+  target files and append-only evidence logs were touched.
+
+## 2026-08-12 11:30 Asia/Shanghai - Bounded stale apply_patch variants
+
+- Human request: inspect the repeated `apply_patch` failures in the LLM log and correct the
+  failure loop shown for `apps/web/src/CubeViewport.tsx`.
+- Diagnosis: the three reported hunks targeted different historical function signatures, so
+  strict context matching correctly rejected them. The loop guard previously counted only an
+  identical patch fingerprint, allowing different stale variants for one file to reach the tool;
+  conflict guidance also exposed only the first ten lines, which omitted the relevant function.
+- TDD evidence: new tests were first run RED (the variant loop ended in `PROVIDER_ERROR`, and
+  relevant current content was absent from guidance), then passed after implementation. Added
+  coverage for path-scoped conflict budgeting, successful target re-read reset (including
+  multi-file patches), and bounded current-file conflict guidance.
+- Implementation: extract affected paths from unified/Codex/Responses patch shapes; share the
+  conflict budget across variants touching the same path until a successful read or write refreshes
+  it; persist path metadata in repair feedback; require a fresh read in the repair prompt; and
+  return up to 8,000 redacted current-file characters instead of only the first ten lines.
+  Fallback remains fingerprint-based when a malformed patch has no parsable path; no fuzzy or
+  unsafe patch application was added.
+- Verification: `uv run pytest tests -q` -> 625 passed with 388 warnings; `uv run ruff check
+  src tests` -> all checks passed; `uv run mypy src` -> no issues found in 110 source files;
+  `git diff --check` -> passed.
+- Human intervention: no provider request, credential access, target repository mutation,
+  deployment, remote push, or destructive Git operation.
+- Lesson: patch freshness must be tracked at the repository-path scope, not by payload equality;
+  strict rejection is safe only when the repair response contains enough current file context.
+
+## 2026-08-12 12:05:00 Asia/Shanghai - Isolated TUI conversation sessions
+
+- Task: implement explicit TUI session context management after the user reported mixed
+  conversations and requested menu-driven `/resume`/`/clear` behavior.
+- Triggered skills: `using-superpowers`, `brainstorming`, `writing-plans`, `systematic-debugging`,
+  `test-driven-development`, and `verification-before-completion`; the implementation plan is
+  `docs/superpowers/plans/2026-08-12-tui-session-context-plan.md`. No development subagent was
+  dispatched; all edits were made by `/root` in the shared worktree.
+- TDD evidence: focused tests were first run RED (parser still returned `latest`, controller had
+  no stream boundary, and both commands mounted no menu). GREEN coverage now includes menu actions,
+  session snapshot metadata, cross-session prompt isolation, old transcript/cache clearing, and
+  late progress/event rejection.
+- Implementation: `/resume` without a selector opens a session menu; explicit `latest`/UUID
+  selectors remain direct. `/clear` offers new/switch/cancel. Session labels show redacted title,
+  short UUID, latest run status/task, and updated time. `TuiController` replaces progress/event
+  queues on session/run changes, cancels the old token, filters drains by the selected stream run,
+  and uses a generation guard so late execution results cannot overwrite the selected session.
+  `SessionContextBuilder` was regression-tested to keep transcripts exact-session scoped.
+- Verification: initial gate `uv run pytest tests -q` -> 630 passed with 424 warnings; final gate
+  `uv run pytest tests -q` -> 632 passed with 442 warnings and `uv run pytest tests/tui -q` ->
+  94 passed; focused session tests -> 4 passed; `uv run ruff check src tests` passed;
+  `uv run mypy src` reported no issues in 110 files; `git diff --check` passed.
+- Human intervention: user approved the menu/session-isolation design with “继续”; no provider
+  request, credential access, remote push, deployment, or destructive Git operation occurred.
+- Lesson: session isolation needs both authoritative exact-session snapshots and an ephemeral
+  stream boundary; clearing only widgets leaves late worker events capable of reappearing.
+
+## 2026-08-12 12:15:00 Asia/Shanghai - Closed completed TUI streams
+
+- Follow-up: a RED regression showed that a late progress item from a completed run could still
+  arrive after the normal queue had been drained. The controller now marks terminal progress/event
+  streams, clears their run IDs when each queue reaches `Empty`, and rejects subsequent updates;
+  normal completed output remains available for its first drain.
+- Final verification: `uv run pytest tests -q` -> 632 passed with 442 warnings; `uv run pytest
+  tests/tui -q` -> 94 passed; Ruff, mypy, and `git diff --check` passed.
+
+## 2026-08-12 19:39:17 Asia/Shanghai - Deterministic apply_patch recovery barrier
+
+- Human request: continue the approved harness repair after the LLM log showed repeated stale
+  `apply_patch` failures and mixed conversation context.
+- Triggered skills: `using-superpowers`, `brainstorming`, `writing-plans`, `using-git-worktrees`,
+  `executing-plans`, `systematic-debugging`, `test-driven-development`, `requesting-code-review`,
+  and `verification-before-completion`. Design and plan: `docs/superpowers/specs/2026-08-12-apply-patch-recovery-design.md`
+  and `docs/superpowers/plans/2026-08-12-apply-patch-recovery-plan.md`.
+- Diagnosis: the strict patch parser was correctly rejecting stale hunks, but the loop treated the
+  model prompt as the only recovery mechanism. Alternate stale patches, writes bundled with reads,
+  and resumed runs could therefore bypass the intended reread step. The reproduced SQLite run was
+  `be51368d-c571-4fec-8a05-e699d72c6752`.
+- TDD evidence: the new barrier regressions were first run RED before implementation (stale writes
+  still dispatched, mixed responses still wrote, and the new session field was not yet persisted).
+  GREEN coverage now includes multi-file reads, repeated reads, real `a/` directories, force-write
+  filtering, same-response aborts, finish/validation rejection, failed unrelated reads, and SQLite
+  round trips.
+- Implementation: persist `patch_repair_paths` in `LoopSession`; after a conflict, allow only a
+  separate successful `read_file` response for each affected path; reject writes, finish,
+  validation, approval, mixed, and unrelated actions deterministically; abort remaining actions in
+  the response that caused the conflict; clear paths only after successful reads; keep the existing
+  path-scoped no-progress guard; separate patch `a/`/`b/` normalization from repository read-path
+  normalization; and make the prompt describe the enforced barrier rather than relying on wording.
+- Review evidence: code review identified repeat-read blocking, force-write filtering, legacy
+  guidance, and `a/` path normalization risks. Each was corrected with a focused regression test.
+- Verification: `UV_CACHE_DIR=/tmp/coding613-uv-cache uv run pytest tests/application/test_loop.py
+  tests/application/test_context.py tests/adapters/storage/test_sqlite.py -q` -> 114 passed with
+  1 warning; the repository tool/LLM/domain/ports suites -> 148 passed with 1 warning; the TUI
+  command/renderer subset -> 45 passed with 1 warning; Ruff passed; mypy reported no issues in 110
+  source files; `git diff --check` passed.
+- Broader-suite boundary: the root default pytest collection also traverses untracked `tmp/cube`
+  tests with unavailable FastAPI/cube dependencies, while the maintained `tests` invocation did not
+  complete because an existing LanceDB test hung. These are recorded as verification limits, not
+  treated as evidence that the focused repair is green.
+- Human intervention: no provider request, credential access, remote push, deployment, or
+  destructive Git operation occurred. The shared worktree already contained unrelated user edits;
+  no reset or overwrite was performed and no commit was created to avoid bundling those changes.
+- Lesson: prompt guidance can improve recovery context, but only a persisted, tool-dispatch-level
+  read-before-write barrier prevents stale LLM actions from mutating the repository.
+
+## 2026-08-13 09:46:17 Asia/Shanghai - Approved dangerous bypass permission design
+
+- Human request: add a bypass mode comparable to Claude Code's dangerous permission-skip mode so
+  shell commands execute without approval prompts; the user selected 方案 A.
+- Triggered skills: `using-superpowers` and `brainstorming`. The design gate was observed: no
+  implementation source or test was changed before approval.
+- External reference: Anthropic's official CLI/IAM documentation was checked to distinguish
+  “skip permission prompts” from disabling validation or managed enforcement.
+- Decision: add first-class `PermissionMode.BYPASS`; convert final `ASK` decisions to `ALLOW`, while
+  retaining hard/config/rule `DENY`, schema validation, argv-only commands, sandbox constraints,
+  feedback, budgets, and audit events. Add `--dangerously-skip-permissions` as an explicit alias
+  and expose the canonical `bypass` value through CLI, TUI, config, persistence, and status output.
+- Evidence: approved design
+  `docs/superpowers/specs/2026-08-13-dangerous-bypass-permission-design.md`; design-only commit
+  `8df9151` (`docs: design dangerous bypass permission mode`).
+- Human intervention: the user explicitly approved 方案 A. No provider request, credential access,
+  repository tool execution, deployment, remote push, destructive Git operation, or implementation
+  change occurred. Existing unrelated dirty-worktree changes were preserved.
+- Lesson: a dangerous mode needs one semantic axis: skip approvals. Treating it as “allow every
+  input” would conflate human approval with deterministic validation and sandbox enforcement.
+
+## 2026-08-13 09:58:43 Asia/Shanghai - Dangerous bypass implementation plan
+
+- Human decision: confirmed the written bypass design without revisions.
+- Triggered skill: `writing-plans`; no implementation skill was invoked and no implementation file
+  was changed during this phase gate.
+- Plan: `docs/superpowers/plans/2026-08-13-dangerous-bypass-permission.md` divides delivery into
+  domain/config/CLI and output contracts, central policy plus AgentLoop behavior, TUI warnings,
+  documentation/offline demo, and final verification with two-stage review.
+- Self-review: added explicit coverage for text/JSON/stream effective-mode output, CLI option
+  conflicts, nested command hard denials, invocation filters, sandbox constraints, and preservation
+  of an already-pending strict approval after the default changes to bypass. Placeholder and
+  whitespace scans passed.
+- Evidence: plan-only commit `e7206d6` (`docs: plan dangerous bypass permission mode`).
+- Human intervention: implementation approach selection remains pending. Existing unrelated
+  dirty-worktree edits were preserved; no credentials, provider request, real LLM, deployment,
+  remote push, or destructive Git operation occurred.
 ## 2026-08-13 10:10:01 Asia/Shanghai - Dangerous bypass Task 1
 
 - Human decision: execute approved 方案 A inline; add a Claude Code-style dangerous bypass while
@@ -2519,3 +2675,53 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
   passed.
 - Environment detection confirmed a named linked worktree, branch `feat/dangerous-bypass`, and
   base `main@e7206d6`. Integration remains a user decision; no remote action was performed.
+
+## 2026-08-14 12:44:36 Asia/Shanghai - Dangerous bypass local main integration
+
+- Human decision: selected `finishing-a-development-branch` option 1, local merge into `main`.
+- Before integration, the feature worktree repeated the maintained offline suite: 655 passed. A
+  read-only three-way preview identified four conflicts with the dirty main checkout.
+- Preservation: tracked user changes were saved in temporary stash `49105f8`; untracked course
+  documents, `submission.jsonc`, and `tmp/` stayed in place. GitHub `main` was current at
+  `e7206d6`, so local `main` fast-forwarded to feature tip `9aac5e5`.
+- Conflict handling: the stash reapplied with conflicts only in `AGENT_LOG.md`, `PLAN.md`,
+  `DELIVERY_STATUS.md`, and `tests/tui/test_commands.py`. Append-only records were merged in
+  chronological order. The command test retains both `/permissions bypass` and menu-opening
+  `/resume` behavior. All restored user files remain unstaged, matching their pre-merge state.
+- Integrated verification: `UV_CACHE_DIR=/tmp/coding613-uv-cache uv run pytest tests -q` -> 680
+  passed with 478 warnings; the conflict-sensitive subset -> 176 passed; Ruff passed; mypy found no
+  issues in 110 source files; documentation tests, CLI help, and `git diff --check` passed.
+- Remote boundary: no push or GitHub Actions run was performed. The confirmed submission remote is
+  GitHub; no NJU Git remote is required.
+
+## 2026-08-14 13:03:31 Asia/Shanghai - Uncommitted-change review and publication preparation
+
+- Human request: review the remaining uncommitted changes, commit them, and push the project to the
+  confirmed GitHub submission repository.
+- Triggered skills: `using-superpowers`, `requesting-code-review`, GitHub `yeet`, and
+  `verification-before-completion`. The earlier implementation review was completed before this
+  delivery-record update; no new development subagent was dispatched in this phase.
+- Review scope: 19 tracked implementation/test files across deterministic patch recovery and TUI
+  session isolation, plus the pending delivery/process records, ignore rules, and two course source
+  documents. No unresolved Critical or Important finding remains.
+- Important finding and TDD evidence: `ContextAssembler._needs_patch_conflict_repair` stripped the
+  leading `a/` from an already normalized repository path a second time. A focused RED reproduced a
+  real `a/value.txt` path clearing the execution barrier while leaving stale repair guidance in the
+  prompt. GREEN preserves real `a/` and `b/` directories and limits header-prefix stripping to
+  patch parsing.
+- Implementation commits: `00d9e9e` (`fix: enforce deterministic patch recovery`) and `83f65b0`
+  (`feat: isolate tui conversation sessions`). Commit messages identify `/root` implementation and
+  do not claim development-subagent authorship.
+- Fresh local gate before publication: maintained suite 681 passed; patch-recovery selection 129
+  passed; TUI suite 99 passed; deterministic demos 3 passed; Ruff passed; mypy reported no issues
+  in 110 source files; `uv lock --check`, documentation tests, `git diff --check`, and the
+  sensitive-value filename scan passed.
+- Submission boundary: `submission.jsonc` still contains example student ID/name and release URL
+  values. It remains deliberately untracked because the course template forbids submitting example
+  values. The repository URL is known as `https://github.com/Insouciant21/613-coding`; the real
+  student identity and release URL are not inferable from repository state.
+- Remote boundary at record time: GitHub push and Actions inspection remain pending. No credential
+  value was printed or persisted, and no provider, deployment, or destructive Git action occurred.
+- Lesson: publication review must validate both implementation behavior and submission metadata;
+  an invalid required-form template should remain outside the commit until its authoritative human
+  values are available.

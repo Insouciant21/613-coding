@@ -240,3 +240,42 @@ The strongest brainstorming outcome was forcing explicit boundaries around objec
 - Before/after: before, a provider had one model and `/config` required manual arguments; after,
   aliases can be switched persistently with per-model reasoning/resource overrides, Anthropic is a
   supported SDK transport, and the TUI presents discoverable selectable menus.
+
+### Iteration 16: Deterministic `apply_patch` recovery barrier
+
+- Question: why can a failed strict patch still consume turns with alternate stale patches, and
+  what harness boundary should make recovery deterministic?
+- Decision: retain exact hunk matching, but persist the normalized conflict paths in
+  `LoopSession.patch_repair_paths`. Until every path has a successful `read_file`, the loop
+  rejects writes, finish/validation actions, and mixed read/write responses without dispatching
+  them. Successful reads clear only their matching paths; the existing repeated-conflict
+  classifier remains the bounded no-progress guard.
+- Before/after: before, the prompt asked the model to reread files and the loop inferred repeated
+  `apply_patch` conflicts from old events; after, the required read state is explicit, durable
+  across resume/restart, and enforced for every write tool.
+- Uncertainty exposed: the recovery read must be observed in a separate model response, so a
+  response that mixes `read_file` and a write is rejected rather than allowing the write to run
+  against content the model has not yet seen.
+- Evidence: `docs/superpowers/specs/2026-08-12-apply-patch-recovery-design.md`,
+  `docs/superpowers/plans/2026-08-12-apply-patch-recovery-plan.md`, and the reproduced
+  `tmp/cube` run `be51368d-c571-4fec-8a05-e699d72c6752`.
+
+### Iteration 17: Dangerous permission-bypass mode
+
+- Question: should shell automation be folded into `autonomous`, exposed as a separate boolean,
+  or represented by a fourth first-class permission mode?
+- User decision: 采用方案 A（新增一等 `bypass` 模式），语义类似 Claude Code 的 dangerous
+  permission-skip behavior.
+- Decision: every policy result that would request one-time approval becomes allowed in bypass
+  mode. Deterministic denials, schema validation, explicit deny rules, `allow_writes = false`,
+  repository and credential boundaries, sandbox constraints, feedback, and budgets remain active.
+- Interface decision: support `--permission-mode bypass`, the explicit
+  `--dangerously-skip-permissions` alias, `/permissions bypass`, and `/config set mode bypass`.
+  Conflicting CLI selections fail rather than silently overriding each other, and the TUI displays
+  a conspicuous dangerous-mode warning.
+- Uncertainty exposed: “bypass” can mean bypassing approvals or bypassing every policy. The approved
+  interpretation is approval bypass only: `ASK` becomes `ALLOW`; `DENY` remains `DENY`.
+- Before/after: before, every mode asks for undeclared shell commands and command batches; after,
+  explicitly selected bypass runs execute all otherwise approval-eligible actions immediately and
+  leave an auditable `mode.bypass.*` decision trail.
+- Evidence: `docs/superpowers/specs/2026-08-13-dangerous-bypass-permission-design.md`.

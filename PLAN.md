@@ -1107,6 +1107,70 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   with 388 warnings; Ruff, mypy, and `git diff --check` passed.
 - Commit: `34a2986` (`fix: avoid nested static validation content`).
 
+## Stale apply_patch variant recovery — complete (2026-08-12 11:30 Asia/Shanghai)
+
+- Status: implemented and offline verified locally; responsible actor: `/root`.
+- Scope: prevent different stale patch variants for one file from repeatedly reaching the patch
+  parser, while preserving strict context matching and safe recovery.
+- Implementation: affected paths are extracted from unified/Codex/Responses patch shapes; conflict
+  evidence is shared per path until all affected paths are successfully re-read or changed by a
+  successful write; repair feedback records paths; the repair prompt requires fresh reads; and
+  conflict guidance returns bounded current-file content (8,000 characters).
+- Regression evidence: tests cover stale variants, exact conflicts, target re-read reset, multi-file
+  refresh, and current content beyond the former ten-line guidance window.
+- Verification: `uv run pytest tests -q` -> 625 passed with 388 warnings; Ruff, mypy, and
+  `git diff --check` passed.
+- Commit: `00d9e9e` (`fix: enforce deterministic patch recovery`), together with the persisted
+  dispatch barrier and its final review repair.
+
+## TUI session context isolation — complete (2026-08-12 12:05 Asia/Shanghai)
+
+- Status: implemented and offline verified locally; responsible actor: `/root`.
+- Scope: `/resume` without an argument opens a selectable session menu; explicit `latest`/UUID
+  selectors remain direct. `/clear` now requires an explicit new/switch/cancel choice. Session
+  labels include redacted title, short ID, latest run status/task, and update time.
+- Isolation: exact-session snapshots remain authoritative; switching/new submissions replace the
+  progress and event queues, cancel the previous token, clear TUI transcript/approval/tool caches,
+  reject stale run progress, close completed streams after their first drain, and use a generation
+  guard against late worker state writes. Context builder regression coverage confirms another
+  session's transcript is not added to an LLM prompt.
+- Evidence: `docs/superpowers/plans/2026-08-12-tui-session-context-plan.md`,
+  `tests/tui/test_commands.py`, `tests/tui/test_controller.py`, `tests/tui/test_app.py`, and
+  `tests/application/test_context.py`.
+- Verification: `uv run pytest tests -q` -> 632 passed with 442 warnings; TUI suite -> 94 passed;
+  Ruff, mypy, and `git diff --check` passed. Existing unrelated worktree changes were preserved.
+- Commit: `83f65b0` (`feat: isolate tui conversation sessions`).
+
+## Deterministic apply_patch recovery barrier — complete (2026-08-14 13:02 Asia/Shanghai)
+
+- Status: implemented, review-repaired, and offline verified locally; responsible actor: `/root`.
+- Scope: make strict patch conflicts enter an explicit persisted read-repair state. Every affected
+  path must be successfully read in a separate response before any write, validation, approval,
+  finish, or mixed response can dispatch. The barrier survives `LoopSession` persistence and keeps
+  the existing repeated-conflict `no_progress` stop.
+- Evidence: design `docs/superpowers/specs/2026-08-12-apply-patch-recovery-design.md`, plan
+  `docs/superpowers/plans/2026-08-12-apply-patch-recovery-plan.md`, and regressions in
+  `tests/application/test_loop.py`, `tests/application/test_context.py`, and
+  `tests/adapters/storage/test_sqlite.py`.
+- Review repair: review found that `ContextAssembler._needs_patch_conflict_repair` stripped a
+  repository path's leading `a/` twice. A focused RED reproduced `a/value.txt` clearing the
+  execution barrier while stale repair guidance remained in context; GREEN now preserves real
+  `a/` and `b/` repository directories while normalizing patch headers separately.
+- Verification: the final patch-recovery selection passed 129 tests; the maintained offline suite
+  passed 681 tests; deterministic demos passed 3 tests; Ruff, mypy across 110 source files,
+  `uv lock --check`, documentation tests, and `git diff --check` passed.
+- Commit: `00d9e9e` (`fix: enforce deterministic patch recovery`).
+
+## Dangerous bypass permission mode — implementation planned (2026-08-13 09:58 Asia/Shanghai)
+
+- Status: design and detailed plan approved; implementation approach selection is pending.
+- Design: `docs/superpowers/specs/2026-08-13-dangerous-bypass-permission-design.md` (`8df9151`).
+- Plan: `docs/superpowers/plans/2026-08-13-dangerous-bypass-permission.md` (`e7206d6`).
+- Scope: add a first-class `bypass` value and dangerous CLI alias, central `ASK -> ALLOW`
+  conversion with every `DENY` preserved, AgentLoop no-approval evidence, persistent/output
+  contracts, TUI warnings, offline demo, full verification, and two-stage review.
+- Verification: planning-only self-review and `git diff --cached --check` passed; no implementation
+  or runtime test result is claimed yet.
 ## Dangerous bypass permission mode (2026-08-13)
 
 - Approved design: `docs/superpowers/specs/2026-08-13-dangerous-bypass-permission-design.md`.
@@ -1133,3 +1197,13 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   reviews reported no Critical, Important, or Minor findings. Delivery-record commits: `c946b30`
   and `04d2d49`. The fresh branch gate at `04d2d49` repeated the 655-test offline suite and all
   static/documentation/CLI checks successfully.
+- Local integration — complete. The user selected option 1 and `main` fast-forwarded from
+  `e7206d6` to `9aac5e5`. Existing uncommitted patch-recovery and TUI-session work was restored via
+  a stash-backed three-way merge without staging or committing it. The combined maintained suite
+  passed 680 tests; the conflict-sensitive subset passed 176; Ruff, mypy, docs, CLI help, and diff
+  checks passed. GitHub push and remote CI remain pending.
+- Restored-work completion — complete. Deterministic patch recovery was review-repaired and
+  committed as `00d9e9e`; TUI conversation isolation was committed as `83f65b0`. The exact local
+  tip passed 681 maintained tests, 129 patch-recovery tests, 99 TUI tests, and 3 deterministic demo
+  tests, plus Ruff, mypy, lock, documentation, and diff checks. GitHub push and remote CI remain
+  pending.

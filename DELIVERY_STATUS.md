@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-14 12:31:06 (Asia/Shanghai)
-Responsible actor: `/root` for dangerous-bypass coordination, local verification, review recovery, and delivery evidence. No real provider request, credential access, deployment, push, or pipeline operation was performed.
+Last updated: 2026-08-14 13:03:31 (Asia/Shanghai)
+Responsible actor: `/root` for review recovery, local integration, verification, and delivery evidence. No real provider request, credential access, deployment, push, or pipeline operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -12,7 +12,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Claude-Code-like TUI/CLI parity | Tasks 1-7 implemented and offline verified in `feature/claude-code-parity`; handoff pending user integration choice | design `3a07f09`; plan; implementation `fd8871e`; evidence below and in `PLAN.md`/`AGENT_LOG.md` | merge or retain the isolated branch; configure a provider for a real coding run |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
-| Dangerous bypass permission mode | feature branch complete, review-clean, and offline verified; integration pending | design `8df9151`; plan `e7206d6`; Tasks 1-4 `7c8f333`..`dde5383`; review repairs `a48e565`, `5b788f7`, `206881e`; lifecycle repair `e54a31c`; delivery records `c946b30`, `04d2d49`; 655-test final gate | integrate `feat/dangerous-bypass` only after the user selects the branch-finishing option, then rerun exact-main CI |
+| Dangerous bypass permission mode | locally integrated into `main`, review-clean, and offline verified; GitHub push pending | design `8df9151`; plan `e7206d6`; Tasks 1-4 `7c8f333`..`dde5383`; review repairs `a48e565`, `5b788f7`, `206881e`; lifecycle repair `e54a31c`; integrated tip `9aac5e5`; exact local tip `83f65b0`; maintained gate 681 passed | push `main`, then require GitHub artifact/unit-test jobs to pass |
 | Binary/wheel/sdist artifact builder | Docker-exported and runtime-smoked on main; CI/release configuration present | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08/TUI-09 evidence | push/tag when an operator wants remote CI artifacts or a GitHub release |
 | Main Web/HTTP removal | complete and verified on main | import/dependency/manifest absence contracts; merge `4528bda` | retain removal regression checks |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
@@ -1024,6 +1024,76 @@ Every completed plan task must link a commit and fresh verification output here.
   with 388 warnings; Ruff, mypy, and `git diff --check` passed.
 - Latest verification timestamp: 2026-08-12 10:32 CST. Commit: `34a2986` (`fix: avoid nested static validation content`).
 
+### Stale apply_patch variant recovery — delivered (2026-08-12 11:30 Asia/Shanghai)
+
+- Status: verified locally; responsible actor: `/root`.
+- Fix: conflict tracking now scopes the repair budget to affected repository paths, requiring all
+  paths to be refreshed before a retry; distinct stale patch variants can no longer bypass the
+  no-progress guard. The model receives up to 8,000 redacted characters of current file content,
+  and the repair prompt explicitly requires successful `read_file` calls.
+- Regression evidence: tests cover distinct stale variants, exact conflicts, target re-read reset,
+  multi-file refresh, and relevant content past the old ten-line excerpt.
+- Verification: `uv run pytest tests -q` -> 625 passed with 388 warnings; `uv run ruff check src
+  tests`, `uv run mypy src`, and `git diff --check` passed.
+- Latest verification timestamp: 2026-08-12 11:30 CST. No provider request, credential access,
+  target repository mutation, deployment, remote push, or destructive Git operation occurred.
+- Commit: `00d9e9e` (`fix: enforce deterministic patch recovery`), including the stronger persisted
+  dispatch barrier and final path-normalization review repair.
+
+### TUI session context isolation — delivered (2026-08-12 12:05 Asia/Shanghai)
+
+- Status: verified locally; responsible actor: `/root`.
+- Delivery: `/resume` opens a selectable session menu when no selector is supplied; `/resume
+  latest` and `/resume UUID` remain direct. `/clear` presents new/switch/cancel choices. Menu
+  entries show redacted title, short session ID, latest run status/task, and update time.
+- Safety/isolation: exact session snapshots are rendered after switching; old transcript, approval,
+  tool, draft, and validation caches are cleared. Controller progress/event queues are replaced,
+  old cancellation is requested, stale run updates are filtered, completed streams close after
+  their first drain, and generation checks prevent late worker results from restoring the previous
+  session. Session context prompt isolation is covered.
+- Evidence: plan `docs/superpowers/plans/2026-08-12-tui-session-context-plan.md`, log entry at
+  2026-08-12 12:05, and focused regressions in the TUI/context test files.
+- Verification: `uv run pytest tests -q` -> 632 passed with 442 warnings; `uv run pytest tests/tui
+  -q` -> 94 passed; Ruff, mypy, and diff checks passed. No provider request, credential access,
+  deployment, remote push, or destructive Git operation occurred.
+- Commit: `83f65b0` (`feat: isolate tui conversation sessions`).
+
+### Deterministic apply_patch recovery barrier — delivered (2026-08-14 13:02 Asia/Shanghai)
+
+- Status: review-repaired and offline verification passed; responsible actor: `/root`.
+- Delivery: strict patch conflicts now persist affected paths in `LoopSession`; only successful
+  target `read_file` actions may proceed until all paths are refreshed. Writes, finish,
+  validation, approval, mixed responses, and unrelated reads are rejected without dispatch. The
+  conflict-causing response cannot continue with later writes, and real repository paths beginning
+  with `a/` or `b/` are preserved during read checks.
+- User-facing recovery: the next prompt explains the enforced read-required barrier and asks for a
+  fresh patch after rereading current files. The prompt is no longer the sole enforcement layer.
+- Evidence: design/plan under `docs/superpowers/2026-08-12-apply-patch-recovery-*`, implementation
+  in `src/coding613/application/loop.py`, `context.py`, and `domain/models.py`, with focused tests
+  in the application and SQLite suites.
+- Review repair: a real repository path beginning with `a/` was normalized twice in context repair
+  detection, so the execution barrier could clear while stale guidance remained. The focused RED
+  reproduced `a/value.txt`; GREEN separates patch-header normalization from repository paths.
+- Latest verification timestamp: 2026-08-14 13:02 CST. The patch-recovery selection passed 129
+  tests, the maintained offline suite passed 681 tests, the deterministic demos passed 3 tests,
+  and Ruff, mypy across 110 source files, lock, documentation, and whitespace checks passed.
+- Commit: `00d9e9e` (`fix: enforce deterministic patch recovery`). No provider request, credential
+  access, deployment, remote push, or destructive Git operation occurred.
+
+### Dangerous bypass permission mode — design approved (2026-08-13 09:46 Asia/Shanghai)
+
+- Status: design committed; written-spec review and implementation plan are pending. Responsible
+  actor: `/root`.
+- Approved boundary: `bypass` skips all approval prompts by converting `ASK` to `ALLOW`, including
+  undeclared shell commands and command batches. It does not override deterministic `DENY`, schema
+  validation, explicit deny rules, `allow_writes = false`, repository/credential boundaries, or
+  worker sandbox controls.
+- Planned interfaces: `--permission-mode bypass`, `--dangerously-skip-permissions`, `/permissions
+  bypass`, and `/config set mode bypass`, with a conspicuous `DANGEROUS: BYPASS` status.
+- Evidence: `docs/superpowers/specs/2026-08-13-dangerous-bypass-permission-design.md`; commit
+  `8df9151`. No implementation verification is claimed at this phase gate.
+- Detailed implementation plan: `docs/superpowers/plans/2026-08-13-dangerous-bypass-permission.md`;
+  commit `e7206d6`. Execution approach selection is pending as of 2026-08-13 09:58 CST.
 ## Dangerous bypass permission mode - feature complete (2026-08-14 12:16 Asia/Shanghai)
 
 - Scope: add explicit `bypass` selection through config, root CLI, TUI, run persistence, output,
@@ -1047,10 +1117,17 @@ Every completed plan task must link a commit and fresh verification output here.
   replaced it with explicit lifecycle guards and the scoped re-review marked it addressed. Final
   spec-compliance and code-quality reviews both passed with no Critical, Important, or Minor
   findings.
-- Handoff: branch `feat/dangerous-bypass` contains implementation through `e54a31c` and delivery
-  evidence in `c946b30`; merge, push, and exact-main CI remain pending the user's
-  `finishing-a-development-branch` choice. GitHub is the confirmed submission repository; no NJU
-  Git remote is required.
+- Integration: the user selected local merge. `main` fast-forwarded from `e7206d6` to `9aac5e5`.
+  Pre-existing tracked modifications were preserved through stash-backed three-way integration;
+  four conflicts were resolved by retaining both append-only evidence histories and both TUI
+  command contracts. Untracked course files and `tmp/` remained in place.
 - Latest branch gate: 2026-08-14 12:31 Asia/Shanghai at `04d2d49`. The maintained offline suite
   passed 655 tests in 12.46s outside the documented restricted-sandbox LanceDB boundary. Ruff,
   mypy, lock, documentation, CLI-help, diff, and clean-status checks passed.
+- Latest integrated-worktree gate: 2026-08-14 12:44 Asia/Shanghai at `main@9aac5e5` with restored
+  user changes. The maintained suite passed 680 tests; the conflict-sensitive subset passed 176;
+  Ruff, mypy, documentation, CLI-help, and diff checks passed. GitHub push and CI remain pending.
+- Restored-work commits: deterministic patch recovery `00d9e9e`; TUI conversation isolation
+  `83f65b0`. The exact local tip passed 681 maintained tests, 129 patch-recovery tests, 99 TUI
+  tests, and 3 deterministic demo tests, plus Ruff, mypy, lock, documentation, and diff checks.
+  GitHub push and CI remain pending.
