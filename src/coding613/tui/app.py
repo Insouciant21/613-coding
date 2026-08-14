@@ -11,6 +11,7 @@ from uuid import UUID
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.css.query import NoMatches
 from textual.widgets import Static, TextArea
 from textual.widgets.option_list import Option
 
@@ -1163,7 +1164,10 @@ class CodingApp(App[None]):
         self.query_one(ConversationLog).scroll_end(animate=False)
 
     def _update_input_state(self) -> None:
-        composer = self.query_one(TaskComposer)
+        try:
+            composer = self.query_one(TaskComposer)
+        except NoMatches:
+            return
         awaiting = self._approval_id is not None
         composer.disabled = self._executing or awaiting
         if not composer.disabled:
@@ -1172,14 +1176,20 @@ class CodingApp(App[None]):
     def _set_active_operation(self, label: str, *, reset: bool = False) -> None:
         if reset:
             self._operation_started_at = None
-            self.query_one(ActiveOperation).update(label)
+            try:
+                self.query_one(ActiveOperation).update(label)
+            except NoMatches:
+                pass
             return
         elapsed = (
             time.monotonic() - self._operation_started_at
             if self._operation_started_at is not None
             else 0.0
         )
-        self.query_one(ActiveOperation).update(f"{label} | elapsed={elapsed:.1f}s")
+        try:
+            self.query_one(ActiveOperation).update(f"{label} | elapsed={elapsed:.1f}s")
+        except NoMatches:
+            pass
 
     @property
     def _permission_mode(self) -> PermissionMode:
