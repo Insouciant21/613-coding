@@ -1,7 +1,7 @@
 # DELIVERY_STATUS.md
 
-Last updated: 2026-08-12 02:16:57 (Asia/Shanghai)
-Responsible actor: `/root` for OpenAI tool support, local shell execution, patch-conflict recovery, and local verification. No real provider request, deployment, or pipeline operation was performed.
+Last updated: 2026-08-14 12:16:09 (Asia/Shanghai)
+Responsible actor: `/root` for dangerous-bypass coordination, local verification, review recovery, and delivery evidence. No real provider request, credential access, deployment, push, or pipeline operation was performed.
 
 This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, `PLAN.md`, `SPEC_PROCESS.md`, CI/CD logs, test output, and commits.
 
@@ -12,6 +12,7 @@ This is an index of delivery evidence. Source records remain in `AGENT_LOG.md`, 
 | Claude-Code-like TUI/CLI parity | Tasks 1-7 implemented and offline verified in `feature/claude-code-parity`; handoff pending user integration choice | design `3a07f09`; plan; implementation `fd8871e`; evidence below and in `PLAN.md`/`AGENT_LOG.md` | merge or retain the isolated branch; configure a provider for a real coding run |
 | Safe repository mutations | design and implementation plan committed; execution pending | design `e7f7ece`; plan `9ee205d` | select execution workflow and begin MUTATION-01 |
 | Claude Code-like TUI | implemented and verified on main, including pause/restart/approval recovery | design `e7f7ece`; merge `4528bda`; Pilot and full-suite evidence in TUI-09 | retain regression coverage and configure provider credentials locally |
+| Dangerous bypass permission mode | feature branch complete, review-clean, and offline verified; integration pending | design `8df9151`; plan `e7206d6`; Tasks 1-4 `7c8f333`..`dde5383`; review repairs `a48e565`, `5b788f7`, `206881e`; lifecycle repair `e54a31c`; 655-test final gate | integrate `feat/dangerous-bypass` only after the user selects the branch-finishing option, then rerun exact-main CI |
 | Binary/wheel/sdist artifact builder | Docker-exported and runtime-smoked on main; CI/release configuration present | `Dockerfile`, `packaging/`, `scripts/build_artifacts.sh`, `scripts/smoke_artifacts.sh`; TUI-08/TUI-09 evidence | push/tag when an operator wants remote CI artifacts or a GitHub release |
 | Main Web/HTTP removal | complete and verified on main | import/dependency/manifest absence contracts; merge `4528bda` | retain removal regression checks |
 | Cube recovery through 613 Coding | design and recovery plan written; blocked on the two harness stages | `docs/superpowers/plans/2026-08-09-cube-solver-recovery.md`; Cube Task 2 `8c052ee` | repair Task 3 through new TUI after harness verification |
@@ -1022,3 +1023,30 @@ Every completed plan task must link a commit and fresh verification output here.
 - Verification: `uv run pytest tests/tui -q` -> 88 passed; `uv run pytest tests -q` -> 621 passed
   with 388 warnings; Ruff, mypy, and `git diff --check` passed.
 - Latest verification timestamp: 2026-08-12 10:32 CST. Commit: `34a2986` (`fix: avoid nested static validation content`).
+
+## Dangerous bypass permission mode - feature complete (2026-08-14 12:16 Asia/Shanghai)
+
+- Scope: add explicit `bypass` selection through config, root CLI, TUI, run persistence, output,
+  documentation, and the deterministic demo. Bypass converts only policy `ASK` decisions to
+  `ALLOW`; hard/config/rule `DENY`, schema validation, argv-only execution, repository boundaries,
+  sandbox limits, feedback, budgets, and audit persistence remain authoritative.
+- TDD: Tasks 1-4 recorded RED results of 8, 6, 5, and 2 failures before implementation, followed
+  by focused GREEN results of 82, 111, 82, and 8 passes. Review repairs are `a48e565`, `5b788f7`,
+  and `206881e`. Final verification exposed a Textual teardown race; the lifecycle RED and repair
+  are recorded in `.superpowers/sdd/2026-08-13-dangerous-bypass-permission/task-5-report.md` and
+  commit `e54a31c`.
+- Verification: the complete bypass selection passed 282 tests; the final maintained offline suite
+  passed 655 tests. Ruff, mypy across 110 source files, `uv lock --check`, `git diff --check`, and
+  `613-coding --help` passed. Help lists canonical `bypass` and
+  `--dangerously-skip-permissions` with the retained-denials warning.
+- Environment boundary: `lancedb.connect()` hung in the managed restricted sandbox's background
+  event loop. Faulthandler identified that exact frame. The same offline demo and full suites
+  passed outside that restriction with no network or credential access; the limitation is recorded
+  rather than represented as an in-sandbox pass.
+- Review: the task-level teardown review found one Important broad-exception issue; `e54a31c`
+  replaced it with explicit lifecycle guards and the scoped re-review marked it addressed. Final
+  spec-compliance and code-quality reviews both passed with no Critical, Important, or Minor
+  findings.
+- Handoff: branch `feat/dangerous-bypass` is complete through `e54a31c`; merge, push, and exact-main
+  CI remain pending the user's `finishing-a-development-branch` choice. GitHub is the confirmed
+  submission repository; no NJU Git remote is required.

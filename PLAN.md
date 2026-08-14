@@ -1106,3 +1106,28 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Verification: `uv run pytest tests/tui -q` -> 88 passed; `uv run pytest tests -q` -> 621 passed
   with 388 warnings; Ruff, mypy, and `git diff --check` passed.
 - Commit: `34a2986` (`fix: avoid nested static validation content`).
+
+## Dangerous bypass permission mode (2026-08-13)
+
+- Approved design: `docs/superpowers/specs/2026-08-13-dangerous-bypass-permission-design.md`.
+- Execution plan: `docs/superpowers/plans/2026-08-13-dangerous-bypass-permission.md`.
+- Task 1 — complete. Added the canonical mode, config/SQLite persistence, root CLI selectors,
+  deterministic conflict rejection, and text/JSON/stream reporting. RED: 8 failed, 74 passed.
+  GREEN: 82 passed; scoped Ruff, CLI help, and diff checks passed. Commit: `7c8f333`.
+- Task 2 — complete. Centralized bypass conversion of policy `ASK` to `ALLOW` while preserving
+  every deterministic `DENY`, invocation filter, pending approval, and sandbox boundary. RED: 6
+  failed, 105 passed. GREEN: 111 passed; scoped Ruff, mypy, and diff checks passed. Commit:
+  `451fa7e`.
+- Task 3 — complete. Added TUI selection, menu integration, and a shared conspicuous warning for
+  footer/status/permission/config views. RED: 5 failed, 77 passed. GREEN: 82 passed; scoped Ruff,
+  mypy, and diff checks passed. Commit: `5935178`.
+- Task 4 — complete. Extended the deterministic demo and current operator/specification docs.
+  RED: 2 failed, 6 passed. GREEN: 8 passed; scoped Ruff, mypy, and diff checks passed. Commit:
+  `dde5383`.
+- Task 5 - complete on the isolated branch. Final bypass selection: 282 passed. Final maintained
+  offline suite after lifecycle repair: 655 passed. Ruff, mypy across 110 source files,
+  `uv lock --check`, `git diff --check`, and CLI help passed. The restricted sandbox hung in
+  `lancedb.connect()`; faulthandler captured the boundary and the same offline tests passed outside
+  that restriction without network or credentials. The teardown fix `e54a31c` passed four focused
+  lifecycle/restore regressions and a scoped re-review. Final spec-compliance and code-quality
+  reviews reported no Critical, Important, or Minor findings. Delivery-record commit: pending.

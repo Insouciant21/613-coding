@@ -2392,3 +2392,108 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Lesson: Textual widgets must never be used as `Static` content; renderables belong inside a
   widget, not as its content value.
 - Commit: `34a2986` (`fix: avoid nested static validation content`).
+
+## 2026-08-13 10:10:01 Asia/Shanghai - Dangerous bypass Task 1
+
+- Human decision: execute approved 方案 A inline; add a Claude Code-style dangerous bypass while
+  preserving deterministic denials and sandbox constraints.
+- Triggered skills: `using-git-worktrees`, `executing-plans`, and
+  `test-driven-development`; isolated branch `feat/dangerous-bypass` was created because the main
+  checkout contains unrelated uncommitted changes.
+- Baseline: `UV_CACHE_DIR=/tmp/coding613-uv-cache uv run pytest tests -q` -> 621 passed.
+- RED: the Task 1 focused command failed with 8 expected failures and 74 passes because bypass was
+  absent from the enum/config/storage path, the dangerous alias was unknown, and output omitted
+  the effective mode.
+- GREEN: the same focused command passed 82 tests; scoped Ruff, root help, and `git diff --check`
+  passed. The root help lists both `--permission-mode ... bypass` and
+  `--dangerously-skip-permissions`.
+- Implementation: canonical enum/config/SQLite round-trip, deterministic CLI alias/conflict
+  handling, and effective run mode propagation through text, JSON, and stream terminal output.
+- Commit: `7c8f333` (`feat: add bypass permission selection`). No real LLM, credential, network
+  request, Docker daemon, or external repository was used.
+- Lesson: terminal output must use the persisted `Run.permission_mode`, not merely the invocation
+  default, so resumed and repository-configured runs report their actual governance state.
+
+## 2026-08-13 10:12:53 Asia/Shanghai - Dangerous bypass Task 2
+
+- Triggered skills: `executing-plans` and `test-driven-development`.
+- RED: the focused policy/loop/filter/sandbox command produced 6 expected failures and 105 passes:
+  five soft categories remained `ASK`, and the loop stopped in `WAITING_APPROVAL`.
+- GREEN: the same command passed 111 tests. Scoped Ruff, policy mypy, and `git diff --check`
+  passed.
+- Implementation: `PolicyEngine._apply_permission_mode` converts only the final non-denied
+  `ASK` decision to `ALLOW` for bypass. Hard rules, repository write disabling, project deny
+  rules, invocation filters, invalid schemas, and sandbox constraints retain their existing
+  independent denial paths.
+- Loop evidence: an undeclared `run_command` executed exactly once with rule
+  `mode.bypass.command`, produced no approval, and completed. The existing strict approval test
+  still paused, and a reconstructed strict pending approval stayed pending alongside a new bypass
+  run.
+- Commit: `451fa7e` (`feat: bypass soft permission prompts`). No command from the test tool call
+  was executed by a subprocess; the loop used its in-memory fake executor.
+- Lesson: a single finalizer after explicit project rules makes the bypass auditable and prevents
+  category-specific gaps while leaving every deterministic denial as an early return.
+
+## 2026-08-13 10:15:09 Asia/Shanghai - Dangerous bypass Task 3
+
+- Triggered skills: `executing-plans` and `test-driven-development`.
+- RED: the focused TUI/config command failed 5 tests and passed 77; bypass was rejected by the
+  slash parser, absent from the menu, and lacked danger warnings in runtime/config surfaces.
+- GREEN: the same command passed 82 tests. Scoped Ruff, three-source mypy, and
+  `git diff --check` passed.
+- Implementation: `/permissions bypass`, config-menu `mode:bypass`, and one display-only helper
+  for `DANGEROUS: BYPASS` in the footer, `/status`, and `/permissions list`. Project configuration
+  summaries retain `mode=bypass` and append the warning.
+- Commit: `5935178` (`feat: expose dangerous bypass mode in tui`).
+- Lesson: canonical values and operator warnings serve different contracts; keeping the warning
+  in a display helper avoids corrupting persistence and machine-readable output.
+
+## 2026-08-13 10:16:52 Asia/Shanghai - Dangerous bypass Task 4
+
+- Triggered skills: `executing-plans` and `test-driven-development`.
+- RED: demo/docs tests failed 2 and passed 6 because the demo lacked a bypass result and current
+  operator documents omitted the dangerous selectors and boundary.
+- GREEN: the same command passed 8 tests. Scoped Ruff, demo mypy, and `git diff --check` passed.
+- Implementation: the offline deterministic demo now evaluates an undeclared argv command under
+  bypass without dispatching it, while evaluating repository escape under the same mode as a hard
+  denial. README, current SPEC, and deployment guidance cover both CLI selectors, both TUI
+  selectors, warning text, and retained deny/sandbox constraints.
+- Commit: `dde5383` (`docs: document dangerous bypass boundary`). No historical spec was rewritten.
+- Lesson: the core demo is stronger when one result proves both sides of the boundary—automatic
+  soft permission and immutable hard denial—without needing a real shell or LLM.
+
+## 2026-08-14 12:16:09 Asia/Shanghai - Dangerous bypass Task 5 final verification and review
+
+- Human context: the user asked to continue the unfinished modifications and separately confirmed
+  that GitHub is the submission repository, so no NJU Git remote is required. The existing isolated
+  worktree `/home/int21/Workspace/ai4se_project/.worktrees/dangerous-bypass` and branch
+  `feat/dangerous-bypass` were resumed; the dirty main checkout was not modified or overwritten.
+- Triggered skills: `using-superpowers`, `brainstorming` (existing approved design/plan recovery),
+  `using-git-worktrees`, `subagent-driven-development`, `test-driven-development`,
+  `systematic-debugging`, `requesting-code-review`, and `verification-before-completion`.
+- Recovery evidence: Tasks 1-4 already existed as commits `7c8f333`, `451fa7e`, `5935178`, and
+  `dde5383`, followed by review repairs `a48e565`, `5b788f7`, and `206881e`. The SDD recovery ledger
+  and task report are under
+  `.superpowers/sdd/2026-08-13-dangerous-bypass-permission/`.
+- Debugging: the first fresh bypass selection exposed two Textual teardown failures. The restore
+  worker completed after widget unmount and called `query_one(TaskComposer/ActiveOperation)`. The
+  implementer `/root/bypass_tui_teardown_fix` first produced `cb7433d`; task review found one
+  Important broad-`NoMatches` suppression issue. Fix round 1 added an explicit `is_running`
+  lifecycle boundary and mounted-state propagation tests in `e54a31c`. Scoped re-review marked the
+  finding addressed with no new Critical or Important breakage.
+- Verification: four focused lifecycle/restore regressions passed. The complete bypass selection
+  passed 282 tests. The final maintained offline suite passed 655 tests. Ruff passed; mypy reported
+  no issues in 110 source files; `uv lock --check` and `git diff --check` passed; root CLI help
+  listed `bypass` and `--dangerously-skip-permissions` with the retained-denials warning.
+- Environment boundary: inside the managed restricted sandbox, the demo hung in
+  `lancedb.connect()` while its background event loop waited on a future. Faulthandler captured the
+  exact stack. The identical offline demo and full suites passed outside that restriction after
+  approval. No network, real LLM, credential, Docker daemon, target repository, deployment, push,
+  or external service was used.
+- Reviews: final spec-compliance review PASS and final code-quality review PASS; both reported no
+  Critical, Important, or Minor findings. Reviewer task: `/root/bypass_fix_rereview`.
+- Handoff: implementation tip `e54a31c`; delivery records are updated in this task and branch
+  integration remains subject to `finishing-a-development-branch` selection.
+- Lesson: lifecycle error handling must distinguish shutdown from a malformed mounted UI. A broad
+  exception catch made teardown green but hid a real invariant; an explicit app-state guard keeps
+  both reliability and observability.
