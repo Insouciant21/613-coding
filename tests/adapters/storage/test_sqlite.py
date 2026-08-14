@@ -104,6 +104,20 @@ def test_session_round_trip_and_ordered_runs(tmp_path: Path) -> None:
     assert store.list_runs_for_session(session.id) == [first, second]
 
 
+def test_loop_session_patch_repair_paths_survive_sqlite_round_trip(tmp_path: Path) -> None:
+    store = SqliteEventStore(tmp_path / "state.db")
+    run = Run(task="recover stale patch")
+    store.create_run(run)
+    session = LoopSession(
+        run_id=run.id,
+        patch_repair_paths=("src/a.py", "src/b.py"),
+    )
+
+    store.save_loop_session(session)
+
+    assert store.get_loop_session(run.id) == session
+
+
 def test_run_options_survive_storage_round_trip(tmp_path: Path) -> None:
     store = SqliteEventStore(tmp_path / "state.db")
     options = RunOptions(

@@ -174,6 +174,7 @@ class LoopSession(DomainModel):
     resource_profile: str | None = None
     max_output_tokens: int | None = Field(default=None, gt=0)
     force_write: bool = False
+    patch_repair_paths: tuple[str, ...] = ()
     no_action_streak: int = Field(default=0, ge=0)
     provider_error_streak: int = Field(default=0, ge=0)
 

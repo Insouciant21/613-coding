@@ -60,9 +60,13 @@ _NO_PROGRESS_REPAIR_PROMPT = (
 
 _PATCH_CONFLICT_REPAIR_PROMPT = (
     "The previous apply_patch was rejected because its context no longer matches the current "
-    "repository. Re-read every affected file, inspect the current content, and create a fresh "
-    "patch against that content. Do not retry the unchanged patch and do not overwrite unrelated "
-    "changes."
+    "repository. The harness now has a read-required repair barrier: until every affected path "
+    "has a successful read_file result, it will reject every write, validation, approval, and "
+    "finish action. Re-read every affected path with read_file. In the next response emit only "
+    "read_file calls for the affected paths; do "
+    "not mix a read with a write. After observing the returned current content, submit a fresh "
+    "patch in a later response. Do not retry an unchanged or alternate stale patch and do not "
+    "overwrite unrelated changes."
 )
 
 _NO_ACTION_REPAIR_PROMPT = (
@@ -495,12 +499,23 @@ def _needs_write_escalation(recent_events: Sequence[Event]) -> bool:
     """Escalate a failed no-change validation before the next model call."""
 
     for event in reversed(recent_events):
+        if event.event_type == "feedback.invalid_action":
+            details = event.payload.get("details")
+            if isinstance(details, dict) and details.get("require_fresh_patch") is True:
+                return False
         if event.event_type == "validation.completed":
             payload = event.payload
             if payload.get("passed") is False and not payload.get("changed_files"):
                 return True
         if event.event_type == "feedback.tool_error":
             details = event.payload.get("details")
+            if (
+                isinstance(details, dict)
+                and details.get("tool") == "apply_patch"
+                and isinstance(details.get("error"), str)
+                and details["error"].startswith("PatchConflictError")
+            ):
+                return False
             if isinstance(details, dict) and not details.get("changed_files"):
                 return True
     return False
@@ -509,27 +524,54 @@ def _needs_write_escalation(recent_events: Sequence[Event]) -> bool:
 def _needs_patch_conflict_repair(recent_events: Sequence[Event]) -> bool:
     """Give the next model call deterministic guidance after a stale patch."""
 
-    for event in reversed(recent_events):
-        if event.event_type == "feedback.invalid_action":
+    required: set[str] = set()
+    repair_started = False
+    for event in recent_events:
+        if event.event_type in {"feedback.tool_error", "feedback.invalid_action"}:
             details = event.payload.get("details")
-            return isinstance(details, dict) and details.get("require_fresh_patch") is True
-        if event.event_type != "feedback.tool_error":
-            if event.event_type in {
-                "tool.completed",
-                "validation.completed",
-                "feedback.pass",
-            }:
-                return False
+            if not isinstance(details, dict):
+                continue
+            is_conflict = (
+                event.event_type == "feedback.tool_error"
+                and details.get("tool") == "apply_patch"
+                and isinstance(details.get("error"), str)
+                and details["error"].startswith("PatchConflictError")
+            )
+            is_repair_feedback = (
+                event.event_type == "feedback.invalid_action"
+                and details.get("require_fresh_patch") is True
+            )
+            if is_conflict or is_repair_feedback:
+                paths = details.get("patch_paths")
+                raw_paths = paths if isinstance(paths, (list, tuple, set)) else ()
+                if not raw_paths:
+                    continue
+                required = set()
+                for item in raw_paths:
+                    if not isinstance(item, str):
+                        continue
+                    path = item.strip()
+                    while path.startswith("./"):
+                        path = path[2:]
+                    if path:
+                        required.add(path)
+                repair_started = True
+                continue
+        if not repair_started or event.event_type != "tool.completed":
             continue
-        details = event.payload.get("details")
-        if not isinstance(details, dict):
-            return False
-        return (
-            details.get("tool") == "apply_patch"
-            and isinstance(details.get("error"), str)
-            and details["error"].startswith("PatchConflictError")
-        )
-    return False
+        payload = event.payload
+        call = payload.get("call")
+        if payload.get("success") is not True or not isinstance(call, dict):
+            continue
+        if call.get("name") != "read_file":
+            continue
+        arguments = call.get("arguments")
+        if isinstance(arguments, dict) and isinstance(arguments.get("path"), str):
+            path = arguments["path"].strip()
+            while path.startswith("./"):
+                path = path[2:]
+            required.discard(path)
+    return repair_started and bool(required)
 
 
 def _responses_continuation_items(

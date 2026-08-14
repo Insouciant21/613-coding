@@ -346,6 +346,9 @@ def test_context_gives_fresh_patch_guidance_after_patch_conflict(tmp_path: Path)
                 "tool": "apply_patch",
                 "error": "PatchConflictError: hunk context does not match",
                 "changed_files": [],
+                "require_fresh_patch": True,
+                "repair_state": "read_required",
+                "patch_paths": ["src/parser.py"],
             },
         },
         datetime.now(UTC),
@@ -356,8 +359,120 @@ def test_context_gives_fresh_patch_guidance_after_patch_conflict(tmp_path: Path)
     assert any(
         "fresh patch" in message.content.lower()
         and "re-read" in message.content.lower()
+        and "read-required repair barrier" in message.content.lower()
+        and "only read_file" in message.content.lower()
         for message in context.messages
     )
+    assert not any(
+        "must edit" in message.content.lower()
+        and "do not repeat read-only" in message.content.lower()
+        for message in context.messages
+    )
+
+
+def test_context_keeps_partial_patch_repair_guidance_until_all_paths_are_read(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    conflict = Event.new(
+        "feedback.tool_error",
+        run.id,
+        {
+            "message": "apply_patch conflicted with repository content",
+            "details": {
+                "tool": "apply_patch",
+                "error": "PatchConflictError: hunk context does not match",
+                "patch_paths": ["one.txt", "two.txt"],
+            },
+        },
+        datetime.now(UTC),
+    )
+    read_one = Event.new(
+        "tool.completed",
+        run.id,
+        {
+            "success": True,
+            "call": {"name": "read_file", "arguments": {"path": "one.txt"}},
+        },
+        datetime.now(UTC),
+    )
+
+    context = assembler.build(run.id, "update both files", (conflict, read_one))
+
+    assert any("read-required repair barrier" in message.content.lower() for message in context.messages)
+
+
+def test_context_clears_patch_repair_guidance_for_real_a_directory(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    conflict = Event.new(
+        "feedback.tool_error",
+        run.id,
+        {
+            "message": "apply_patch conflicted with repository content",
+            "details": {
+                "tool": "apply_patch",
+                "error": "PatchConflictError: hunk context does not match",
+                "patch_paths": ["a/value.txt"],
+            },
+        },
+        datetime.now(UTC),
+    )
+    read = Event.new(
+        "tool.completed",
+        run.id,
+        {
+            "success": True,
+            "call": {"name": "read_file", "arguments": {"path": "a/value.txt"}},
+        },
+        datetime.now(UTC),
+    )
+
+    context = assembler.build(run.id, "update the nested value", (conflict, read))
+
+    assert not any(
+        "read-required repair barrier" in message.content.lower()
+        for message in context.messages
+    )
+
+
+def test_context_ignores_legacy_conflict_and_keeps_new_repair_guidance(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    legacy = Event.new(
+        "feedback.tool_error",
+        run.id,
+        {
+            "message": "legacy patch conflict",
+            "details": {
+                "tool": "apply_patch",
+                "error": "PatchConflictError: hunk context does not match",
+            },
+        },
+        datetime.now(UTC),
+    )
+    current = Event.new(
+        "feedback.tool_error",
+        run.id,
+        {
+            "message": "current patch conflict",
+            "details": {
+                "tool": "apply_patch",
+                "error": "PatchConflictError: hunk context does not match",
+                "patch_paths": ["src/parser.py"],
+            },
+        },
+        datetime.now(UTC),
+    )
+
+    context = assembler.build(run.id, "update the parser", (legacy, current))
+
+    assert any("read-required repair barrier" in message.content.lower() for message in context.messages)
 
 
 def test_context_builds_responses_shell_continuation_from_provider_and_tool_events(
@@ -528,6 +643,30 @@ def test_session_context_bounds_and_redacts_prior_transcript(tmp_path: Path) -> 
     assert all("sk-test-secret-1234" not in message.content for message in transcript)
     assert any(message.content == "Omitted 1 earlier transcript entries." for message in context.messages)
     assert any(message.content == "current task" for message in context.messages)
+
+
+def test_session_context_does_not_include_another_session_transcript(tmp_path: Path) -> None:
+    repository, project, _, _, _ = setup_memory(tmp_path)
+    store = SqliteEventStore(repository.path)
+    first = InteractiveSession(project_id=project.id, title="first")
+    second = InteractiveSession(project_id=project.id, title="second")
+    store.create_interactive_session(first)
+    store.create_interactive_session(second)
+    store.create_run(
+        Run(project_id=project.id, session_id=first.id, task="first-session secret context")
+    )
+    current = Run(project_id=project.id, session_id=second.id, task="second-session task")
+    store.create_run(current)
+    builder = SessionContextBuilder(
+        ContextAssembler(repository, FakeIndex(), RecordingEmbedding()),
+        store,
+    )
+
+    context = builder.build(current.id, current.task, ())
+
+    rendered = "\n".join(message.content for message in context.messages)
+    assert "second-session task" in rendered
+    assert "first-session secret context" not in rendered
 
 
 def test_session_context_merges_run_system_prompts_and_model_metadata(tmp_path: Path) -> None:

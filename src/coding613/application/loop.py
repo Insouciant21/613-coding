@@ -190,6 +190,7 @@ class _Session:
     no_action_streak: int = 0
     provider_error_streak: int = 0
     resource_profile: ResourceProfile | None = None
+    patch_repair_paths: set[str] = field(default_factory=set)
 
     @classmethod
     def restore(
@@ -238,6 +239,7 @@ class _Session:
                 if snapshot.resource_profile
                 else None
             ),
+            patch_repair_paths=set(snapshot.patch_repair_paths),
         )
 
     def snapshot(self, run_id: UUID) -> LoopSession:
@@ -265,6 +267,7 @@ class _Session:
                 self.resource_profile.max_output_tokens if self.resource_profile else None
             ),
             force_write=self.force_write,
+            patch_repair_paths=tuple(sorted(self.patch_repair_paths)),
             no_action_streak=self.no_action_streak,
             provider_error_streak=self.provider_error_streak,
         )
@@ -341,7 +344,14 @@ class AgentLoop:
                             )
                         )
                     )
-                    if not (session.force_write and definition.name in _READ_ONLY_TOOLS)
+                    if not (
+                        session.force_write
+                        and definition.name in _READ_ONLY_TOOLS
+                        and not (
+                            session.patch_repair_paths
+                            and definition.name == "read_file"
+                        )
+                    )
                 )
                 budget_definition = (
                     (_TASK_BUDGET_TOOL,) if session.resource_profile is None else ()
@@ -592,6 +602,77 @@ class AgentLoop:
 
             session.no_action_streak = 0
             continue_model = False
+            if session.patch_repair_paths and not self._allow_patch_repair_response(
+                response.actions, session.patch_repair_paths
+            ):
+                blocked_patch = next(
+                    (
+                        envelope.action
+                        for envelope in response.actions
+                        if isinstance(envelope.action, ToolCall)
+                        and envelope.action.name == "apply_patch"
+                    ),
+                    None,
+                )
+                if (
+                    blocked_patch is not None
+                    and self._patch_conflict_attempts(
+                        blocked_patch, run_id, dependencies
+                    )
+                    >= _PATCH_CONFLICT_REPEAT_LIMIT
+                ):
+                    return self._terminal_without_action(
+                        run_id,
+                        task,
+                        session,
+                        dependencies,
+                        state_before,
+                        StopReason.NO_PROGRESS,
+                        "run.no_progress.repeated_patch_conflict",
+                        FeedbackKind.NO_PROGRESS,
+                        "apply_patch conflicted repeatedly for the same file without a fresh read; stopping until a current patch is generated",
+                        context=context,
+                        response=response,
+                    )
+                feedback = Feedback(
+                    kind=FeedbackKind.INVALID_ACTION,
+                    message=(
+                        "patch repair requires successful read_file calls for every affected "
+                        "path before any write, validation, approval, or finish action"
+                    ),
+                    details={
+                        "repair_state": "read_required",
+                        "require_fresh_patch": True,
+                        "patch_paths": sorted(session.patch_repair_paths),
+                        "mixed_response": any(
+                            isinstance(envelope.action, ToolCall)
+                            and envelope.action.name == "read_file"
+                            for envelope in response.actions
+                        )
+                        and any(
+                            not (
+                                isinstance(envelope.action, ToolCall)
+                                and envelope.action.name == "read_file"
+                            )
+                            for envelope in response.actions
+                        ),
+                    },
+                )
+                self._block(session, feedback.kind)
+                self._feedback_event(dependencies, run_id, feedback)
+                self._record(
+                    run_id,
+                    session,
+                    dependencies,
+                    state_before=state_before,
+                    context=context,
+                    response=response,
+                    feedback=feedback,
+                    schema_validation=SchemaValidationEvidence(
+                        valid=True, target="model_response"
+                    ),
+                )
+                continue
             validation_action_index = max(
                 (
                     action_index
@@ -602,7 +683,10 @@ class AgentLoop:
                 default=-1,
             )
             parallel_reads = self._prepare_parallel_read_batch(
-                response.actions, run_id, dependencies
+                response.actions,
+                run_id,
+                dependencies,
+                repair_paths=session.patch_repair_paths,
             )
             if parallel_reads is not None:
                 if self._execute_read_only_batch(
@@ -886,7 +970,12 @@ class AgentLoop:
                 schema_evidence = SchemaValidationEvidence(
                     valid=True, target="tool_call"
                 )
-                if self._is_repeated_read_action(action, run_id, dependencies):
+                if self._is_repeated_read_action(action, run_id, dependencies) and not (
+                    session.patch_repair_paths
+                    and action.name == "read_file"
+                    and self._normalize_read_path(action.arguments.get("path"))
+                    in session.patch_repair_paths
+                ):
                     feedback = Feedback(
                         kind=FeedbackKind.INVALID_ACTION,
                         message=(
@@ -989,7 +1078,7 @@ class AgentLoop:
                         StopReason.NO_PROGRESS,
                         "run.no_progress.repeated_patch_conflict",
                         FeedbackKind.NO_PROGRESS,
-                        "the same apply_patch conflicted repeatedly; stopping until a fresh patch is generated",
+                        "apply_patch conflicted repeatedly for the same file without a fresh read; stopping until a current patch is generated",
                         context=context,
                         response=response,
                     )
@@ -997,13 +1086,14 @@ class AgentLoop:
                     feedback = Feedback(
                         kind=FeedbackKind.INVALID_ACTION,
                         message=(
-                            "the exact apply_patch already conflicted; re-read the affected file "
-                            "and generate a different patch before retrying"
+                            "apply_patch already conflicted for the affected file; re-read every "
+                            "affected path and generate a fresh patch before retrying"
                         ),
                         details={
                             "tool": action.name,
                             "require_fresh_patch": True,
                             "patch_fingerprint": self._patch_fingerprint(action),
+                            "patch_paths": sorted(self._patch_paths(action)),
                         },
                     )
                     self._block(session, feedback.kind)
@@ -1117,6 +1207,13 @@ class AgentLoop:
                     policy_decision=policy_evidence,
                 ):
                     return self._summary(run_id, session)
+                # A conflict discovered mid-response changes the authorization
+                # boundary for every remaining action in that response.  Stop
+                # processing immediately so a later bundled write or finish
+                # action cannot bypass the read-required repair barrier.
+                if session.patch_repair_paths:
+                    continue_model = True
+                    break
             if continue_model:
                 continue
 
@@ -1126,6 +1223,8 @@ class AgentLoop:
         actions: Sequence[ActionEnvelope],
         run_id: UUID,
         dependencies: LoopDependencies,
+        *,
+        repair_paths: set[str] | None = None,
     ) -> tuple[
         tuple[ActionEnvelope, ToolCall, SchemaValidationEvidence, PolicyDecisionEvidence],
         ...,
@@ -1150,7 +1249,12 @@ class AgentLoop:
                 return None
             try:
                 dependencies.tools.validate(action)
-                if cls._is_repeated_read_action(action, run_id, dependencies):
+                if cls._is_repeated_read_action(action, run_id, dependencies) and not (
+                    repair_paths
+                    and action.name == "read_file"
+                    and cls._normalize_read_path(action.arguments.get("path"))
+                    in repair_paths
+                ):
                     return None
                 decision = cls._policy_decision(action, dependencies)
             except Exception:
@@ -1166,6 +1270,22 @@ class AgentLoop:
                 )
             )
         return tuple(prepared)
+
+    @classmethod
+    def _allow_patch_repair_response(
+        cls, actions: Sequence[ActionEnvelope], required_paths: set[str]
+    ) -> bool:
+        """Allow only a read-only refresh response while patch repair is pending."""
+
+        if not actions:
+            return False
+        return all(
+            isinstance(envelope.action, ToolCall)
+            and envelope.action.name == "read_file"
+            and cls._normalize_read_path(envelope.action.arguments.get("path"))
+            in required_paths
+            for envelope in actions
+        )
 
     def _execute_read_only_batch(
         self,
@@ -1364,13 +1484,92 @@ class AgentLoop:
     def _patch_conflict_attempts(
         cls, action: ToolCall, run_id: UUID, dependencies: LoopDependencies
     ) -> int:
-        """Count consecutive attempts of the same failed patch fingerprint."""
+        """Count unresolved conflicts for the files targeted by a patch.
+
+        A model can produce several different patches from the same stale
+        transcript. Limiting only an exact patch fingerprint therefore lets
+        stale variants render an unbounded stream of conflicts. Variants for
+        the same path share the repair budget until that path is read again.
+        """
 
         if action.name != "apply_patch":
             return 0
         fingerprint = cls._patch_fingerprint(action)
+        paths = cls._patch_paths(action)
+        events = dependencies.events.list_for_run(run_id)
+        if not paths:
+            return cls._exact_patch_conflict_attempts(action, fingerprint, events)
+
         attempts = 0
-        for event in reversed(dependencies.events.list_for_run(run_id)):
+        refreshed_paths: set[str] = set()
+        for event in events:
+            if event.event_type == "tool.completed":
+                payload = event.payload
+                call = payload.get("call")
+                if not isinstance(call, dict):
+                    continue
+                arguments = call.get("arguments")
+                if not isinstance(arguments, dict):
+                    continue
+                name = call.get("name")
+                if payload.get("success") is True and name == "read_file":
+                    read_path = cls._normalize_read_path(arguments.get("path"))
+                    if read_path is not None and read_path in paths:
+                        refreshed_paths.add(read_path)
+                    continue
+                if payload.get("success") is True and name in _WRITE_TOOLS:
+                    changed = payload.get("changed_files")
+                    if isinstance(changed, (list, tuple, set)):
+                        refreshed_paths.update(
+                            normalized
+                            for item in changed
+                            for normalized in (cls._normalize_patch_path(item),)
+                            if normalized is not None and normalized in paths
+                        )
+                    continue
+                if name != "apply_patch":
+                    continue
+                previous = ToolCall(name="apply_patch", arguments=arguments)
+                previous_paths = cls._patch_paths(previous)
+                same_scope = bool(previous_paths.intersection(paths)) or (
+                    not previous_paths and cls._patch_fingerprint(previous) == fingerprint
+                )
+                error = payload.get("error")
+                if same_scope and payload.get("success") is False and isinstance(
+                    error, str
+                ) and error.startswith("PatchConflictError"):
+                    if refreshed_paths == set(paths):
+                        attempts = 0
+                    attempts += 1
+                    refreshed_paths.clear()
+                continue
+            if event.event_type == "feedback.invalid_action":
+                details = event.payload.get("details")
+                if not isinstance(details, dict) or details.get("require_fresh_patch") is not True:
+                    continue
+                detail_paths = details.get("patch_paths")
+                if isinstance(detail_paths, (list, tuple, set)):
+                    normalized_paths = {
+                        normalized
+                        for item in detail_paths
+                        for normalized in (cls._normalize_patch_path(item),)
+                        if normalized is not None
+                    }
+                    same_scope = bool(normalized_paths.intersection(paths))
+                else:
+                    same_scope = details.get("patch_fingerprint") == fingerprint
+                if same_scope:
+                    attempts += 1
+        return 0 if refreshed_paths == set(paths) else attempts
+
+    @classmethod
+    def _exact_patch_conflict_attempts(
+        cls, action: ToolCall, fingerprint: str, events: Sequence[Event]
+    ) -> int:
+        """Fallback for malformed patches whose target path cannot be parsed."""
+
+        attempts = 0
+        for event in reversed(events):
             if event.event_type == "tool.completed":
                 payload = event.payload
                 call = payload.get("call")
@@ -1397,11 +1596,61 @@ class AgentLoop:
                     and details.get("patch_fingerprint") == fingerprint
                 ):
                     attempts += 1
-                    continue
-            # State, model, feedback.tool_error, and tool.started events do not
-            # change the consecutive patch evidence; another completed tool or
-            # a different attempted action does.
         return attempts
+
+    @classmethod
+    def _patch_paths(cls, action: ToolCall) -> frozenset[str]:
+        """Extract normalized repository paths from a unified/Codex patch."""
+
+        if action.name != "apply_patch":
+            return frozenset()
+        arguments = action.arguments
+        patch = arguments.get("patch")
+        if not isinstance(patch, str):
+            operation = arguments.get("operation")
+            if isinstance(operation, dict):
+                patch = operation.get("patch")
+                if not isinstance(patch, str):
+                    operation_path = operation.get("path") or operation.get("file_path")
+                    normalized = cls._normalize_patch_path(operation_path)
+                    return frozenset({normalized}) if normalized is not None else frozenset()
+        if not isinstance(patch, str):
+            return frozenset()
+        paths: set[str] = set()
+        for line in patch.splitlines():
+            candidate: str | None = None
+            if line.startswith(("*** Update File:", "*** Add File:", "*** Delete File:")):
+                candidate = line.split(":", 1)[1].strip()
+            elif line.startswith(("--- ", "+++ ")):
+                candidate = line[4:].split("\t", 1)[0].strip()
+                if candidate == "/dev/null":
+                    candidate = None
+            normalized = cls._normalize_patch_path(candidate)
+            if normalized is not None:
+                paths.add(normalized)
+        return frozenset(paths)
+
+    @staticmethod
+    def _normalize_patch_path(value: object) -> str | None:
+        if not isinstance(value, str):
+            return None
+        path = value.strip()
+        if path.startswith(("a/", "b/")):
+            path = path[2:]
+        while path.startswith("./"):
+            path = path[2:]
+        return path or None
+
+    @staticmethod
+    def _normalize_read_path(value: object) -> str | None:
+        """Canonicalize a repository read path without stripping real ``a/`` dirs."""
+
+        if not isinstance(value, str):
+            return None
+        path = value.strip()
+        while path.startswith("./"):
+            path = path[2:]
+        return path or None
 
     @staticmethod
     def _patch_fingerprint(action: ToolCall) -> str:
@@ -1917,6 +2166,10 @@ class AgentLoop:
                 session.changed_files.append(path)
         if call.name in _WRITE_TOOLS and tool_result.success:
             session.force_write = False
+        if call.name == "read_file" and tool_result.success:
+            read_path = self._normalize_read_path(call.arguments.get("path"))
+            if read_path is not None:
+                session.patch_repair_paths.discard(read_path)
         self._event(
             dependencies,
             run_id,
@@ -1941,6 +2194,18 @@ class AgentLoop:
                     "changed_files": list(tool_result.changed_files),
                 },
             )
+            if call.name == "apply_patch" and tool_error.startswith("PatchConflictError"):
+                patch_paths = self._patch_paths(call)
+                if patch_paths:
+                    session.patch_repair_paths.update(patch_paths)
+                    feedback.details.update(
+                        {
+                            "require_fresh_patch": True,
+                            "repair_state": "read_required",
+                            "patch_paths": sorted(patch_paths),
+                            "patch_fingerprint": self._patch_fingerprint(call),
+                        }
+                    )
             self._block(session, feedback.kind)
             self._feedback_event(dependencies, run_id, feedback)
             self._record_from_turn(

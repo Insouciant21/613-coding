@@ -350,6 +350,10 @@ def response(action: ToolCall | FinishAction) -> LLMResponse:
     return LLMResponse(actions=(ActionEnvelope(action=action),))
 
 
+def response_actions(*actions: ToolCall | FinishAction) -> LLMResponse:
+    return LLMResponse(actions=tuple(ActionEnvelope(action=action) for action in actions))
+
+
 def dependencies(
     tmp_path: Path,
     provider: Provider,
@@ -1223,6 +1227,632 @@ def test_repeated_stale_patch_stops_instead_of_rendering_endless_tool_errors(
         and event.payload.get("details", {}).get("require_fresh_patch") is True
         for event in records.events
     )
+
+
+def test_patch_conflict_blocks_every_write_until_target_is_read(tmp_path: Path) -> None:
+    value = tmp_path / "value.txt"
+    value.write_text("current\n", encoding="utf-8")
+    stale = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": (
+                "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n"
+                "-before\n+after\n"
+            )
+        },
+    )
+    blocked_write = ToolCall(
+        name="edit_file",
+        arguments={"path": "value.txt", "content": "overwritten\n"},
+    )
+    read = ToolCall(name="read_file", arguments={"path": "value.txt"})
+    fresh = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": (
+                "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n"
+                "-current\n+after\n"
+            )
+        },
+    )
+    provider = Provider(
+        (
+            response(stale),
+            response(blocked_write),
+            response(read),
+            response(fresh),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    registry, repository_validator, _ = build_repository_tools(tmp_path, (("true",),))
+    deps = replace(deps, tools=registry, validator=repository_validator)
+
+    summary = AgentLoop().run(uuid4(), "update value", deps)
+
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert value.read_text(encoding="utf-8") == "after\n"
+    assert sum(
+        event.event_type == "tool.completed"
+        and event.payload.get("call", {}).get("name") == "edit_file"
+        for event in records.events
+    ) == 0
+    assert any(
+        event.event_type == "feedback.invalid_action"
+        and event.payload.get("details", {}).get("repair_state") == "read_required"
+        for event in records.events
+    )
+
+
+def test_patch_repair_allows_re_read_of_path_seen_before_conflict(tmp_path: Path) -> None:
+    value = tmp_path / "value.txt"
+    value.write_text("current\n", encoding="utf-8")
+    initial_read = ToolCall(name="read_file", arguments={"path": "value.txt"})
+    stale = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-before\n+after\n"
+        },
+    )
+    fresh = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-current\n+after\n"
+        },
+    )
+    provider = Provider(
+        (
+            response(initial_read),
+            response(stale),
+            response(initial_read),
+            response(fresh),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    registry, repository_validator, _ = build_repository_tools(tmp_path, (("true",),))
+    deps = replace(deps, tools=registry, validator=repository_validator)
+
+    summary = AgentLoop().run(uuid4(), "update value", deps)
+
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert value.read_text(encoding="utf-8") == "after\n"
+    assert sum(
+        event.event_type == "tool.completed"
+        and event.payload.get("call", {}).get("name") == "read_file"
+        for event in records.events
+    ) == 2
+
+
+def test_patch_repair_barrier_overrides_force_write_tool_filter(tmp_path: Path) -> None:
+    value = tmp_path / "value.txt"
+    value.write_text("current\n", encoding="utf-8")
+    run_id = uuid4()
+    initial = LoopSession(
+        run_id=run_id,
+        force_write=True,
+        patch_repair_paths=("value.txt",),
+    )
+    read = ToolCall(name="read_file", arguments={"path": "value.txt"})
+    fresh = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-current\n+after\n"
+        },
+    )
+    provider = Provider(
+        (response(read), response(fresh), response(FinishAction(summary="done")))
+    )
+    deps, _records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    registry, repository_validator, _ = build_repository_tools(tmp_path, (("true",),))
+    deps = replace(deps, tools=registry, validator=repository_validator)
+    deps.sessions.save_loop_session(initial)
+
+    summary = AgentLoop().run(run_id, "update value", deps)
+
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert "read_file" in {tool.name for tool in provider.tool_batches[0]}
+    assert value.read_text(encoding="utf-8") == "after\n"
+
+
+def test_patch_repair_does_not_strip_real_a_directory_from_read_path(tmp_path: Path) -> None:
+    value = tmp_path / "value.txt"
+    decoy_dir = tmp_path / "a"
+    decoy_dir.mkdir()
+    decoy = decoy_dir / "value.txt"
+    value.write_text("current\n", encoding="utf-8")
+    decoy.write_text("decoy\n", encoding="utf-8")
+    stale = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-before\n+after\n"
+        },
+    )
+    wrong_read = ToolCall(name="read_file", arguments={"path": "a/value.txt"})
+    blocked_write = ToolCall(
+        name="edit_file",
+        arguments={"path": "value.txt", "content": "bypassed\n"},
+    )
+    fresh = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-current\n+after\n"
+        },
+    )
+    correct_read = ToolCall(name="read_file", arguments={"path": "value.txt"})
+    provider = Provider(
+        (
+            response(stale),
+            response(wrong_read),
+            response(blocked_write),
+            response(correct_read),
+            response(fresh),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    registry, repository_validator, _ = build_repository_tools(tmp_path, (("true",),))
+    deps = replace(deps, tools=registry, validator=repository_validator)
+
+    summary = AgentLoop().run(uuid4(), "update value", deps)
+
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert value.read_text(encoding="utf-8") == "after\n"
+    assert any(
+        event.event_type == "feedback.invalid_action"
+        and event.payload.get("details", {}).get("patch_paths") == ["value.txt"]
+        for event in records.events
+    )
+
+
+def test_patch_conflict_stops_remaining_actions_in_same_response(tmp_path: Path) -> None:
+    value = tmp_path / "value.txt"
+    value.write_text("current\n", encoding="utf-8")
+    stale = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-before\n+after\n"
+        },
+    )
+    bundled_write = ToolCall(
+        name="edit_file",
+        arguments={"path": "value.txt", "content": "bypassed\n"},
+    )
+    read = ToolCall(name="read_file", arguments={"path": "value.txt"})
+    fresh = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-current\n+after\n"
+        },
+    )
+    provider = Provider(
+        (
+            response_actions(stale, bundled_write),
+            response(read),
+            response(fresh),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    registry, repository_validator, _ = build_repository_tools(tmp_path, (("true",),))
+    deps = replace(deps, tools=registry, validator=repository_validator)
+
+    summary = AgentLoop().run(uuid4(), "update value", deps)
+
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert value.read_text(encoding="utf-8") == "after\n"
+    assert not any(
+        event.event_type == "tool.completed"
+        and event.payload.get("call", {}).get("name") == "edit_file"
+        for event in records.events
+    )
+
+
+def test_patch_repair_barrier_requires_all_multi_file_reads(tmp_path: Path) -> None:
+    one = tmp_path / "one.txt"
+    two = tmp_path / "two.txt"
+    one.write_text("one-current\n", encoding="utf-8")
+    two.write_text("two-current\n", encoding="utf-8")
+    stale = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": (
+                "--- a/one.txt\n+++ b/one.txt\n@@ -1 +1 @@\n-one-old\n+one-new\n"
+                "--- a/two.txt\n+++ b/two.txt\n@@ -1 +1 @@\n-two-old\n+two-new\n"
+            )
+        },
+    )
+    read_one = ToolCall(name="read_file", arguments={"path": "one.txt"})
+    read_two = ToolCall(name="read_file", arguments={"path": "two.txt"})
+    fresh = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": (
+                "--- a/one.txt\n+++ b/one.txt\n@@ -1 +1 @@\n-one-current\n+one-new\n"
+                "--- a/two.txt\n+++ b/two.txt\n@@ -1 +1 @@\n-two-current\n+two-new\n"
+            )
+        },
+    )
+    provider = Provider(
+        (
+            response(stale),
+            response(read_one),
+            response(fresh),
+            response(read_two),
+            response(fresh),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    registry, repository_validator, _ = build_repository_tools(tmp_path, (("true",),))
+    deps = replace(deps, tools=registry, validator=repository_validator)
+
+    summary = AgentLoop().run(uuid4(), "update both values", deps)
+
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert one.read_text(encoding="utf-8") == "one-new\n"
+    assert two.read_text(encoding="utf-8") == "two-new\n"
+    patch_completions = [
+        event
+        for event in records.events
+        if event.event_type == "tool.completed"
+        and event.payload.get("call", {}).get("name") == "apply_patch"
+    ]
+    assert len(patch_completions) == 2
+    assert any(
+        event.event_type == "feedback.tool_error"
+        and event.payload.get("details", {}).get("patch_paths") == ["one.txt", "two.txt"]
+        for event in records.events
+    )
+    assert any(
+        event.event_type == "feedback.invalid_action"
+        and event.payload.get("details", {}).get("patch_paths") == ["two.txt"]
+        for event in records.events
+    )
+
+
+def test_patch_repair_accepts_coherent_multi_file_read_batch(tmp_path: Path) -> None:
+    one = tmp_path / "one.txt"
+    two = tmp_path / "two.txt"
+    one.write_text("one-current\n", encoding="utf-8")
+    two.write_text("two-current\n", encoding="utf-8")
+    stale = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": (
+                "--- a/one.txt\n+++ b/one.txt\n@@ -1 +1 @@\n-one-old\n+one-new\n"
+                "--- a/two.txt\n+++ b/two.txt\n@@ -1 +1 @@\n-two-old\n+two-new\n"
+            )
+        },
+    )
+    read_one = ToolCall(name="read_file", arguments={"path": "one.txt"})
+    read_two = ToolCall(name="read_file", arguments={"path": "two.txt"})
+    fresh = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": (
+                "--- a/one.txt\n+++ b/one.txt\n@@ -1 +1 @@\n-one-current\n+one-new\n"
+                "--- a/two.txt\n+++ b/two.txt\n@@ -1 +1 @@\n-two-current\n+two-new\n"
+            )
+        },
+    )
+    provider = Provider(
+        (
+            response(stale),
+            response_actions(read_one, read_two),
+            response(fresh),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    registry, repository_validator, _ = build_repository_tools(tmp_path, (("true",),))
+    deps = replace(deps, tools=registry, validator=repository_validator)
+
+    summary = AgentLoop().run(uuid4(), "update both values", deps)
+
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert one.read_text(encoding="utf-8") == "one-new\n"
+    assert two.read_text(encoding="utf-8") == "two-new\n"
+    read_events = [
+        event
+        for event in records.events
+        if event.event_type == "tool.completed"
+        and event.payload.get("call", {}).get("name") == "read_file"
+    ]
+    assert len(read_events) == 2
+
+
+def test_patch_repair_rejects_mixed_read_and_write_response(tmp_path: Path) -> None:
+    value = tmp_path / "value.txt"
+    value.write_text("current\n", encoding="utf-8")
+    stale = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-before\n+after\n"
+        },
+    )
+    read = ToolCall(name="read_file", arguments={"path": "value.txt"})
+    write = ToolCall(
+        name="edit_file",
+        arguments={"path": "value.txt", "content": "wrong\n"},
+    )
+    fresh = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-current\n+after\n"
+        },
+    )
+    provider = Provider(
+        (
+            response(stale),
+            response_actions(read, write),
+            response(read),
+            response(fresh),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    registry, repository_validator, _ = build_repository_tools(tmp_path, (("true",),))
+    deps = replace(deps, tools=registry, validator=repository_validator)
+
+    summary = AgentLoop().run(uuid4(), "update value", deps)
+
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert value.read_text(encoding="utf-8") == "after\n"
+    assert sum(
+        event.event_type == "tool.completed"
+        and event.payload.get("call", {}).get("name") == "edit_file"
+        for event in records.events
+    ) == 0
+    assert any(
+        event.event_type == "feedback.invalid_action"
+        and event.payload.get("details", {}).get("mixed_response") is True
+        for event in records.events
+    )
+
+
+def test_patch_repair_rejects_finish_and_validation_until_read(tmp_path: Path) -> None:
+    value = tmp_path / "value.txt"
+    value.write_text("current\n", encoding="utf-8")
+    stale = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-before\n+after\n"
+        },
+    )
+    read = ToolCall(name="read_file", arguments={"path": "value.txt"})
+    validation = ToolCall(name="run_validation", arguments={"argv": ["true"]})
+    fresh = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-current\n+after\n"
+        },
+    )
+    provider = Provider(
+        (
+            response(stale),
+            response(FinishAction(summary="premature")),
+            response(validation),
+            response(read),
+            response(fresh),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    registry, repository_validator, _ = build_repository_tools(tmp_path, (("true",),))
+    deps = replace(deps, tools=registry, validator=repository_validator)
+
+    summary = AgentLoop().run(uuid4(), "update value", deps)
+
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert value.read_text(encoding="utf-8") == "after\n"
+    assert not any(
+        event.event_type == "tool.completed"
+        and event.payload.get("call", {}).get("name") == "run_validation"
+        and event.payload.get("call", {}).get("arguments", {}).get("argv") == ["true"]
+        for event in records.events
+    )
+    repair_feedback = [
+        event
+        for event in records.events
+        if event.event_type == "feedback.invalid_action"
+        and event.payload.get("details", {}).get("repair_state") == "read_required"
+    ]
+    assert len(repair_feedback) == 2
+
+
+def test_failed_unrelated_read_does_not_clear_patch_repair_barrier(tmp_path: Path) -> None:
+    value = tmp_path / "value.txt"
+    value.write_text("current\n", encoding="utf-8")
+    stale = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-before\n+after\n"
+        },
+    )
+    missing_read = ToolCall(name="read_file", arguments={"path": "missing.txt"})
+    blocked_write = ToolCall(
+        name="edit_file",
+        arguments={"path": "value.txt", "content": "bypassed\n"},
+    )
+    read = ToolCall(name="read_file", arguments={"path": "value.txt"})
+    fresh = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-current\n+after\n"
+        },
+    )
+    provider = Provider(
+        (
+            response(stale),
+            response(missing_read),
+            response(blocked_write),
+            response(read),
+            response(fresh),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    registry, repository_validator, _ = build_repository_tools(tmp_path, (("true",),))
+    deps = replace(deps, tools=registry, validator=repository_validator)
+
+    summary = AgentLoop().run(uuid4(), "update value", deps)
+
+    assert summary.stop_reason is StopReason.SUCCESS
+    assert value.read_text(encoding="utf-8") == "after\n"
+    assert not any(
+        event.event_type == "tool.completed"
+        and event.payload.get("call", {}).get("name") == "edit_file"
+        for event in records.events
+    )
+
+
+def test_loop_session_restores_patch_repair_paths(tmp_path: Path) -> None:
+    deps, _, _, _ = dependencies(tmp_path, Provider(()), Validator(()))
+    run_id = uuid4()
+    deps.sessions.save_loop_session(
+        LoopSession(run_id=run_id, patch_repair_paths=("one.txt", "two.txt"))
+    )
+
+    restored = AgentLoop()._load(run_id, deps)
+
+    assert restored.patch_repair_paths == {"one.txt", "two.txt"}
+    assert restored.snapshot(run_id).patch_repair_paths == ("one.txt", "two.txt")
+
+
+def test_stale_patch_variants_are_bounded_until_the_file_is_re_read(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "value.txt").write_text("current\n", encoding="utf-8")
+    actions = tuple(
+        ToolCall(
+            name="apply_patch",
+            arguments={
+                "patch": (
+                    "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n"
+                    f"-{before}\n+after\n"
+                )
+            },
+        )
+        for before in ("before one", "before two", "before three")
+    )
+    provider = Provider(tuple(response(action) for action in actions))
+    deps, records, _, _ = dependencies(tmp_path, provider, Validator(()))
+    registry, repository_validator, _ = build_repository_tools(tmp_path, ())
+    deps = replace(deps, tools=registry, validator=repository_validator)
+
+    summary = AgentLoop().run(uuid4(), "update value", deps)
+
+    assert summary.stop_reason is StopReason.NO_PROGRESS
+    assert len(provider.contexts) == 3
+    assert sum(event.event_type == "tool.completed" for event in records.events) == 1
+    assert sum(event.event_type == "feedback.invalid_action" for event in records.events) == 1
+
+
+def test_re_reading_the_target_file_resets_the_patch_conflict_budget(
+    tmp_path: Path,
+) -> None:
+    deps, records, _, _ = dependencies(tmp_path, Provider(()), Validator(()))
+    run_id = uuid4()
+    stale = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": "--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n"
+            "-before\n+after\n"
+        },
+    )
+    records.append(
+        Event.new(
+            "tool.completed",
+            run_id,
+            {
+                "call": stale.model_dump(mode="json"),
+                "success": False,
+                "error": "PatchConflictError: hunk context does not match",
+            },
+            datetime.now(UTC),
+        )
+    )
+    records.append(
+        Event.new(
+            "tool.completed",
+            run_id,
+            {
+                "call": ToolCall(
+                    name="read_file", arguments={"path": "value.txt"}
+                ).model_dump(mode="json"),
+                "success": True,
+                "changed_files": [],
+            },
+            datetime.now(UTC),
+        )
+    )
+
+    fresh_variant = stale.model_copy(
+        update={
+            "arguments": {
+                "patch": stale.arguments["patch"].replace("before", "current")
+            }
+        }
+    )
+    assert AgentLoop._patch_conflict_attempts(fresh_variant, run_id, deps) == 0
+    records.append(
+        Event.new(
+            "tool.completed",
+            run_id,
+            {
+                "call": fresh_variant.model_dump(mode="json"),
+                "success": False,
+                "error": "PatchConflictError: hunk context does not match",
+            },
+            datetime.now(UTC),
+        )
+    )
+    assert AgentLoop._patch_conflict_attempts(fresh_variant, run_id, deps) == 1
+
+
+def test_multi_file_patch_requires_all_affected_paths_to_be_re_read(
+    tmp_path: Path,
+) -> None:
+    deps, records, _, _ = dependencies(tmp_path, Provider(()), Validator(()))
+    run_id = uuid4()
+    stale = ToolCall(
+        name="apply_patch",
+        arguments={
+            "patch": (
+                "--- a/one.txt\n+++ b/one.txt\n@@ -1 +1 @@\n-before\n+after\n"
+                "--- a/two.txt\n+++ b/two.txt\n@@ -1 +1 @@\n-before\n+after\n"
+            )
+        },
+    )
+    records.append(
+        Event.new(
+            "tool.completed",
+            run_id,
+            {
+                "call": stale.model_dump(mode="json"),
+                "success": False,
+                "error": "PatchConflictError: hunk context does not match",
+            },
+            datetime.now(UTC),
+        )
+    )
+    records.append(
+        Event.new(
+            "tool.completed",
+            run_id,
+            {
+                "call": ToolCall(
+                    name="read_file", arguments={"path": "one.txt"}
+                ).model_dump(mode="json"),
+                "success": True,
+                "changed_files": [],
+            },
+            datetime.now(UTC),
+        )
+    )
+
+    assert AgentLoop._patch_conflict_attempts(stale, run_id, deps) == 1
 
 
 def test_repeated_text_only_model_responses_stop_before_budget_exhaustion(

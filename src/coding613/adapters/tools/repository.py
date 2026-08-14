@@ -31,6 +31,7 @@ class ValidationCommandError(ValueError):
 
 
 _ERROR_DETAIL_LIMIT = 1_000
+_PATCH_GUIDANCE_LIMIT = 8_000
 
 
 def _json(value: object) -> str:
@@ -69,13 +70,15 @@ def _patch_conflict_guidance(tools: FilesystemTools, error: Exception) -> str:
             f"Patch rejected for {path}: {reason}. Re-read {path} with read_file "
             "and submit a fresh patch."
         )
-    lines = current.splitlines()
-    excerpt = "\n".join(lines[:10])
-    if len(excerpt) > 2_000:
-        excerpt = excerpt[:2_000] + "..."
+    excerpt = current
+    if len(excerpt) > _PATCH_GUIDANCE_LIMIT:
+        excerpt = (
+            f"{excerpt[:_PATCH_GUIDANCE_LIMIT]}\n"
+            f"... current file truncated ({len(current) - _PATCH_GUIDANCE_LIMIT} characters omitted)"
+        )
     return (
         f"Patch rejected for {path}: {reason}. re-read {path} and submit a fresh patch.\n"
-        "Current file excerpt (first 10 lines):\n"
+        "Current file content (bounded; use this instead of the stale patch context):\n"
         f"{excerpt}"
     )
 

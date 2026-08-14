@@ -152,6 +152,35 @@ def test_apply_patch_reports_actionable_conflict_reason(tmp_path: Path) -> None:
     assert "re-read" in result.output
 
 
+def test_apply_patch_conflict_guidance_includes_the_relevant_current_file_content(
+    tmp_path: Path,
+) -> None:
+    current = "".join(f"line {index}\n" for index in range(1, 41))
+    (tmp_path / "value.txt").write_text(current, encoding="utf-8")
+    registry, _, _ = build_repository_tools(tmp_path, ())
+
+    result = registry.dispatch(
+        ToolCall(
+            name="apply_patch",
+            arguments={
+                "patch": "--- a/value.txt\n"
+                "+++ b/value.txt\n"
+                "@@ -30 +30 @@\n"
+                "-stale line 30\n"
+                "+new line 30\n"
+            },
+        ),
+        ToolContext(
+            run_id=uuid4(),
+            repository_root=tmp_path,
+            permission_mode=PermissionMode.BALANCED,
+        ),
+    )
+
+    assert result.success is False
+    assert "line 31" in result.output
+
+
 def test_run_command_executes_argv_without_shell_interpolation(tmp_path: Path) -> None:
     registry, _, _ = build_repository_tools(tmp_path, ())
 
