@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
+from textual.css.query import NoMatches
 from textual.widgets import Input, Static
 
 from coding613.application.credentials import CredentialStatus
@@ -718,6 +719,29 @@ async def test_tui_continue_with_prompt_restores_latest_session_then_submits_fol
                 break
 
         assert [run.task for run in fake.runs] == ["first", "follow-up"]
+
+
+@pytest.mark.asyncio
+async def test_tui_cleanup_ignores_missing_widgets_after_shutdown() -> None:
+    app = CodingApp()
+    async with app.run_test(size=(80, 24)):
+        pass
+
+    app._update_input_state()
+    app._set_active_operation("Idle", reset=True)
+
+
+@pytest.mark.asyncio
+async def test_tui_cleanup_surfaces_missing_widgets_while_running() -> None:
+    app = CodingApp()
+    async with app.run_test(size=(80, 24)):
+        await app.query_one(TaskComposer).remove()
+        with pytest.raises(NoMatches):
+            app._update_input_state()
+
+        await app.query_one(ActiveOperation).remove()
+        with pytest.raises(NoMatches):
+            app._set_active_operation("Idle", reset=True)
 
 
 @pytest.mark.asyncio

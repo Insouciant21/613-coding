@@ -11,7 +11,6 @@ from uuid import UUID
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.css.query import NoMatches
 from textual.widgets import Static, TextArea
 from textual.widgets.option_list import Option
 
@@ -889,12 +888,15 @@ class CodingApp(App[None]):
                 self._permission_mode,
                 self.options,
             )
+            if not self.is_running:
+                return
             await self._render_snapshot(snapshot)
             self.controller.drain_progress()
             if self.controller.last_summary is not None:
                 await self._render_summary(self.controller.last_summary)
         except Exception as error:
-            await self.query_one(ConversationLog).mount(render_error(error))
+            if self.is_running:
+                await self.query_one(ConversationLog).mount(render_error(error))
         finally:
             self._executing = False
             self._pending_user = None
@@ -910,13 +912,16 @@ class CodingApp(App[None]):
         self._set_active_operation("Restoring session")
         try:
             snapshot = await self.controller.resume(self.resume or "latest")
+            if not self.is_running:
+                return
             await self._render_snapshot(snapshot, clear=True)
             if self.controller.last_summary is not None:
                 await self._render_summary(self.controller.last_summary)
             if submit_after and self._approval_id is None:
                 await self._submit_message(submit_after)
         except Exception as error:
-            await self.query_one(ConversationLog).mount(render_error(error))
+            if self.is_running:
+                await self.query_one(ConversationLog).mount(render_error(error))
         finally:
             self._executing = False
             self._update_input_state()
@@ -960,6 +965,8 @@ class CodingApp(App[None]):
             self.run_worker(self._render_progress(updates), group="render")
 
     async def _render_progress(self, updates: tuple[RunProgress, ...]) -> None:
+        if not self.is_running:
+            return
         log = self.query_one(ConversationLog)
         for update in updates:
             if update.kind is ProgressKind.TEXT_DELTA:
@@ -1164,10 +1171,9 @@ class CodingApp(App[None]):
         self.query_one(ConversationLog).scroll_end(animate=False)
 
     def _update_input_state(self) -> None:
-        try:
-            composer = self.query_one(TaskComposer)
-        except NoMatches:
+        if not self.is_running:
             return
+        composer = self.query_one(TaskComposer)
         awaiting = self._approval_id is not None
         composer.disabled = self._executing or awaiting
         if not composer.disabled:
@@ -1176,20 +1182,17 @@ class CodingApp(App[None]):
     def _set_active_operation(self, label: str, *, reset: bool = False) -> None:
         if reset:
             self._operation_started_at = None
-            try:
-                self.query_one(ActiveOperation).update(label)
-            except NoMatches:
-                pass
+        if not self.is_running:
+            return
+        if reset:
+            self.query_one(ActiveOperation).update(label)
             return
         elapsed = (
             time.monotonic() - self._operation_started_at
             if self._operation_started_at is not None
             else 0.0
         )
-        try:
-            self.query_one(ActiveOperation).update(f"{label} | elapsed={elapsed:.1f}s")
-        except NoMatches:
-            pass
+        self.query_one(ActiveOperation).update(f"{label} | elapsed={elapsed:.1f}s")
 
     @property
     def _permission_mode(self) -> PermissionMode:
