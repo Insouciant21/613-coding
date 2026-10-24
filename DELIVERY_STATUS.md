@@ -1234,3 +1234,10 @@ Every completed plan task must link a commit and fresh verification output here.
 - Fix: ConversationLog.mount schedules scroll_end after every mount; TaskComposer.submit clears the composer. RED/GREEN: new Pilot test failed on clearing, then on scrolling (15 < 24) with the scroll fix disabled; tests/tui 102 passed, full suite 719 passed, ruff/mypy clean. Live tmux regression: /cost visible and cleared; plain second message completed in-session.
 - Correction to WEATHER-E2E-02 record: second conversational turns were always submittable; only slash-command output visibility was broken. Open defects remaining: bare `providers` / `credentials status` tracebacks; repository-escape denial message detail.
 - Source evidence: AGENT_LOG.md TUIFIX-01; tests/tui/test_end_to_end.py; src/coding613/tui/widgets.py. No CI run yet; no push.
+
+### CLIFIX-01 — management CLI boundary and policy denial messages — 2026-10-25
+
+- Responsible actor: ZCode session (user-directed fix of the last two open defects). Both fixed with RED-first tests.
+- CLI: run_management now returns clean exit codes for typer/click boundary errors (NoArgsIsHelpError prints help, UsageError/MissingParameter print their message); the old click.exceptions.Exit catch never matched typer's vendored namespace. Policy: hard-rule denials name the offending value and repository-escape denials on run_command point to run_validation with the declared argv.
+- Verification: tests/cli 54, loop+policy 112, full suite 724 passed; ruff and mypy clean; live regression of both crashing commands exits 2 without tracebacks. Open defect list from the interactive validations is now empty.
+- Source evidence: AGENT_LOG.md CLIFIX-01; tests/cli/test_entrypoint.py, tests/application/test_loop.py; src/coding613/cli/entrypoint.py, src/coding613/application/policy.py, src/coding613/application/loop.py. No CI run, no push.

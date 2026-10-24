@@ -1131,7 +1131,7 @@ class AgentLoop:
                 if decision.effect is PolicyEffect.DENY:
                     feedback = Feedback(
                         kind=FeedbackKind.POLICY_BLOCKED,
-                        message="policy denied action",
+                        message=self._policy_denial_message(decision, envelope.action),
                         details={"rule_id": decision.rule_id},
                     )
                     self._block(session, feedback.kind)
@@ -1869,7 +1869,7 @@ class AgentLoop:
         if current_decision.effect is PolicyEffect.DENY:
             feedback = Feedback(
                 kind=FeedbackKind.POLICY_BLOCKED,
-                message="current policy denied approved action",
+                message=f"current {self._policy_denial_message(current_decision, pending)}",
                 retryable=False,
                 details={"rule_id": current_decision.rule_id},
             )
@@ -2763,6 +2763,21 @@ class AgentLoop:
             rule_id=decision.rule_id,
             reason=decision.reason,
         )
+
+    @staticmethod
+    def _policy_denial_message(decision: PolicyDecision, action: object) -> str:
+        message = f"policy denied action ({decision.rule_id}): {decision.reason}"
+        if (
+            decision.rule_id == "hard.repository_escape"
+            and isinstance(action, ToolCall)
+            and action.name == "run_command"
+        ):
+            message += (
+                "; run_command cannot use absolute or repository-escaping paths;"
+                " rerun declared validation through the run_validation tool"
+                " with its exact argv"
+            )
+        return message
 
     @staticmethod
     def _policy_decision(call: ToolCall, dependencies: LoopDependencies) -> PolicyDecision:

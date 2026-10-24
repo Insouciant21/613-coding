@@ -168,3 +168,36 @@ def test_continue_dispatch_resumes_latest_tui_session(monkeypatch, tmp_path: Pat
 
     assert launched[0].resume == "latest"
     assert launched[0].continue_latest is True
+
+
+def test_management_group_without_subcommand_shows_help_cleanly(capsys) -> None:
+    from coding613.cli.entrypoint import run_management
+
+    code = run_management(["providers"])
+
+    assert code in (0, 2)
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "Traceback" not in combined
+    assert "Commands" in combined or "Usage" in combined
+
+
+def test_management_missing_argument_fails_without_traceback(capsys) -> None:
+    from coding613.cli.entrypoint import run_management
+
+    code = run_management(["credentials", "status"])
+
+    assert code == 2
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "Traceback" not in combined
+
+
+def test_management_help_flag_exits_cleanly(capsys) -> None:
+    from coding613.cli.entrypoint import run_management
+
+    code = run_management(["providers", "list", "--help"])
+
+    assert code == 0
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.out + captured.err

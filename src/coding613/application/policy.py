@@ -78,7 +78,10 @@ class PolicyEngine:
     ) -> PolicyDecision:
         hard_rule = self._hard_denial(call, config.repository_root)
         if hard_rule is not None:
-            return self._decision(PolicyEffect.DENY, hard_rule, "hard safety rule", call)
+            rule_id, detail = hard_rule
+            return self._decision(
+                PolicyEffect.DENY, rule_id, f"hard safety rule: {detail}", call
+            )
         if call.name in config.denied_tools:
             return self._decision(
                 PolicyEffect.DENY, "config.denied_tool", "repository policy denied tool", call
@@ -261,18 +264,21 @@ class PolicyEngine:
             effect, f"mode.{mode.value}.{category}", f"scoped {category}", call
         )
 
-    def _hard_denial(self, call: ToolCall, root: Path) -> str | None:
+    def _hard_denial(self, call: ToolCall, root: Path) -> tuple[str, str] | None:
+        # Returns (rule_id, offending detail) so denials can tell the model
+        # exactly which value tripped the hard rule.
         if redact_payload(call.arguments) != call.arguments:
-            return "hard.secret_material"
+            return ("hard.secret_material", "arguments contained redacted secret material")
         strings = tuple(self._strings(call.arguments))
-        if any("/var/run/docker.sock" in value for value in strings):
-            return "hard.docker_socket"
+        for value in strings:
+            if "/var/run/docker.sock" in value:
+                return ("hard.docker_socket", value)
         for key in ("cwd", "path", "root", "target"):
-            value = call.arguments.get(key)
-            if isinstance(value, str):
-                path_rule = self._path_rule(value, root)
+            argument = call.arguments.get(key)
+            if isinstance(argument, str):
+                path_rule = self._path_rule(argument, root)
                 if path_rule is not None:
-                    return path_rule
+                    return (path_rule, argument)
         if call.name == "apply_patch":
             patch = call.arguments.get("patch")
             if isinstance(patch, str):
@@ -284,30 +290,28 @@ class PolicyEngine:
                         continue
                     path_rule = self._path_rule(value, root)
                     if path_rule is not None:
-                        return path_rule
+                        return (path_rule, value)
             operation = call.arguments.get("operation")
             if isinstance(operation, dict):
                 path = operation.get("path")
                 if isinstance(path, str):
                     path_rule = self._path_rule(path, root)
                     if path_rule is not None:
-                        return path_rule
+                        return (path_rule, path)
         argv = call.arguments.get("argv")
         if isinstance(argv, list) and all(isinstance(item, str) for item in argv):
             lowered = tuple(item.lower() for item in argv)
             if lowered and lowered[0] in {"sudo", "su", "shutdown", "reboot", "mkfs", "dd"}:
-                return "hard.destructive_command"
+                return ("hard.destructive_command", " ".join(lowered[:3]))
             if "--privileged" in lowered or "/var/run/docker.sock" in lowered:
-                return "hard.privileged_container"
+                return ("hard.privileged_container", " ".join(lowered[:3]))
             if lowered and lowered[0] == "rm" and any(item in {"/", "~"} for item in lowered):
-                return "hard.destructive_command"
+                return ("hard.destructive_command", " ".join(lowered[:3]))
             if lowered and lowered[0] in {"bash", "sh", "zsh"} and "-c" in lowered:
                 script = " ".join(lowered[lowered.index("-c") + 1 :])
-                if any(
-                    fragment in script
-                    for fragment in ("rm -rf /", "rm -rf ~", "mkfs", "shutdown", "reboot")
-                ):
-                    return "hard.destructive_command"
+                for fragment in ("rm -rf /", "rm -rf ~", "mkfs", "shutdown", "reboot"):
+                    if fragment in script:
+                        return ("hard.destructive_command", fragment)
         commands = call.arguments.get("commands")
         if isinstance(commands, list):
             for command in commands:

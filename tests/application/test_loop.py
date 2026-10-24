@@ -2668,3 +2668,89 @@ def test_stable_budget_tool_schema_does_not_allow_reselection(tmp_path: Path) ->
     assert provider.contexts[-1].metadata["resource_profile"] == "standard"
     assert any(e.event_type == "feedback.invalid_action" and
                "already selected" in e.payload["message"] for e in events.events)
+
+
+def test_repository_escape_denial_names_offender_and_guides_validation(
+    tmp_path: Path,
+) -> None:
+    provider = Provider(
+        (
+            response(
+                ToolCall(
+                    name="run_command",
+                    arguments={
+                        "argv": ["python", "-m", "pytest", "-q"],
+                        "cwd": "/opt/venv",
+                    },
+                )
+            ),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, records, _, _ = dependencies(
+        tmp_path,
+        provider,
+        Validator(()),
+        budget=BudgetLimits(total_model_calls=2),
+    )
+    deps.tools.register(
+        ToolDefinition(
+            name="run_command",
+            description="Run command",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "argv": {"type": "array", "items": {"type": "string"}},
+                    "cwd": {"type": "string"},
+                },
+                "required": ["argv"],
+                "additionalProperties": False,
+            },
+        ),
+        Executor([]),
+    )
+
+    AgentLoop().run(uuid4(), "escape command", deps)
+
+    messages = [
+        event.payload.get("message", "")
+        for event in records.events
+        if event.event_type == "feedback.policy_blocked"
+    ]
+    assert messages, "policy denial feedback missing"
+    message = messages[0]
+    assert "hard.repository_escape" in message
+    assert "/opt/venv" in message
+    assert "run_validation" in message
+
+
+def test_path_escape_denial_names_offender_without_command_hint(
+    tmp_path: Path,
+) -> None:
+    provider = Provider(
+        (
+            response(
+                ToolCall(name="edit_file", arguments={"path": "../outside", "content": "x"})
+            ),
+            response(FinishAction(summary="done")),
+        )
+    )
+    deps, records, _, _ = dependencies(
+        tmp_path,
+        provider,
+        Validator(()),
+        budget=BudgetLimits(total_model_calls=2),
+    )
+
+    AgentLoop().run(uuid4(), "escape path", deps)
+
+    messages = [
+        event.payload.get("message", "")
+        for event in records.events
+        if event.event_type == "feedback.policy_blocked"
+    ]
+    assert messages
+    message = messages[0]
+    assert "hard.repository_escape" in message
+    assert "../outside" in message
+    assert "run_validation" not in message

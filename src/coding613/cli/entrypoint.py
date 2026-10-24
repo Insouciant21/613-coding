@@ -5,8 +5,6 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 
-import click
-
 from .main import app
 from .prompt import parse_root_args, run_print
 from .tui import TuiLaunchRequest, launch_tui
@@ -91,8 +89,18 @@ def _selects_root_workflow(argv: Sequence[str]) -> bool:
 def run_management(argv: Sequence[str]) -> int:
     try:
         app(args=list(argv), prog_name="613-coding", standalone_mode=False)
-    except click.exceptions.Exit as error:
-        return int(error.exit_code)
+    except Exception as error:
+        # Management commands raise click-style exceptions (Exit, UsageError,
+        # NoArgsIsHelpError, MissingParameter) whose classes live in typer's
+        # vendored namespace, so structural matching is the stable contract.
+        exit_code = getattr(error, "exit_code", None)
+        if not isinstance(exit_code, int):
+            raise
+        show = getattr(error, "show", None)
+        if callable(show) and type(error).__name__ != "NoArgsIsHelpError":
+            # NoArgsIsHelpError already printed the group help before raising.
+            show()
+        return exit_code
     return 0
 
 
