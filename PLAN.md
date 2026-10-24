@@ -1226,3 +1226,24 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - Fixed `edit_file` and `apply_patch` dropping ordinary access/execute permissions during atomic replacement. Added ten real-filesystem regressions, retaining private new-file defaults and dropping special privilege bits.
 - RED: 8 failed, 2 passed. GREEN: tools suite 86 passed; full maintained suite 691 passed (478 existing dependency deprecation warnings); Ruff, mypy (110 source files), and diff check passed.
 - Evidence: AGENT_LOG.md MODE-01; tests/adapters/tools/test_filesystem.py; src/coding613/adapters/tools/filesystem.py. Commit: none; remote CI not run.
+
+## LOOP-CACHE-01 — core loop and prompt-cache repair (2026-09-21)
+
+- Status: locally implemented and verified; uncommitted. User requested direct work without Superpowers.
+- Scope: stable normal-turn budget schema; historical evidence before mutable ledger; one-entry project/task embedding reuse with fresh memory authorization; Anthropic cache breakpoints and effective thinking budget; correct provider cache/token accounting. README describes limits and persisted usage fields.
+- TDD: initial 7 context/provider regressions and budget schema test failed before repair; history cache directive separately reproduced before addition. Focused gate: 163 passed. Full maintained offline suite: 702 passed, 478 dependency warnings. Ruff, mypy (110 files), whitespace checks passed.
+- Offline evidence: reusable full-message prefix 2,767 -> 8,307 characters in the recorded six-read scenario; two builds -> one embedding request. Actual provider hit rate remains unmeasured.
+- Source evidence: AGENT_LOG.md LOOP-CACHE-01 and context/loop/provider regression tests. No commit hash, remote pipeline, or release artifact for these uncommitted changes.
+
+### LOOP-CACHE-LIVE — real API validation (2026-09-21)
+
+- Explicitly authorized live probe completed: active ai2 / gpt-5.6-terra / Responses streaming, five synthetic-only requests, 512 output-token cap each, all successful.
+- First three changing-tail requests reported zero cached tokens. Two exact-repeat controls reported 3897/5180 and 3561/5180 cached tokens. Cache support is observed; stable hit rate and old/new optimization benefit are not established.
+- Evidence: docs/evidence/2026-09-21-live-cache-probe.json; AGENT_LOG.md LOOP-CACHE-LIVE. No full AgentLoop live run or Anthropic live run. Records uncommitted; no CI pipeline started.
+
+## LOOP-CACHE-02 — history and explicit breakpoint optimization (2026-09-22)
+
+- Locally implemented and verified, uncommitted. Default history capacity follows context budget rather than a ten-event window; Responses continuations precede volatile state. Added optional provider/model explicit caching with trusted ledger boundaries and reported cache-write accounting.
+- RED: adapter/context cases 4 failures, configuration and cache-write regressions separately failed before implementation. GREEN: focused 59 passed, full 709 passed (478 existing warnings); Ruff, mypy across 110 files, diff check passed.
+- Offline prefix evidence: 2,760 -> 19,370 shared characters in the 15-to-16 read-event scenario. Live explicit payload accepted; fresh-prefix ABBA comparison reported zero hits for both variants. No demonstrated live hit-rate improvement; option stays default-off and active user configuration is unchanged.
+- Evidence: AGENT_LOG.md LOOP-CACHE-02; docs/evidence/2026-09-22-cache-optimization-v2.json; corresponding context/config/Responses tests. Commit: none; remote CI not run.

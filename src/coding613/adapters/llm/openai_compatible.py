@@ -359,17 +359,27 @@ class OpenAICompatibleLLM:
         # normalized vocabulary used by the loop and cost display.
         cache_read = cls._field(usage, "cache_read_input_tokens")
         cache_creation = cls._field(usage, "cache_creation_input_tokens")
-        if type(cache_read) in {int, float}:
-            values.setdefault("prompt_cache_hit_tokens", cache_read)
-        if type(cache_creation) in {int, float}:
-            values.setdefault("prompt_cache_miss_tokens", cache_creation)
-        responses_input_details = cls._field(usage, "input_tokens_details")
-        cached_tokens = cls._field(responses_input_details, "cached_tokens")
-        if type(cached_tokens) in {int, float}:
-            values.setdefault("prompt_cache_hit_tokens", cached_tokens)
-            prompt_tokens = values.get("prompt_tokens")
-            if type(prompt_tokens) in {int, float}:
-                values.setdefault("prompt_cache_miss_tokens", prompt_tokens - cached_tokens)
+        if type(cache_read) in {int, float} or type(cache_creation) in {int, float}:
+            read = cache_read if type(cache_read) in {int, float} else 0
+            created = cache_creation if type(cache_creation) in {int, float} else 0
+            uncached = input_tokens if type(input_tokens) in {int, float} else 0
+            values["prompt_tokens"] = uncached + read + created
+            values.setdefault("prompt_cache_hit_tokens", read)
+            values.setdefault("prompt_cache_miss_tokens", uncached + created)
+            values["cache_creation_input_tokens"] = created
+        for detail_field in ("prompt_tokens_details", "input_tokens_details"):
+            details = cls._field(usage, detail_field)
+            cache_write_tokens = cls._field(details, "cache_write_tokens")
+            if type(cache_write_tokens) in {int, float}:
+                values.setdefault("prompt_cache_write_tokens", cache_write_tokens)
+            cached_tokens = cls._field(details, "cached_tokens")
+            if type(cached_tokens) in {int, float}:
+                values.setdefault("prompt_cache_hit_tokens", cached_tokens)
+                prompt_tokens = values.get("prompt_tokens")
+                if type(prompt_tokens) in {int, float}:
+                    values.setdefault("prompt_cache_miss_tokens", max(0, prompt_tokens - cached_tokens))
+        if "prompt_tokens" in values and "completion_tokens" in values:
+            values.setdefault("total_tokens", values["prompt_tokens"] + values["completion_tokens"])
         completion_details = cls._field(usage, "completion_tokens_details")
         reasoning_tokens = cls._field(completion_details, "reasoning_tokens")
         responses_output_details = cls._field(usage, "output_tokens_details")

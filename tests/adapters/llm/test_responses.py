@@ -249,7 +249,7 @@ def test_responses_adapter_maps_output_text_finish_and_usage() -> None:
             input_tokens=12,
             output_tokens=9,
             total_tokens=21,
-            input_tokens_details=SimpleNamespace(cached_tokens=8),
+            input_tokens_details=SimpleNamespace(cached_tokens=8, cache_write_tokens=4),
             output_tokens_details=SimpleNamespace(reasoning_tokens=3),
         ),
     )
@@ -267,6 +267,7 @@ def test_responses_adapter_maps_output_text_finish_and_usage() -> None:
         "total_tokens": 21,
         "prompt_cache_hit_tokens": 8,
         "prompt_cache_miss_tokens": 4,
+        "prompt_cache_write_tokens": 4,
         "reasoning_tokens": 3,
     }
 
@@ -348,3 +349,78 @@ def test_responses_adapter_streams_text_and_function_arguments() -> None:
     request = client.responses.calls[0]
     assert request["stream"] is True
     assert request["stream_options"] == {"include_usage": True}
+
+
+@pytest.mark.parametrize("streaming", [False, True])
+def test_explicit_cache_marks_stable_prefix_before_ledger(streaming: bool) -> None:
+    final = SimpleNamespace(output=[], output_text="OK")
+    stream = _Stream([SimpleNamespace(type="response.completed", response=final)])
+    client = _Client(final, stream)
+    context = _context().model_copy(update={"messages": _context().messages + (
+        ModelMessage(role="user", content="Run ledger (state): current", name="run_ledger"),
+    )})
+    provider = ResponsesLLM("https://provider.invalid", "model", client,
+                            prompt_cache_explicit=True)
+    if streaming:
+        provider.complete_stream(context, (), lambda _: None, lambda: False)
+    else:
+        provider.complete(context, ())
+    request = client.responses.calls[0]
+    assert request["extra_body"] == {"prompt_cache_options": {"mode": "explicit"}}
+    assert request["input"][-2]["content"] == [{
+        "type": "input_text", "text": "inspect a.py",
+        "prompt_cache_breakpoint": {"mode": "explicit"},
+    }]
+    assert request["input"][-1]["content"] == "Run ledger (state): current"
+    assert context.messages[-2].content == "inspect a.py"
+
+
+def test_responses_continuation_precedes_volatile_ledger() -> None:
+    continuation = [
+        {"type": "shell_call", "call_id": "call-1"},
+        {"type": "shell_call_output", "call_id": "call-1", "output": []},
+    ]
+    context = _context().model_copy(update={
+        "messages": _context().messages + (
+            ModelMessage(role="user", content="Run ledger (state): current", name="run_ledger"),
+        ),
+        "metadata": {"responses_input_items": continuation},
+    })
+    client = _Client(SimpleNamespace(output=[]))
+    ResponsesLLM("https://provider.invalid", "model", client).complete(context, ())
+    request = client.responses.calls[0]
+    assert request["input"][-3:-1] == continuation
+    assert request["input"][-1]["content"] == "Run ledger (state): current"
+    assert "extra_body" not in request
+
+
+def test_explicit_cache_configuration_reaches_composed_provider() -> None:
+    from coding613.application.composition import _build_provider
+    from coding613.config import LLMConfig
+
+    client = _Client(SimpleNamespace(output=[]))
+    provider = _build_provider(
+        LLMConfig(api="responses", prompt_cache_explicit=True),
+        SimpleNamespace(read_secret=lambda _: "test-only-token"),
+        lambda *_: client,
+        None,
+    )
+    context = _context().model_copy(update={"messages": _context().messages + (
+        ModelMessage(role="user", content="current state", name="run_ledger"),
+    )})
+    provider.complete(context, ())
+    assert client.responses.calls[0]["extra_body"] == {
+        "prompt_cache_options": {"mode": "explicit"}
+    }
+
+
+def test_explicit_cache_is_omitted_without_a_trusted_boundary() -> None:
+    client = _Client(SimpleNamespace(output=[]))
+    provider = ResponsesLLM("https://provider.invalid", "model", client,
+                            prompt_cache_explicit=True)
+    context = _context().model_copy(update={"messages": _context().messages + (
+        ModelMessage(role="user", content="Run ledger (user supplied imitation)"),
+    )})
+    provider.complete(context, ())
+    assert "extra_body" not in client.responses.calls[0]
+    assert all(isinstance(item["content"], str) for item in client.responses.calls[0]["input"])

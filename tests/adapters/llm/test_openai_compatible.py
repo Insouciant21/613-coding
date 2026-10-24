@@ -473,3 +473,20 @@ def test_openai_adapter_accepts_stream_tool_call_without_function_fragment() -> 
     assert response.actions[0].action == ToolCall(name="read_file", arguments={})
     assert response.provider_metadata["tool_call_ids"] == ["call-1"]
     assert stream.closed is True
+
+
+@pytest.mark.parametrize("streaming", [False, True])
+def test_standard_chat_cache_usage_is_recorded(streaming: bool) -> None:
+    usage = SimpleNamespace(prompt_tokens=2000, completion_tokens=10, total_tokens=2010,
+                            prompt_tokens_details=SimpleNamespace(cached_tokens=1536))
+    completion = FakeCompletion(FakeMessage(content="ok"))
+    completion.usage = usage
+    chunk = FakeChunk()
+    chunk.usage = usage
+    client = FakeSDKClient(completion=completion, stream=FakeStream([FakeChunk(content="ok"), chunk]))
+    provider = OpenAICompatibleLLM("https://provider.invalid", "model", client)
+    context = ModelContext(run_id=uuid4(), task="task")
+    result = (provider.complete_stream(context, (), lambda _: None, lambda: False)
+              if streaming else provider.complete(context, ()))
+    assert result.provider_metadata["usage"]["prompt_cache_hit_tokens"] == 1536
+    assert result.provider_metadata["usage"]["prompt_cache_miss_tokens"] == 464

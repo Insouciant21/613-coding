@@ -281,3 +281,16 @@ def test_validate_config_rejects_nonexistent_repository() -> None:
 
     with pytest.raises(ValueError, match="repository"):
         validate_config(config)
+
+
+def test_explicit_prompt_cache_setting_round_trips_with_model_override(tmp_path: Path) -> None:
+    from coding613.config import LLMConfig, ModelConfig
+
+    provider = LLMConfig(api="responses", prompt_cache_explicit=True, active_model="plain",
+                         models={"plain": ModelConfig(model="custom", prompt_cache_explicit=False)})
+    config = UserConfig(active_provider="test", providers={"test": provider})
+    path = tmp_path / "config.toml"
+    save_user_config(config, path)
+    restored = load_user_config(path).providers["test"]
+    assert restored.prompt_cache_explicit is True
+    assert restored.effective().prompt_cache_explicit is False

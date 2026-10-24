@@ -1,0 +1,132 @@
+{
+  "recorded_at": "2026-09-22T13:03:42.646074+08:00",
+  "provider": "ai2",
+  "api": "responses",
+  "model": "gpt-5.6-terra",
+  "synthetic_only": true,
+  "output_limit_per_request": 512,
+  "initial_capability_probe": [
+    {
+      "round": 1,
+      "success": false,
+      "seconds": 33.573,
+      "error_type": "ProviderHTTPError"
+    }
+  ],
+  "production_explicit_requests": [
+    {
+      "round": 1,
+      "success": true,
+      "seconds": 7.811,
+      "usage": {
+        "total_tokens": 5185,
+        "prompt_tokens": 5180,
+        "completion_tokens": 5,
+        "prompt_cache_hit_tokens": 3688,
+        "prompt_cache_miss_tokens": 1492
+      },
+      "text_chars": 3,
+      "streamed_chars": 3
+    },
+    {
+      "round": 2,
+      "success": true,
+      "seconds": 4.35,
+      "usage": {
+        "total_tokens": 5198,
+        "prompt_tokens": 5180,
+        "completion_tokens": 18,
+        "prompt_cache_hit_tokens": 3635,
+        "prompt_cache_miss_tokens": 1545
+      },
+      "text_chars": 3,
+      "streamed_chars": 3
+    }
+  ],
+  "isolated_prefix_abba_comparison": [
+    {
+      "round": 1,
+      "variant": "baseline",
+      "success": true,
+      "seconds": 31.658,
+      "usage": {
+        "total_tokens": 5223,
+        "prompt_tokens": 5206,
+        "completion_tokens": 17,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 5206
+      },
+      "text_chars": 3,
+      "streamed_chars": 3
+    },
+    {
+      "round": 2,
+      "variant": "explicit",
+      "success": true,
+      "seconds": 12.225,
+      "usage": {
+        "total_tokens": 5211,
+        "prompt_tokens": 5206,
+        "completion_tokens": 5,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 5206
+      },
+      "text_chars": 3,
+      "streamed_chars": 3
+    },
+    {
+      "round": 3,
+      "variant": "explicit",
+      "success": true,
+      "seconds": 2.532,
+      "usage": {
+        "total_tokens": 5211,
+        "prompt_tokens": 5206,
+        "completion_tokens": 5,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 5206
+      },
+      "text_chars": 3,
+      "streamed_chars": 3
+    },
+    {
+      "round": 4,
+      "variant": "baseline",
+      "success": true,
+      "seconds": 3.445,
+      "usage": {
+        "total_tokens": 5223,
+        "prompt_tokens": 5206,
+        "completion_tokens": 17,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 5206
+      },
+      "text_chars": 3,
+      "streamed_chars": 3
+    }
+  ],
+  "history_prefix_measurement": {
+    "previous": {
+      "common_message_prefix_chars": 2760,
+      "retained_events": 13
+    },
+    "optimized": {
+      "common_message_prefix_chars": 19370,
+      "retained_events": 16
+    }
+  },
+  "reported_successful_usage": {
+    "input_tokens": 31184,
+    "cached_input_tokens": 7323,
+    "output_tokens": 67
+  },
+  "interpretation": [
+    "Initial exploratory request failed with ProviderHTTPError; billing and usage for that request are unknown.",
+    "Production explicit requests succeeded and reported hits, but reused catalog content from earlier probes.",
+    "ABBA uses fresh cohort and distinct variant labels at the start to isolate prefixes. Each variant changes the trailing ledger on its second request. All four reported zero hits.",
+    "The proxy accepted the explicit request fields; acceptance does not establish that it honors their caching semantics.",
+    "No improvement in provider hit rate is established; explicit mode remains opt-in and local user configuration was not modified.",
+    "The offline history measurement compares max_recent_events=10 to the new context-derived default with 15 then 16 synthetic read events. It measures common full-message content characters, not tokens.",
+    "No full live AgentLoop end-to-end run, no real repository data upload, no monetary cost estimate."
+  ]
+}

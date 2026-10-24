@@ -57,7 +57,8 @@ def test_anthropic_messages_adapter_maps_tools_reasoning_and_usage() -> None:
 
     call = client.messages.calls[0]
     assert call["model"] == "claude-sonnet"
-    assert call["system"] == "system instructions"
+    assert call["system"] == [{"type": "text", "text": "system instructions",
+                               "cache_control": {"type": "ephemeral"}}]
     assert call["thinking"] == {"type": "enabled", "budget_tokens": 2048}
     assert call["tools"] == [
         {"name": "list_files", "description": "List files", "input_schema": {"type": "object"}}
@@ -85,3 +86,62 @@ def test_anthropic_adapter_accepts_provider_specific_reasoning_effort() -> None:
         "type": "enabled",
         "budget_tokens": 2048,
     }
+
+
+def test_anthropic_counts_all_input_tokens_including_cache() -> None:
+    provider = AnthropicLLM(None, "claude-sonnet", FakeClient())
+    result = provider.complete(ModelContext(run_id=uuid4(), task="inspect"), ())
+    usage = result.provider_metadata["usage"]
+    assert usage["prompt_tokens"] == 32
+    assert usage["prompt_cache_hit_tokens"] == 10
+    assert usage["prompt_cache_miss_tokens"] == 22
+    assert usage["cache_creation_input_tokens"] == 2
+    assert usage["total_tokens"] == 40
+
+
+def test_anthropic_thinking_respects_per_turn_output_limit() -> None:
+    client = FakeClient()
+    provider = AnthropicLLM(None, "claude-sonnet", client,
+                            max_output_tokens=128000, reasoning_effort="high")
+    provider.complete(ModelContext(run_id=uuid4(), task="inspect",
+                                   metadata={"max_output_tokens": 2048}), ())
+    request = client.messages.calls[0]
+    assert request["max_tokens"] == 2048
+    assert request["thinking"] == {"type": "enabled", "budget_tokens": 1024}
+
+
+def test_anthropic_caches_stable_system_without_hoisting_repair_tail() -> None:
+    from coding613.ports.llm import ModelMessage
+
+    client = FakeClient()
+    provider = AnthropicLLM(None, "claude-sonnet", client)
+    provider.complete(ModelContext(run_id=uuid4(), task="inspect", messages=(
+        ModelMessage(role="system", content="stable instructions"),
+        ModelMessage(role="user", content="inspect"),
+        ModelMessage(role="system", content="Read the conflicted file now"),
+    )), ())
+    request = client.messages.calls[0]
+    assert request["system"] == [{"type": "text", "text": "stable instructions",
+                                  "cache_control": {"type": "ephemeral"}}]
+    assert "Read the conflicted file now" in str(request["messages"][-1])
+
+
+def test_anthropic_history_cache_breakpoint_excludes_changing_ledger() -> None:
+    from coding613.ports.llm import ModelMessage
+
+    client = FakeClient()
+    provider = AnthropicLLM(None, "claude-sonnet", client)
+    for count in (1, 2):
+        provider.complete(ModelContext(run_id=uuid4(), task="inspect", messages=(
+            ModelMessage(role="system", content="stable instructions"),
+            ModelMessage(role="user", content="inspect"),
+            ModelMessage(role="user", content="Event tool.completed: stable source"),
+            ModelMessage(role="user", content=f"Run ledger (state): {count}"),
+        )), ())
+    first, second = client.messages.calls
+    assert first["messages"][:2] == second["messages"][:2]
+    assert first["messages"][1]["content"] == [{
+        "type": "text", "text": "Event tool.completed: stable source",
+        "cache_control": {"type": "ephemeral"},
+    }]
+    assert first["messages"][2]["content"] == "Run ledger (state): 1"

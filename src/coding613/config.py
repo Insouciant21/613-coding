@@ -40,6 +40,7 @@ class ModelConfig(DomainModel):
     max_output_tokens: int | None = Field(default=None, gt=0, le=MAX_OUTPUT_TOKENS)
     context_window_chars: int | None = Field(default=None, gt=0, le=4_000_000)
     streaming: bool | None = None
+    prompt_cache_explicit: bool | None = None
 
     @field_validator("model")
     @classmethod
@@ -76,6 +77,7 @@ class LLMConfig(DomainModel):
         le=4_000_000,
     )
     streaming: bool = False
+    prompt_cache_explicit: bool = False
     reasoning_effort: str = Field(default="low", min_length=1, max_length=64)
     # Responses hosted and client-side protocol tools are opt-in per user
     # provider. Local function tools remain registered by the harness.
@@ -174,6 +176,8 @@ class LLMConfig(DomainModel):
             updates["context_window_chars"] = selected.context_window_chars
         if selected.streaming is not None:
             updates["streaming"] = selected.streaming
+        if selected.prompt_cache_explicit is not None:
+            updates["prompt_cache_explicit"] = selected.prompt_cache_explicit
         return self.model_copy(update=updates)
 
     @field_validator("provider")

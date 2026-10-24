@@ -418,6 +418,7 @@ def _build_provider(
             max_output_tokens=config.max_output_tokens,
             reasoning_effort=config.reasoning_effort,
             streaming=config.streaming,
+            prompt_cache_explicit=config.prompt_cache_explicit,
         )
     return CredentialedOpenAICompatibleLLM(
         provider=config.credential,

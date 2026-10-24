@@ -141,6 +141,7 @@ class CredentialedResponsesLLM:
         max_output_tokens: int = 1536,
         reasoning_effort: str = "low",
         streaming: bool = False,
+        prompt_cache_explicit: bool = False,
     ) -> None:
         self._provider = provider
         self._base_url = base_url
@@ -150,6 +151,7 @@ class CredentialedResponsesLLM:
         self._max_output_tokens = max_output_tokens
         self._reasoning_effort = reasoning_effort
         self.streaming_enabled = streaming
+        self._prompt_cache_explicit = prompt_cache_explicit
         self._client_factory = client_factory or _default_client
         self._delegate: ResponsesLLM | None = None
 
@@ -194,6 +196,7 @@ class CredentialedResponsesLLM:
                 timeout_seconds=self._timeout_seconds,
                 max_output_tokens=self._max_output_tokens,
                 reasoning_effort=self._reasoning_effort,
+                prompt_cache_explicit=self._prompt_cache_explicit,
             )
         except Exception:  # noqa: BLE001 - hide reader/factory details at the credential boundary
             if client is not None:

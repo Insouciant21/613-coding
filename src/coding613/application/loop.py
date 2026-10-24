@@ -57,6 +57,7 @@ from coding613.ports.llm import (
     LLMProvider,
     LLMResponse,
     ModelContext,
+    ModelMessage,
     RetryableProviderError,
     ToolDefinition,
 )
@@ -353,9 +354,9 @@ class AgentLoop:
                         )
                     )
                 )
-                budget_definition = (
-                    (_TASK_BUDGET_TOOL,) if session.resource_profile is None else ()
-                )
+                # Keep schemas stable for provider prefix caching. Repeated budget
+                # selections are rejected by the deterministic dispatch guard below.
+                budget_definition = (_TASK_BUDGET_TOOL,)
                 hosted_definitions = tuple(
                     definition
                     for definition in dependencies.provider_tools
@@ -1368,7 +1369,20 @@ class AgentLoop:
             session.resource_profile.name if session.resource_profile else "pending"
         )
         metadata["max_output_tokens"] = profile.max_output_tokens
-        return context.model_copy(update={"metadata": metadata})
+        messages = context.messages
+        if session.resource_profile is not None:
+            # Providers do not send harness metadata to the model. Keep this
+            # changing control state at the tail without changing tool schemas.
+            messages += (ModelMessage(
+                role="system",
+                content=(
+                    f"Run resource profile is already selected: {profile.name}; "
+                    f"output ceiling {profile.max_output_tokens} tokens. "
+                    "Do not call set_task_budget again. Continue the repository task "
+                    "using its current tool and validation evidence."
+                ),
+            ),)
+        return context.model_copy(update={"metadata": metadata, "messages": messages})
 
     def _select_resource_profile(
         self,

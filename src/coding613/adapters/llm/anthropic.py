@@ -127,20 +127,23 @@ class AnthropicLLM:
             "max_tokens": self._max_output_tokens_for(context),
         }
         if system:
-            request["system"] = system
+            request["system"] = [{
+                "type": "text", "text": system,
+                "cache_control": {"type": "ephemeral"},
+            }]
         function_tools = tuple(tool for tool in tools if tool.transport == "function")
         if function_tools:
             request["tools"] = [self._tool_payload(tool) for tool in function_tools]
-        thinking = self._thinking()
+        thinking = self._thinking(self._max_output_tokens_for(context))
         if thinking is not None:
             request["thinking"] = thinking
         return request
 
-    def _thinking(self) -> dict[str, Any] | None:
+    def _thinking(self, max_tokens: int) -> dict[str, Any] | None:
         if self._reasoning_effort.lower() in {"low", "off", "none", "disabled"}:
             return None
         # Anthropic requires the thinking budget to be below max_tokens.
-        budget = min(max(1024, self._max_output_tokens // 2), self._max_output_tokens - 1)
+        budget = min(max(1024, max_tokens // 2), max_tokens - 1)
         if budget < 1024:
             return None
         return {"type": "enabled", "budget_tokens": budget}
@@ -158,13 +161,14 @@ class AnthropicLLM:
         return self._max_output_tokens
 
     @staticmethod
-    def _messages(context: ModelContext) -> tuple[str, list[dict[str, str]]]:
+    def _messages(context: ModelContext) -> tuple[str, list[dict[str, Any]]]:
         raw = OpenAICompatibleLLM._messages(context)
-        systems = [item["content"] for item in raw if item["role"] == "system"]
-        messages: list[dict[str, str]] = []
+        systems: list[str] = []
+        messages: list[dict[str, Any]] = []
         for item in raw:
             role = item["role"]
-            if role == "system":
+            if role == "system" and not messages:
+                systems.append(item["content"])
                 continue
             # Anthropic Messages accepts user/assistant turns.  Tool output is
             # represented as a user turn because dispatch remains harness-owned.
@@ -173,6 +177,16 @@ class AnthropicLLM:
             )
         if not messages:
             messages = [{"role": "user", "content": context.task}]
+        # Cache the reusable evidence, not the ledger or transient repair guidance.
+        for index, message in enumerate(messages):
+            if message["content"].startswith("Run ledger (") and index > 0:
+                previous = messages[index - 1]
+                if previous["content"]:
+                    previous["content"] = [{
+                        "type": "text", "text": previous["content"],
+                        "cache_control": {"type": "ephemeral"},
+                    }]
+                break
         return "\n\n".join(redact_text(item) for item in systems), messages
 
     @staticmethod

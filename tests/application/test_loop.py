@@ -761,9 +761,14 @@ def test_model_selected_resource_profile_updates_next_request_budget(tmp_path: P
 
     assert summary.status is RunState.COMPLETED
     assert "set_task_budget" in {tool.name for tool in provider.tool_batches[0]}
-    assert "set_task_budget" not in {tool.name for tool in provider.tool_batches[1]}
+    assert provider.tool_batches[0] == provider.tool_batches[1]
     assert provider.contexts[1].metadata["resource_profile"] == "complex"
     assert provider.contexts[1].metadata["max_output_tokens"] == 128_000
+    assert any(
+        "already selected" in message.content and "Do not call set_task_budget again" in message.content
+        for message in provider.contexts[1].messages
+    )
+    assert not any("already selected" in m.content for m in provider.contexts[0].messages)
 
 
 def test_independent_read_only_tools_run_concurrently_but_preserve_result_order(
@@ -2647,3 +2652,19 @@ def test_malformed_dependency_results_become_terminal_summaries(
     assert summary.status is RunState.FAILED
     assert summary.stop_reason is StopReason.DEPENDENCY_ERROR
     assert records.iterations[-1].state_after is RunState.FAILED
+
+
+def test_stable_budget_tool_schema_does_not_allow_reselection(tmp_path: Path) -> None:
+    provider = Provider((
+        response(ToolCall(name="set_task_budget", arguments={"difficulty": "standard"})),
+        response(ToolCall(name="set_task_budget", arguments={"difficulty": "complex"})),
+        response(FinishAction(summary="inspected")),
+    ))
+    deps, events, _, _ = dependencies(tmp_path, provider, Validator(()),
+                                     budget=BudgetLimits(total_model_calls=4))
+    summary = AgentLoop().run(uuid4(), "inspect", deps)
+    assert summary.status is RunState.COMPLETED
+    assert provider.tool_batches[0] == provider.tool_batches[1] == provider.tool_batches[2]
+    assert provider.contexts[-1].metadata["resource_profile"] == "standard"
+    assert any(e.event_type == "feedback.invalid_action" and
+               "already selected" in e.payload["message"] for e in events.events)

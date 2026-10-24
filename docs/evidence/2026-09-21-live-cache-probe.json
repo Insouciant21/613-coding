@@ -1,0 +1,108 @@
+{
+  "verified_at": "2026-09-21T22:21:52.161932+08:00",
+  "scope": "live lower-level Responses streaming adapter; synthetic data only; not full AgentLoop end-to-end",
+  "provider": "ai2",
+  "model": "gpt-5.6-terra",
+  "api": "responses",
+  "output_limit_per_request": 512,
+  "request_count": 5,
+  "cache_key_override": false,
+  "prompt": {
+    "source": "generated synthetic catalog; no repository files, memory or instructions",
+    "catalog_records": 160,
+    "initial_input_tokens": 5180,
+    "instruction": "Reply only OK",
+    "tools": []
+  },
+  "changing_tail": [
+    {
+      "round": 1,
+      "success": true,
+      "seconds": 34.078,
+      "usage": {
+        "total_tokens": 5185,
+        "prompt_tokens": 5180,
+        "completion_tokens": 5,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 5180
+      },
+      "text_chars": 3,
+      "streamed_chars": 3,
+      "cache_hit_ratio": 0.0
+    },
+    {
+      "round": 2,
+      "success": true,
+      "seconds": 3.684,
+      "usage": {
+        "total_tokens": 5198,
+        "prompt_tokens": 5180,
+        "completion_tokens": 18,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 5180
+      },
+      "text_chars": 3,
+      "streamed_chars": 3,
+      "cache_hit_ratio": 0.0
+    },
+    {
+      "round": 3,
+      "success": true,
+      "seconds": 3.656,
+      "usage": {
+        "total_tokens": 5213,
+        "prompt_tokens": 5193,
+        "completion_tokens": 20,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 5193
+      },
+      "text_chars": 3,
+      "streamed_chars": 3,
+      "cache_hit_ratio": 0.0
+    }
+  ],
+  "identical_control": [
+    {
+      "round": 1,
+      "success": true,
+      "seconds": 4.856,
+      "usage": {
+        "total_tokens": 5185,
+        "prompt_tokens": 5180,
+        "completion_tokens": 5,
+        "prompt_cache_hit_tokens": 3897,
+        "prompt_cache_miss_tokens": 1283
+      },
+      "text_chars": 3,
+      "streamed_chars": 3,
+      "cache_hit_ratio": 0.752317
+    },
+    {
+      "round": 2,
+      "success": true,
+      "seconds": 2.997,
+      "usage": {
+        "total_tokens": 5185,
+        "prompt_tokens": 5180,
+        "completion_tokens": 5,
+        "prompt_cache_hit_tokens": 3561,
+        "prompt_cache_miss_tokens": 1619
+      },
+      "text_chars": 3,
+      "streamed_chars": 3,
+      "cache_hit_ratio": 0.687452
+    }
+  ],
+  "totals": {
+    "input_tokens": 25913,
+    "cached_input_tokens": 7458,
+    "output_tokens": 53
+  },
+  "limitations": [
+    "First group uses an unchanged synthetic catalog with changing final ledger; third request adds one synthetic evidence message.",
+    "Second group repeats the exact first-group initial request twice, using a fresh client.",
+    "Durations include credential/client initialization for the first request of each process.",
+    "No old-versus-new AgentLoop A/B, no measured billing amount, no Anthropic live test.",
+    "Zero hits on the first three requests and nonzero control hits confirm availability, not stable hit rate or a causal speedup from code changes."
+  ]
+}

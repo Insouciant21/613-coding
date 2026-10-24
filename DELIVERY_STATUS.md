@@ -1174,3 +1174,25 @@ Every completed plan task must link a commit and fresh verification output here.
 - Verification: 691 tests passed, including deterministic demos; 478 pre-existing asyncio deprecation warnings. Tools selection: 86 passed. Ruff, mypy (110 files), and whitespace check passed.
 - Source evidence: AGENT_LOG.md MODE-01, PLAN.md MODE-01, tests/adapters/tools/test_filesystem.py. Latest local test output: `/tmp/613-agent-repair-pytest.log`.
 - CI/CD: no pipeline or job was started for this uncommitted repair; historical pipeline results above do not verify these changes. No package build, remote push, credential access, or deployment.
+
+### LOOP-CACHE-01 — verified locally, 2026-09-21 21:16 Asia/Shanghai
+
+- Responsible actor: `/root`; changes uncommitted. Latest local gate: 702 tests passed, including deterministic demos, 478 dependency deprecation warnings; Ruff, mypy (110 source files), and diff checks passed.
+- Delivered: longer stable history prefix, stable normal-turn budget tool schema with repeat rejection, bounded embedding reuse without stale memory authorization, Anthropic explicit caching and thinking-limit repair, Chat/Responses/Anthropic cache usage normalization.
+- Source records: PLAN.md LOOP-CACHE-01; AGENT_LOG.md LOOP-CACHE-01; README caching notes; tests/application/test_context.py, test_loop.py and tests/adapters/llm regressions.
+- Offline measurement: common full-message prefix 2,767 -> 8,307 characters; two context builds use one embedding request. No live provider cache-hit or cost-reduction claim.
+- CI/CD: not started for this patch; historical pipeline/job results do not validate it. Build/release/publication unchanged. No provider calls or credential access.
+
+### LOOP-CACHE-LIVE — 2026-09-21 22:21 Asia/Shanghai
+
+- Responsible actor `/root`. User-authorized real API verification: 5/5 Responses streaming calls successful using active ai2 / gpt-5.6-terra and synthetic inputs only.
+- Cache evidence: changing-tail rounds 0 hits; identical controls 75.23% and 68.75% input-token hits. Total reported input 25,913, cached input 7,458, output 53. Actual billing not reported.
+- Source evidence: [live cache probe](docs/evidence/2026-09-21-live-cache-probe.json), AGENT_LOG.md LOOP-CACHE-LIVE, PLAN.md follow-up. No secret material in records.
+- Limits: adapter-level test, not full live AgentLoop or before/after A/B; no stable-rate guarantee. No production-code edits, build, remote CI jobs, commit, or publication in this verification task.
+
+### LOOP-CACHE-02 — 2026-09-22 13:02 Asia/Shanghai
+
+- Responsible actor `/root`; implementation and local verification complete, uncommitted. Full suite: 709 passed, 478 existing dependency warnings; focused suite 59 passed; Ruff, mypy (110 files), diff check passed.
+- Improvements: context-budget-derived history capacity; Responses tool continuations before mutable ledger; explicit breakpoints configurable per provider/model, default off; cache-write usage preserved when reported.
+- Offline prefix comparison: 2,760 -> 19,370 characters. Live: one failed exploratory request, six successful requests; fresh-prefix ABBA gave zero hits in both variants, so no demonstrated live caching gain. Active provider settings remain unchanged.
+- Source records: AGENT_LOG.md/PLAN.md LOOP-CACHE-02; [v2 evidence](docs/evidence/2026-09-22-cache-optimization-v2.json); README and regression tests. No new CI/CD pipeline/job, release build, commit, or push.

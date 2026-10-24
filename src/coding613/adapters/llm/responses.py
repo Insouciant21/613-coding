@@ -51,6 +51,7 @@ class ResponsesLLM:
         max_output_tokens: int = 1536,
         reasoning_effort: str = "low",
         clock: Callable[[], float] = time.monotonic,
+        prompt_cache_explicit: bool = False,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
@@ -59,18 +60,14 @@ class ResponsesLLM:
         self._max_output_tokens = max_output_tokens
         self._reasoning_effort = reasoning_effort
         self._clock = clock
+        self._prompt_cache_explicit = prompt_cache_explicit
 
     def complete(
         self, context: ModelContext, tools: Sequence[ToolDefinition]
     ) -> LLMResponse:
         try:
             response = self._client.responses.create(
-                model=self._model_for(context),
-                input=self._input(context),
-                tools=[self._tool_payload(tool) for tool in tools],
-                max_output_tokens=self._max_output_tokens_for(context),
-                reasoning={"effort": self._reasoning_effort},
-                store=False,
+                **self._request(context, tools),
             )
         except ProviderError:
             raise
@@ -94,14 +91,9 @@ class ResponsesLLM:
             if cancelled():
                 raise ProviderCancelledError("provider stream was cancelled")
             stream = self._client.responses.create(
-                model=self._model_for(context),
-                input=self._input(context),
-                tools=[self._tool_payload(tool) for tool in tools],
-                max_output_tokens=self._max_output_tokens_for(context),
-                reasoning={"effort": self._reasoning_effort},
+                **self._request(context, tools),
                 stream=True,
                 stream_options={"include_usage": True},
-                store=False,
             )
             text_parts: list[str] = []
             calls: dict[str, dict[str, Any]] = {}
@@ -355,6 +347,33 @@ class ResponsesLLM:
             return min(self._max_output_tokens, override)
         return self._max_output_tokens
 
+    def _request(
+        self, context: ModelContext, tools: Sequence[ToolDefinition]
+    ) -> dict[str, Any]:
+        items = self._input(context)
+        request: dict[str, Any] = {
+            "model": self._model_for(context),
+            "input": items,
+            "tools": [self._tool_payload(tool) for tool in tools],
+            "max_output_tokens": self._max_output_tokens_for(context),
+            "reasoning": {"effort": self._reasoning_effort},
+            "store": False,
+        }
+        boundary = next(
+            (i for i, message in enumerate(context.messages) if message.name == "run_ledger"),
+            0,
+        )
+        if self._prompt_cache_explicit and boundary > 0:
+            # The option is explicitly enabled per provider/model, never inferred from a name.
+            item = items[boundary - 1]
+            if item.get("role") in {"system", "user"} and isinstance(item.get("content"), str):
+                item["content"] = [{
+                    "type": "input_text", "text": item["content"],
+                    "prompt_cache_breakpoint": {"mode": "explicit"},
+                }]
+                request["extra_body"] = {"prompt_cache_options": {"mode": "explicit"}}
+        return request
+
     @staticmethod
     def _input(context: ModelContext) -> list[dict[str, Any]]:
         messages = [
@@ -364,9 +383,15 @@ class ResponsesLLM:
         continuation = context.metadata.get("responses_input_items")
         if not isinstance(continuation, list):
             return messages
-        return messages + [
-            dict(item) for item in continuation if isinstance(item, dict)
-        ]
+        boundary = next(
+            (i for i, message in enumerate(context.messages) if message.name == "run_ledger"),
+            len(messages),
+        )
+        return (
+            messages[:boundary]
+            + [dict(item) for item in continuation if isinstance(item, dict)]
+            + messages[boundary:]
+        )
 
     @staticmethod
     def _tool_payload(tool: ToolDefinition) -> dict[str, Any]:

@@ -121,9 +121,39 @@ Large tool results are shown as a short redacted preview in the TUI. The loop re
 10,000,000 characters of a tool result internally; press `Ctrl+T` to expand the latest result,
 with the expanded terminal view still bounded at 1 MiB for terminal safety.
 Validation previews are limited to 10 lines (with a safety cap for a single extremely long line),
-and use the same `Ctrl+T` expansion. The context metadata exposes `cache_prefix_sha256`; the stable
-system guidance and task are placed before the changing run ledger/events so compatible Responses
-providers can reuse their prompt-cache prefix.
+and use the same `Ctrl+T` expansion. Context assembly places stable system guidance and the task
+first, retained events in chronological order next, and the changing run ledger and repair hints
+last. Normal budget selection keeps tool schemas unchanged; repeated selection is still rejected
+by the loop. This preserves reusable prefixes until history rolls over, compaction occurs, or
+instructions/memory/tool permissions change. `cache_prefix_sha256` identifies the assembler's
+leading system messages; it is not a provider cache-hit measurement.
+
+Anthropic requests mark stable system guidance and the evidence immediately before the ledger
+with ephemeral cache breakpoints. Transient repair hints stay in the message tail. Chat Completions
+keeps provider-managed caching. Responses also keeps that default; for an endpoint/model that
+supports OpenAI explicit breakpoints, set `prompt_cache_explicit = true` in its user provider
+profile or model table. The adapter then marks the stable message immediately before the harness
+ledger and requests explicit-only caching. It leaves the option out when no trusted ledger boundary
+exists. The option defaults to false; do not infer support from a model alias on a compatibility
+proxy. A model-table override can disable it independently of the provider default.
+
+Responses native tool continuations now precede the changing ledger, and the default event history
+capacity is derived from `context_window_chars / max_message_chars` (128 events with current
+defaults) instead of sliding after 10 events. Explicit event limits remain supported, and dynamic
+compaction still retains current evidence and the ledger.
+
+Normalized `provider_metadata.usage` in persisted iteration model responses records
+`prompt_tokens`, `prompt_cache_hit_tokens`, and `prompt_cache_miss_tokens` when reported by the
+provider. Anthropic total input includes ordinary input, cache reads, and cache creation; cache
+creation is also retained separately. Responses cache writes are recorded as
+`prompt_cache_write_tokens` when the endpoint reports them, so cache-write cost can be analyzed
+separately from hits. Actual cache eligibility and hit rates depend on the selected
+provider/model and request size; unknown cache counts are not treated as zero.
+
+The assembler reuses its last successful redacted task embedding within the same project, avoiding
+repeated embedding calls across turns. Memory retrieval and SQLite permission checks still run on
+every build, so changed or newly restricted memories take effect immediately. Failed embeddings
+are not cached and retain the keyword fallback.
 
 Each model turn receives a bounded repository context assembled by the harness. The repository
 root may provide `AGENTS.override.md`, `AGENTS.md`, `CLAUDE.local.md`, or `CLAUDE.md`; their

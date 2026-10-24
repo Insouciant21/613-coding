@@ -170,7 +170,7 @@ def test_context_keeps_task_in_stable_prefix_before_changing_run_evidence(
         changed.messages[: task_index + 1]
     )
     assert baseline.metadata["cache_prefix_sha256"] == changed.metadata["cache_prefix_sha256"]
-    assert changed.messages[task_index + 1].content.startswith("Run ledger (")
+    assert changed.messages[-1].content.startswith("Run ledger (")
 
 
 def test_context_compacts_old_event_messages_without_losing_task_or_latest_evidence(
@@ -224,7 +224,7 @@ def test_context_falls_back_to_sqlite_keyword_search_and_bounds_events(tmp_path:
     )
     context = assembler.build(run.id, "fix parser", events)
     assert context.metadata["memory_ids"] == [str(public.id)]
-    assert context.messages[-1].content.endswith('{"n":2}')
+    assert any(message.content.endswith('{"n":2}') for message in context.messages)
     assert all("old" not in message.content for message in context.messages)
 
 
@@ -276,7 +276,8 @@ def test_context_serializes_persisted_events_without_unmatched_tool_messages(
     context = assembler.build(run.id, "fix parser", (event,))
 
     assert context.messages[-1].role == "user"
-    assert context.messages[-1].content.startswith("Event state.transition:")
+    assert any(m.role == "user" and m.content.startswith("Event state.transition:")
+               for m in context.messages)
 
 
 def test_context_keeps_goal_directed_worker_instructions_ahead_of_run_history(
@@ -301,7 +302,7 @@ def test_context_keeps_goal_directed_worker_instructions_ahead_of_run_history(
     assert any(
         message.content == "implement the missing file" for message in context.messages
     )
-    assert context.messages[-1].content.startswith("Event feedback.tool_error:")
+    assert any(m.content.startswith("Event feedback.tool_error:") for m in context.messages)
 
 
 def test_context_escalates_after_repeated_validation_tool_errors_without_changes(
@@ -711,3 +712,72 @@ def test_openai_compatible_embedding_maps_single_request() -> None:
             base_url="https://provider.invalid/v1", model="embed-model", http_client=client
         )
         assert provider.embed(("a", "b")) == [[1.0, 0.0], [0.0, 1.0]]
+
+
+def test_context_reuses_event_prefix_before_dynamic_ledger(tmp_path: Path) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    events = tuple(
+        Event.new("tool.completed", run.id, {
+            "success": True, "call": {"name": "read_file", "arguments": {"path": f"{i}.py"}},
+            "output": f"source-{i}", "changed_files": [],
+        }, datetime.now(UTC)) for i in range(3)
+    )
+    before = assembler.build(run.id, "inspect", events[:2])
+    after = assembler.build(run.id, "inspect", events)
+    ledger_index = next(i for i, m in enumerate(before.messages) if m.content.startswith("Run ledger"))
+    assert any(m.content.startswith("Event ") for m in before.messages[:ledger_index])
+    assert before.messages[:ledger_index] == after.messages[:ledger_index]
+    assert after.metadata["ledger"] != before.metadata["ledger"]
+
+
+def test_embedding_reuse_does_not_cache_authoritative_memory(tmp_path: Path) -> None:
+    repository, _, run, public, _ = setup_memory(tmp_path)
+    embedding = RecordingEmbedding()
+    assembler = ContextAssembler(repository, FakeIndex((public.id,)), embedding,
+                                 allowed_permission_tags=frozenset({"public"}))
+    assembler.build(run.id, "inspect", ())
+    repository.put(public.model_copy(update={"text": "updated convention"}))
+    updated = assembler.build(run.id, "inspect", ())
+    assert "updated convention" in updated.model_dump_json()
+    assert embedding.texts == ["inspect"]
+    assembler.build(run.id, "different task", ())
+    assert embedding.texts == ["inspect", "different task"]
+
+
+def test_cached_embedding_still_applies_current_memory_permissions(tmp_path: Path) -> None:
+    repository, _, run, public, _ = setup_memory(tmp_path)
+    embedding = RecordingEmbedding()
+    assembler = ContextAssembler(repository, FakeIndex((public.id,)), embedding,
+                                 allowed_permission_tags=frozenset({"public"}))
+    assert str(public.id) in assembler.build(run.id, "inspect", ()).metadata["memory_ids"]
+    repository.put(public.model_copy(update={"permission_tags": frozenset({"private"})}))
+    context = assembler.build(run.id, "inspect", ())
+    assert context.metadata["memory_ids"] == []
+    assert public.text not in context.model_dump_json()
+    assert embedding.texts == ["inspect"]
+
+
+def test_failed_embedding_is_retried_instead_of_cached(tmp_path: Path) -> None:
+    repository, _, run, public, _ = setup_memory(tmp_path)
+    embedding = RecordingEmbedding(fail=True)
+    assembler = ContextAssembler(repository, FakeIndex((public.id,)), embedding,
+                                 allowed_permission_tags=frozenset({"public"}))
+    assembler.build(run.id, "inspect", ())
+    embedding.fail = False
+    context = assembler.build(run.id, "inspect", ())
+    assert context.metadata["memory_ids"] == [str(public.id)]
+    assert embedding.texts == ["inspect", "inspect"]
+
+
+def test_default_history_does_not_slide_after_ten_events(tmp_path: Path) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    events = tuple(Event.new("state.transition", run.id, {"step": i}, datetime.now(UTC))
+                   for i in range(12))
+    before = assembler.build(run.id, "inspect", events[:11])
+    after = assembler.build(run.id, "inspect", events)
+    stable = tuple(m for m in before.messages if not m.content.startswith("Run ledger ("))
+    assert after.messages[:len(stable)] == stable
+    assert any('"step":0' in m.content for m in after.messages)
+    assert after.messages[-1].name == "run_ledger"
