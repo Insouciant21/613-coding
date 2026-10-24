@@ -8,12 +8,26 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen
+from textual.widget import AwaitMount, Widget
 from textual.widgets import Button, Input, OptionList, Select, Static, TextArea
 from textual.widgets.option_list import Option
 
 
 class ConversationLog(VerticalScroll):
     """Scrollable conversation output owned by the controller."""
+
+    def mount(
+        self,
+        *widgets: Widget,
+        before: int | str | Widget | None = None,
+        after: int | str | Widget | None = None,
+    ) -> AwaitMount:
+        # Newest evidence must stay on screen: without this, output mounted
+        # after a long transcript lands below the fold and looks like a dead
+        # command even though it rendered.
+        mounted = super().mount(*widgets, before=before, after=after)
+        self.call_after_refresh(self.scroll_end, animate=False)
+        return mounted
 
 
 class ConfigMenu(OptionList):
@@ -274,6 +288,9 @@ class TaskComposer(TextArea):
         value = self.text.strip()
         if value:
             self.post_message(self.Submitted(value))
+            # Clear on submission so a slash command does not linger in the
+            # composer and get silently appended to by the next keystrokes.
+            self.load_text("")
 
 
 class StatusFooter(Static):

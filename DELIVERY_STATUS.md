@@ -1227,3 +1227,10 @@ Every completed plan task must link a commit and fresh verification output here.
 - Outcome: single-turn romannum task completed in 8 turns / 128.9 s; validation passed on first attempt (5/5, also verified independently with CLI exit-code checks). Relative validation argv produced zero repository_escape denials versus 4 in the prior absolute-path run.
 - New open defect: TUI Enter-submit soft-lock after a completed run (typing/Ctrl+J/keypad-Enter still work; Ctrl+Q healthy; suspect stuck `_executing` guard with summary rendered by the progress channel). Recorded with reproduction detail; no fix in this task.
 - Source evidence: [TUI romannum E2E](docs/evidence/2026-10-24-tui-romannum-e2e/README.md), AGENT_LOG.md WEATHER-E2E-02. No CI pipeline, no push, no harness source change.
+
+### TUIFIX-01 — slash-command output below the fold — 2026-10-25
+
+- Responsible actor: ZCode session (user asked to fix the open TUI defect from WEATHER-E2E-02). Root cause corrected: not a stuck `_executing` guard — command output mounted below the fold of the non-auto-scrolling ConversationLog, and the composer was not cleared on command submission; together they imitated a dead Enter key on long transcripts.
+- Fix: ConversationLog.mount schedules scroll_end after every mount; TaskComposer.submit clears the composer. RED/GREEN: new Pilot test failed on clearing, then on scrolling (15 < 24) with the scroll fix disabled; tests/tui 102 passed, full suite 719 passed, ruff/mypy clean. Live tmux regression: /cost visible and cleared; plain second message completed in-session.
+- Correction to WEATHER-E2E-02 record: second conversational turns were always submittable; only slash-command output visibility was broken. Open defects remaining: bare `providers` / `credentials status` tracebacks; repository-escape denial message detail.
+- Source evidence: AGENT_LOG.md TUIFIX-01; tests/tui/test_end_to_end.py; src/coding613/tui/widgets.py. No CI run yet; no push.
