@@ -335,6 +335,114 @@ def test_context_escalates_after_repeated_validation_tool_errors_without_changes
     )
 
 
+def test_context_does_not_escalate_after_recovered_validation_pass(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    events = (
+        Event.new(
+            "feedback.tool_error",
+            run.id,
+            {"message": "objective validation produced tool_error", "details": {"changed_files": []}},
+            datetime.now(UTC),
+        ),
+        Event.new(
+            "tool.completed",
+            run.id,
+            {
+                "success": True,
+                "call": {"name": "apply_patch", "arguments": {}},
+                "output": "",
+                "changed_files": ["src/value.py"],
+            },
+            datetime.now(UTC),
+        ),
+        Event.new(
+            "validation.completed",
+            run.id,
+            {
+                "command": ["pytest"],
+                "kind": "test",
+                "exit_code": 0,
+                "stdout": "",
+                "stderr": "",
+                "duration_seconds": 0.1,
+                "timed_out": False,
+                "resource_exhausted": False,
+                "output_truncated": False,
+            },
+            datetime.now(UTC),
+        ),
+        Event.new(
+            "feedback.pass",
+            run.id,
+            {"message": "objective validation passed"},
+            datetime.now(UTC),
+        ),
+    )
+
+    context = assembler.build(run.id, "repair the value module", events)
+
+    assert not any(
+        "must edit" in message.content.lower() for message in context.messages
+    )
+
+
+def test_context_does_not_escalate_when_latest_failure_changed_files(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    events = (
+        Event.new(
+            "validation.completed",
+            run.id,
+            {"passed": False, "changed_files": []},
+            datetime.now(UTC),
+        ),
+        Event.new(
+            "feedback.test_failure",
+            run.id,
+            {
+                "message": "objective validation produced test_failure",
+                "details": {"changed_files": ["src/value.py"]},
+            },
+            datetime.now(UTC),
+        ),
+    )
+
+    context = assembler.build(run.id, "repair the value module", events)
+
+    assert not any(
+        "must edit" in message.content.lower() for message in context.messages
+    )
+
+
+def test_context_escalates_on_latest_code_failure_without_changes(
+    tmp_path: Path,
+) -> None:
+    repository, _, run, _, _ = setup_memory(tmp_path)
+    assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())
+    events = (
+        Event.new(
+            "feedback.test_failure",
+            run.id,
+            {
+                "message": "objective validation produced test_failure",
+                "details": {"changed_files": []},
+            },
+            datetime.now(UTC),
+        ),
+    )
+
+    context = assembler.build(run.id, "repair the value module", events)
+
+    assert any(
+        "must edit" in message.content.lower() for message in context.messages
+    )
+
+
 def test_context_gives_fresh_patch_guidance_after_patch_conflict(tmp_path: Path) -> None:
     repository, _, run, _, _ = setup_memory(tmp_path)
     assembler = ContextAssembler(repository, FakeIndex(), RecordingEmbedding())

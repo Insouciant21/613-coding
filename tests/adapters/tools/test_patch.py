@@ -636,3 +636,36 @@ def test_patch_can_create_two_files_in_one_action(tmp_path: Path, patch: str) ->
     assert result.added == 2
     assert (tmp_path / "first.txt").read_text() == "first\n"
     assert (tmp_path / "second.txt").read_text() == "second\n"
+
+
+def test_prepare_patch_accepts_deletion_of_dash_prefixed_lines() -> None:
+    # A hunk line for deleted content "-- sql comment" is itself prefixed
+    # "--- " in the patch; it must not be mistaken for a new file header.
+    source = "keep\n-- sql comment\nremoved\nkeep2\n"
+    patch = (
+        "--- a/notes.sql\n"
+        "+++ b/notes.sql\n"
+        "@@ -1,4 +1,2 @@\n"
+        " keep\n"
+        "--- sql comment\n"
+        "-removed\n"
+        " keep2\n"
+    )
+
+    plan = prepare_patch(patch, lambda path: source)
+
+    assert plan.changes == (
+        PreparedChange(
+            path="notes.sql",
+            operation=PatchOperation.UPDATE,
+            before=source,
+            after="keep\nkeep2\n",
+        ),
+    )
+
+
+def test_prepare_patch_rejects_header_without_target_line() -> None:
+    patch = "--- a/notes.sql\n+++ b/notes.sql\n@@ -1 +1 @@\n-old\n+new\n--- a/other.sql\n"
+
+    with pytest.raises(InvalidPatchError, match="unified file header is incomplete"):
+        prepare_patch(patch, lambda path: "old\n")

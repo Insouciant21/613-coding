@@ -509,18 +509,34 @@ def _pinned_read_events(
     return tuple(selected)
 
 def _needs_write_escalation(recent_events: Sequence[Event]) -> bool:
-    """Escalate a failed no-change validation before the next model call."""
+    """Escalate a failed no-change validation before the next model call.
 
+    The newest decisive feedback wins.  A later pass, a failing attempt that
+    did change files, an environment-class failure, or a newer patch-repair
+    barrier resolves every older trigger, so the repair prompt is never
+    injected after the model already recovered.
+    """
+
+    code_failure_kinds = {
+        "feedback.test_failure",
+        "feedback.lint_failure",
+        "feedback.type_failure",
+    }
+    resolved_kinds = {
+        "feedback.pass",
+        "feedback.timeout",
+        "feedback.resource_exhausted",
+        "feedback.environment_failure",
+        "feedback.policy_blocked",
+        "feedback.merge_conflict",
+        "feedback.no_progress",
+    }
     for event in reversed(recent_events):
-        if event.event_type == "feedback.invalid_action":
+        kind = event.event_type
+        if kind in code_failure_kinds:
             details = event.payload.get("details")
-            if isinstance(details, dict) and details.get("require_fresh_patch") is True:
-                return False
-        if event.event_type == "validation.completed":
-            payload = event.payload
-            if payload.get("passed") is False and not payload.get("changed_files"):
-                return True
-        if event.event_type == "feedback.tool_error":
+            return not (isinstance(details, dict) and details.get("changed_files"))
+        if kind == "feedback.tool_error":
             details = event.payload.get("details")
             if (
                 isinstance(details, dict)
@@ -529,8 +545,31 @@ def _needs_write_escalation(recent_events: Sequence[Event]) -> bool:
                 and details["error"].startswith("PatchConflictError")
             ):
                 return False
-            if isinstance(details, dict) and not details.get("changed_files"):
-                return True
+            # Classifier feedback always carries changed_files; tool_error
+            # events without it are plain tool failures and carry no evidence
+            # about whether the model is stuck not-editing.
+            if isinstance(details, dict) and "changed_files" in details:
+                return not details.get("changed_files")
+            continue
+        if kind in resolved_kinds:
+            return False
+        if kind == "feedback.invalid_action":
+            details = event.payload.get("details")
+            if isinstance(details, dict) and details.get("require_fresh_patch") is True:
+                return False
+            continue
+        if kind == "validation.completed":
+            payload = event.payload
+            if "passed" in payload:
+                return payload.get("passed") is False and not payload.get("changed_files")
+            exit_code = payload.get("exit_code")
+            if (
+                exit_code == 0
+                and payload.get("timed_out") is not True
+                and payload.get("resource_exhausted") is not True
+            ):
+                return False
+            continue
     return False
 
 

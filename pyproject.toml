@@ -41,6 +41,11 @@ default-groups = ["dev"]
 [tool.uv.build-backend]
 module-name = "coding613"
 
+[tool.pytest.ini_options]
+# Keep the canonical `uv run pytest` scoped to the project suite: demo runs
+# leave importable test files under tmp/ workspaces that break collection.
+testpaths = ["tests"]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100

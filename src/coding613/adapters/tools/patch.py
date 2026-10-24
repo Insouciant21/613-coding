@@ -116,8 +116,8 @@ def prepare_patch(
         raise InvalidPatchError("patch contains unsupported metadata")
     if not patch.startswith("--- "):
         raise InvalidPatchError("patch must start with a unified file header")
-    _preflight_header_pairs(patch)
     file_patches = _validate_patch_lines(patch)
+    _preflight_header_pairs(file_patches)
 
     try:
         # Parse files independently: repeated /dev/null sources otherwise confuse
@@ -333,28 +333,27 @@ def _header_path(value: str) -> str:
     return path
 
 
-def _preflight_header_pairs(patch: str) -> None:
-    lines = patch.splitlines()
+def _preflight_header_pairs(file_patches: tuple[str, ...]) -> None:
+    """Validate each split file chunk's header pair and target uniqueness.
+
+    Headers are identified on the hunk-aware split, so a deleted hunk line
+    whose content merely starts with ``--`` is never mistaken for a file
+    header.
+    """
+
     targets: set[str] = set()
-    index = 0
-    found = 0
-    while index < len(lines):
-        line = lines[index]
-        if not line.startswith("--- "):
-            index += 1
-            continue
-        if index + 1 >= len(lines) or not lines[index + 1].startswith("+++ "):
+    for file_patch in file_patches:
+        lines = file_patch.splitlines()
+        if len(lines) < 2 or not lines[1].startswith("+++ "):
             raise InvalidPatchError("unified file header is incomplete")
         _, path = _operation_path(
-            _header_path(line[4:]),
-            _header_path(lines[index + 1][4:]),
+            _header_path(lines[0][4:]),
+            _header_path(lines[1][4:]),
         )
         if path in targets:
             raise InvalidPatchError(f"duplicate patch target: {path}")
         targets.add(path)
-        found += 1
-        index += 2
-    if found == 0:
+    if not targets:
         raise InvalidPatchError("patch contains no file headers")
 
 
