@@ -1219,3 +1219,10 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
   `package-and-artifacts` output from run `31771935622`. No tag/history rewrite occurred.
 - Submission metadata remains incomplete: the GitHub repository is private and
   `submission.jsonc` still needs the student's real ID and name. The release URL is now available.
+
+## MODE-01 — preserve permissions during agent file updates (2026-09-20)
+
+- Local implementation and verification complete; not committed. Current user explicitly waived Superpowers workflow.
+- Fixed `edit_file` and `apply_patch` dropping ordinary access/execute permissions during atomic replacement. Added ten real-filesystem regressions, retaining private new-file defaults and dropping special privilege bits.
+- RED: 8 failed, 2 passed. GREEN: tools suite 86 passed; full maintained suite 691 passed (478 existing dependency deprecation warnings); Ruff, mypy (110 source files), and diff check passed.
+- Evidence: AGENT_LOG.md MODE-01; tests/adapters/tools/test_filesystem.py; src/coding613/adapters/tools/filesystem.py. Commit: none; remote CI not run.

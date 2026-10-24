@@ -168,3 +168,49 @@ def test_git_diff_returns_worktree_patch(tmp_path: Path) -> None:
     patch = GitTools(tmp_path).diff()
     assert "-before" in patch
     assert "+after" in patch
+
+
+@pytest.mark.parametrize("operation", ["edit", "patch"])
+@pytest.mark.parametrize("mode", [0o755, 0o644, 0o640])
+def test_content_update_preserves_permissions(
+    tmp_path: Path, operation: str, mode: int
+) -> None:
+    target = tmp_path / "script.sh"
+    target.write_text("before\n", encoding="utf-8")
+    target.chmod(mode)
+    tools = FilesystemTools(tmp_path)
+
+    if operation == "edit":
+        tools.edit_file("script.sh", "after\n")
+    else:
+        tools.apply_patch(
+            "--- a/script.sh\n+++ b/script.sh\n@@ -1 +1 @@\n-before\n+after\n"
+        )
+
+    assert target.read_text(encoding="utf-8") == "after\n"
+    assert target.stat().st_mode & 0o7777 == mode
+
+
+@pytest.mark.parametrize("operation", ["edit", "patch"])
+def test_new_file_permissions_remain_private(tmp_path: Path, operation: str) -> None:
+    tools = FilesystemTools(tmp_path)
+    if operation == "edit":
+        tools.edit_file("new.txt", "created\n")
+    else:
+        tools.apply_patch("--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1 @@\n+created\n")
+    assert (tmp_path / "new.txt").stat().st_mode & 0o7777 == 0o600
+
+
+@pytest.mark.parametrize("operation", ["edit", "patch"])
+def test_content_update_drops_privileged_permissions(tmp_path: Path, operation: str) -> None:
+    target = tmp_path / "script.sh"
+    target.write_text("before\n", encoding="utf-8")
+    target.chmod(0o6755)
+    tools = FilesystemTools(tmp_path)
+    if operation == "edit":
+        tools.edit_file("script.sh", "after\n")
+    else:
+        tools.apply_patch(
+            "--- a/script.sh\n+++ b/script.sh\n@@ -1 +1 @@\n-before\n+after\n"
+        )
+    assert target.stat().st_mode & 0o7777 == 0o755

@@ -99,12 +99,20 @@ class FilesystemTools:
         resolved.parent.mkdir(parents=True, exist_ok=True)
         if not resolved.parent.resolve(strict=True).is_relative_to(self.root):
             raise PathOutsideRepositoryError("parent escaped repository root")
+        try:
+            metadata = resolved.stat()
+        except FileNotFoundError:
+            mode = None
+        else:
+            mode = metadata.st_mode & 0o777 if stat.S_ISREG(metadata.st_mode) else None
         descriptor, temporary_name = tempfile.mkstemp(prefix=f".{resolved.name}.", dir=resolved.parent)
         temporary_path = Path(temporary_name)
         try:
             with os.fdopen(descriptor, "wb") as temporary_file:
                 temporary_file.write(data)
                 temporary_file.flush()
+                if mode is not None:
+                    os.fchmod(temporary_file.fileno(), mode)
                 os.fsync(temporary_file.fileno())
             os.replace(temporary_path, resolved)
         finally:
@@ -239,6 +247,12 @@ class FilesystemTools:
         descriptor: int | None = None
         staged = False
         try:
+            try:
+                metadata = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                mode = None
+            else:
+                mode = metadata.st_mode & 0o777 if stat.S_ISREG(metadata.st_mode) else None
             flags = (
                 os.O_WRONLY
                 | os.O_CREAT
@@ -258,6 +272,8 @@ class FilesystemTools:
                 if written < 1:
                     raise OSError("could not write patch staging file")
                 view = view[written:]
+            if mode is not None:
+                os.fchmod(descriptor, mode)
             os.fsync(descriptor)
             os.close(descriptor)
             descriptor = None

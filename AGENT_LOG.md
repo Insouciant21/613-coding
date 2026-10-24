@@ -2786,3 +2786,15 @@ Chronological evidence log for the 613 Coding project. Entries are appended afte
 - Lesson: a skip marker on a tagged commit affects release automation as well as branch CI; release
   tags should normally point to a non-skipped build commit or the workflow should expose an
   explicit manual dispatch path.
+
+## 2026-09-20 17:55 Asia/Shanghai — MODE-01 agent defect investigation and repair
+
+- User request: find and fix agent problems; later explicit instruction: do not use Superpowers.
+- Initial investigation loaded systematic-debugging, test-driven-development, verification-before-completion, writing-plans, using-git-worktrees, executing-plans and requesting-code-review instructions. A scratch worktree `fix/file-modes` was created before the user's correction. All subsequent work proceeded directly, without further skills or subagents; the workflow deviation follows the current user instruction. No redesign was implemented.
+- Baseline: `uv run pytest tests -q` -> 681 passed, 478 upstream asyncio deprecation warnings.
+- Root cause: both edit_file and apply_patch atomically replaced existing files with 0600 staging files, dropping executable and group/other access bits. This can break scripts after an otherwise correct agent patch.
+- RED: ten new real-filesystem cases -> 8 failed, 2 passed; expected 0755/0644/0640 became 0600. An initial editing command used unavailable `python`; it made no changes. Retried through the required uv-managed Python.
+- Repair: copy ordinary access bits for existing regular files to the staging descriptor before fsync/replacement. Patch metadata lookup stays relative to the anchored parent descriptor and does not follow symlinks. New files stay 0600; setuid/setgid/sticky bits are not copied.
+- GREEN: tools suite -> 86 passed. Copied only the two changed code/test files back into the original workspace after checking they had no user edits. Full suite in original workspace -> 691 passed, 478 warnings (13.22s); Ruff passed; mypy passed across 110 source files; git diff --check passed. Full suite includes deterministic demos and requires no real provider.
+- Direct review: checked permission preservation, new-file defaults, special-bit removal, ordering before replace, and existing descriptor cleanup. No independent subagent review was performed. No commit, push, remote CI or build was run. Existing REFLECTION.md and submissions/ changes were preserved.
+- Lesson: atomic replacement must account for file permissions; content-only regression assertions miss operational breakage.

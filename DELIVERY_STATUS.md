@@ -1166,3 +1166,11 @@ Every completed plan task must link a commit and fresh verification output here.
   `9bfa992e...a13a`, and sdist `a52af34c...9885`.
 - Local-only boundary: the student's modified `REFLECTION.md`, local reflection design/plan, and
   `submissions/` archive were not staged, tagged, uploaded, or included in this release.
+
+### MODE-01 local agent repair — 2026-09-20 17:55 Asia/Shanghai
+
+- Responsible actor: `/root`. Status: locally repaired and verified; uncommitted.
+- Fixed file access/execute permission loss in edit_file and apply_patch; new files remain private and special privilege bits are removed on update.
+- Verification: 691 tests passed, including deterministic demos; 478 pre-existing asyncio deprecation warnings. Tools selection: 86 passed. Ruff, mypy (110 files), and whitespace check passed.
+- Source evidence: AGENT_LOG.md MODE-01, PLAN.md MODE-01, tests/adapters/tools/test_filesystem.py. Latest local test output: `/tmp/613-agent-repair-pytest.log`.
+- CI/CD: no pipeline or job was started for this uncommitted repair; historical pipeline results above do not verify these changes. No package build, remote push, credential access, or deployment.
