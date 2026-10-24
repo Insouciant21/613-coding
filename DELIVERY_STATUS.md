@@ -1196,3 +1196,19 @@ Every completed plan task must link a commit and fresh verification output here.
 - Improvements: context-budget-derived history capacity; Responses tool continuations before mutable ledger; explicit breakpoints configurable per provider/model, default off; cache-write usage preserved when reported.
 - Offline prefix comparison: 2,760 -> 19,370 characters. Live: one failed exploratory request, six successful requests; fresh-prefix ABBA gave zero hits in both variants, so no demonstrated live caching gain. Active provider settings remain unchanged.
 - Source records: AGENT_LOG.md/PLAN.md LOOP-CACHE-02; [v2 evidence](docs/evidence/2026-09-22-cache-optimization-v2.json); README and regression tests. No new CI/CD pipeline/job, release build, commit, or push.
+
+### PROJECT-E2E-01 — 2026-09-22 real project gate
+
+- Responsible actor `/root`; uncommitted implementation and evidence. Three fresh single-conversation projects used real ai2/gpt-5.6-terra through the owned loop and repository tools.
+- Fixed two experimentally exposed issues: multi-file new-file patch parsing and repeated resource-profile selection caused by insufficient visible runtime guidance.
+- Final run COMPLETED in 5 calls and 47.20 seconds accounted model time. Generated project passed 14 tests, independent rerun and 45 matrix cases; acceptance/config seeds unchanged. Earlier 12-call failed and 6-call completed runs are preserved.
+- Latest harness checks: 711 offline tests passed, 478 dependency warnings; Ruff, mypy (110 files), diff check passed. Cache rates varied (60.8%/80.2%/32.8%); no caching improvement claim.
+- Source evidence: [real project report](docs/evidence/2026-09-22-project-e2e/README.md), linked raw reports and project archive; PLAN.md/AGENT_LOG.md PROJECT-E2E-01. No new CI/CD pipeline/job, commit, release build or push. Local application-service E2E does not cover Docker Supervisor or Textual interaction.
+
+### BUGFIX-01 — review-driven repairs: escalation staleness, patch preflight, pytest scope — 2026-10-24
+
+- Responsible actor: ZCode agent session (user-requested bug hunt then fixes). Implementation and local verification complete; uncommitted.
+- Fixes: `_needs_write_escalation` now lets the newest decisive feedback resolve older stale triggers (no "must edit" prompt after a recovered pass or a failure that changed files; real classifier feedback shapes are recognized). Patch header preflight validates the hunk-aware file split, so deleting lines whose content starts with `-- ` no longer yields a false "incomplete header" rejection. `pyproject.toml` scopes `uv run pytest` to `tests/` so demo workspaces under `tmp/` cannot break the canonical command.
+- Verification: RED observed for all three fixes before implementation (three context tests failed; dash-prefix patch rejected, old preflight re-verified against the corrected patch line; root collection showed 7 errors). GREEN: root `uv run pytest -q` 716 passed (478 existing asyncio warnings); `uv run ruff check .` and `uv run mypy src` (110 files) clean; `git diff --check` clean.
+- Source evidence: AGENT_LOG.md BUGFIX-01; tests/application/test_context.py, tests/adapters/tools/test_patch.py; src/coding613/application/context.py, src/coding613/adapters/tools/patch.py, pyproject.toml.
+- CI/CD: no pipeline or job started; historical results do not cover these changes. No commit, push, credential access, real LLM, or release build. Low-severity review observations (anthropic ledger sniffing, MemoryQuery tag validation, BLOCKED dead state, id()-keyed replay set, workspace changed_files reporting) remain open by user decision.

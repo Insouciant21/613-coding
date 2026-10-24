@@ -117,10 +117,12 @@ def prepare_patch(
     if not patch.startswith("--- "):
         raise InvalidPatchError("patch must start with a unified file header")
     _preflight_header_pairs(patch)
-    _validate_patch_lines(patch)
+    file_patches = _validate_patch_lines(patch)
 
     try:
-        files = PatchSet(patch)
+        # Parse files independently: repeated /dev/null sources otherwise confuse
+        # unidiff when a marker-based patch creates several files at once.
+        files = [item for file_patch in file_patches for item in PatchSet(file_patch)]
     except Exception as error:
         raise InvalidPatchError("malformed unified patch") from error
     if not files:
@@ -356,10 +358,16 @@ def _preflight_header_pairs(patch: str) -> None:
         raise InvalidPatchError("patch contains no file headers")
 
 
-def _validate_patch_lines(patch: str) -> None:
+def _validate_patch_lines(patch: str) -> tuple[str, ...]:
     source_remaining = target_remaining = 0
     hunk_pattern = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
-    for line in patch.splitlines():
+    files: list[str] = []
+    file_lines: list[str] = []
+    for line in patch.splitlines(keepends=True):
+        if not (source_remaining or target_remaining) and line.startswith("--- ") and file_lines:
+            files.append("".join(file_lines))
+            file_lines = []
+        file_lines.append(line)
         if source_remaining or target_remaining:
             if line.startswith("\\ No newline at end of file"):
                 continue
@@ -384,6 +392,10 @@ def _validate_patch_lines(patch: str) -> None:
         target_remaining = int(match.group(4) or "1") if match.group(3) else 0
     if source_remaining or target_remaining:
         raise InvalidPatchError("hunk line count mismatch")
+
+    if file_lines:
+        files.append("".join(file_lines))
+    return tuple(files)
 
 
 def _operation_path(source: str, target: str) -> tuple[PatchOperation, str]:

@@ -1,0 +1,149 @@
+{
+  "recorded_at": "2026-09-22T21:35:43.116740+08:00",
+  "provider": "ai2",
+  "model": "gpt-5.6-terra",
+  "scope": "Real project via ConversationService -> RunService -> owned AgentLoop -> real Responses provider -> governed repository tools -> subprocess unittest validation -> SQLite persistence. The observer only records calls; no responses/actions are mocked.",
+  "project": "standard-library temperature converter library and CLI",
+  "method": "Three fresh Git repositories with identical requirements and acceptance tests. Each run receives one user prompt in one session; no manual edits of the agent-generated implementation. Same model, 12-call limit, 4096 output-token ceiling and 300-second model-time budget.",
+  "runs": [
+    {
+      "variant": "before",
+      "run_id": "0e035e3c-ae1d-48ff-9d53-bb0b48b37f2c",
+      "session_id": "aa68a91d-da15-4d2e-80d5-80de65854286",
+      "status": "failed",
+      "stop_reason": "budget_exhausted",
+      "model_calls": 12,
+      "input_tokens": 83413,
+      "cached_input_tokens": 50688,
+      "output_tokens": 6290,
+      "cache_hit_ratio": 0.6076750626401161,
+      "seconds": 140.44696247705724,
+      "independent_validation_exit": 0,
+      "acceptance_unchanged": true,
+      "actions": [
+        [
+          "set_task_budget"
+        ],
+        [
+          "set_task_budget"
+        ],
+        [
+          "read_file",
+          "read_file",
+          "list_files"
+        ],
+        [
+          "apply_patch"
+        ],
+        [
+          "apply_patch"
+        ],
+        [
+          "apply_patch"
+        ],
+        [
+          "apply_patch"
+        ],
+        [
+          "apply_patch"
+        ],
+        [
+          "apply_patch"
+        ],
+        [
+          "run_validation"
+        ],
+        [
+          "edit_file"
+        ],
+        [
+          "run_validation"
+        ]
+      ]
+    },
+    {
+      "variant": "patch-fixed",
+      "run_id": "7d28a89a-9a40-4417-aaba-f7eb5de0c5fd",
+      "session_id": "9656d21e-3782-4391-a614-6fb93942db3a",
+      "status": "completed",
+      "stop_reason": "success",
+      "model_calls": 6,
+      "input_tokens": 37041,
+      "cached_input_tokens": 29696,
+      "output_tokens": 2016,
+      "cache_hit_ratio": 0.8017062174347345,
+      "seconds": 50.3662865680235,
+      "independent_validation_exit": 0,
+      "acceptance_unchanged": true,
+      "actions": [
+        [
+          "set_task_budget"
+        ],
+        [
+          "set_task_budget"
+        ],
+        [
+          "read_file",
+          "read_file",
+          "list_files"
+        ],
+        [
+          "apply_patch"
+        ],
+        [
+          "run_validation"
+        ],
+        [
+          "finish"
+        ]
+      ]
+    },
+    {
+      "variant": "final",
+      "run_id": "564ed89a-b1f3-4beb-adcf-89f53753e751",
+      "session_id": "887a3983-1763-41a3-a655-86367369f502",
+      "status": "completed",
+      "stop_reason": "success",
+      "model_calls": 5,
+      "input_tokens": 31240,
+      "cached_input_tokens": 10240,
+      "output_tokens": 1976,
+      "cache_hit_ratio": 0.32778489116517284,
+      "seconds": 47.198980177985504,
+      "independent_validation_exit": 0,
+      "acceptance_unchanged": true,
+      "actions": [
+        [
+          "set_task_budget"
+        ],
+        [
+          "read_file",
+          "read_file",
+          "list_files"
+        ],
+        [
+          "apply_patch"
+        ],
+        [
+          "run_validation"
+        ],
+        [
+          "finish"
+        ]
+      ]
+    }
+  ],
+  "final_checks": {
+    "unit_tests": 14,
+    "independent_conversion_matrix_cases": 45,
+    "seed_acceptance_and_harness_unchanged": true,
+    "cli_stdout": "212.00 F"
+  },
+  "limitations": [
+    "The local application-service loop is exercised, not Textual interaction or Docker Supervisor workers.",
+    "Fresh runs are sequential and model output/provider cache state are nondeterministic; performance ratios are observations, not guaranteed causal gains.",
+    "Reported provider_cost=0 is the harness default when pricing is absent, not a free-usage claim.",
+    "The 12-call baseline was not extended: its project passes independent tests but its harness run failed before finish.",
+    "The final experiment kept explicit prompt caching disabled, matching the unchanged active profile."
+  ]
+}

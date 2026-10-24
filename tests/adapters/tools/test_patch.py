@@ -622,3 +622,17 @@ def test_apply_patch_reports_root_close_failure_after_commit(
 
     assert raised.value.changed_files == ("value.txt",)
     assert target.read_text(encoding="utf-8") == "new\n"
+
+
+@pytest.mark.parametrize("patch", [
+    "*** Begin Patch\n*** Add File: first.txt\n+first\n*** Add File: second.txt\n+second\n*** End Patch\n",
+    (
+        "--- /dev/null\n+++ b/first.txt\n@@ -0,0 +1 @@\n+first\n"
+        "--- /dev/null\n+++ b/second.txt\n@@ -0,0 +1 @@\n+second\n"
+    ),
+])
+def test_patch_can_create_two_files_in_one_action(tmp_path: Path, patch: str) -> None:
+    result = FilesystemTools(tmp_path).apply_patch(patch)
+    assert result.added == 2
+    assert (tmp_path / "first.txt").read_text() == "first\n"
+    assert (tmp_path / "second.txt").read_text() == "second\n"

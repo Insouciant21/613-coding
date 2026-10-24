@@ -1,0 +1,148 @@
+from __future__ import annotations
+import hashlib
+import json
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+from coding613.adapters.credentials.keyring import KeyringCredentialStore
+from coding613.application.composition import _build_provider, build_services
+from coding613.config import UserConfig, load_user_config, save_user_config
+from coding613.domain.conversation import PromptRequest
+from coding613.domain.models import PermissionMode
+from coding613.domain.options import RunOptions
+
+root=Path(tempfile.mkdtemp(prefix='613-project-e2e-'))
+Path('/tmp/613-project-e2e-location').write_text(str(root))
+(root/'tests').mkdir()
+(root/'.gitignore').write_text('.613-coding/\n__pycache__/\n*.pyc\n')
+(root/'README.md').write_text('''# TempConvert project requirements
+Implement a standard-library-only Python module tempconvert.py.
+Public API: convert(value: float, source: str, target: str) -> float.
+Units C/F/K are case insensitive. Kelvin absolute zero is 0, Celsius -273.15,
+Fahrenheit -459.67. Reject unknown units, NaN/infinity, and temperatures below
+absolute zero with ValueError. Identity conversions must also validate inputs.
+CLI: python -m tempconvert VALUE SOURCE TARGET. Print exactly two decimal
+places, a space, and the uppercase target unit, e.g. 212.00 F. Invalid inputs
+must produce a nonzero exit and an error on stderr, without a traceback.
+Add usage examples and at least three extra unit tests in tests/test_extra.py.
+Do not modify tests/test_acceptance.py or harness.toml. No external dependencies.
+Run the configured unittest discovery validation, repair failures, and finish.
+''')
+acceptance='''import math
+import subprocess
+import sys
+import unittest
+from tempconvert import convert
+
+class Acceptance(unittest.TestCase):
+    def test_celsius_fahrenheit(self):
+        self.assertAlmostEqual(convert(100, "C", "F"), 212)
+        self.assertAlmostEqual(convert(32, "F", "C"), 0)
+    def test_kelvin(self):
+        self.assertAlmostEqual(convert(0, "C", "K"), 273.15)
+        self.assertAlmostEqual(convert(273.15, "K", "C"), 0)
+        self.assertAlmostEqual(convert(98.6, "F", "K"), 310.15)
+    def test_case_and_identity(self):
+        self.assertAlmostEqual(convert(10, "c", "c"), 10)
+        self.assertAlmostEqual(convert(-40, "c", "f"), -40)
+    def test_absolute_zero(self):
+        self.assertAlmostEqual(convert(-273.15, "C", "K"), 0, places=8)
+        self.assertAlmostEqual(convert(-459.67, "F", "K"), 0, places=8)
+    def test_below_absolute_zero(self):
+        for value, unit in [(-274,"C"),(-1,"K"),(-460,"F")]:
+            with self.subTest(unit=unit), self.assertRaises(ValueError):
+                convert(value, unit, "K")
+    def test_invalid_identity(self):
+        with self.assertRaises(ValueError):
+            convert(-1, "K", "K")
+    def test_unknown_unit(self):
+        for source,target in [("X","C"),("C","X")]:
+            with self.assertRaises(ValueError):
+                convert(10, source, target)
+    def test_nonfinite(self):
+        for value in [math.nan, math.inf, -math.inf]:
+            with self.assertRaises(ValueError):
+                convert(value, "C", "K")
+    def test_cli_success(self):
+        result=subprocess.run([sys.executable,"-m","tempconvert","100","c","f"],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout.strip(),"212.00 F")
+    def test_cli_failure(self):
+        for args in [("oops","C","F"),("-1","K","C"),("nan","C","F")]:
+            result=subprocess.run([sys.executable,"-m","tempconvert",*args],capture_output=True,text=True)
+            self.assertNotEqual(result.returncode,0)
+            self.assertTrue(result.stderr)
+            self.assertNotIn("Traceback",result.stderr)
+'''
+(root/'tests/test_acceptance.py').write_text(acceptance)
+argv=[sys.executable,'-m','unittest','discover','-s','tests','-v']
+(root/'harness.toml').write_text('[policy]\nmode = "balanced"\nallow_writes = true\nvalidation_commands = ['+json.dumps(argv)+']\n')
+subprocess.run(['git','init','-q'],cwd=root,check=True)
+subprocess.run(['git','add','.'],cwd=root,check=True)
+subprocess.run(['git','-c','user.name=613 E2E','-c','user.email=e2e@example.invalid','commit','-qm','seed project requirements and acceptance tests'],cwd=root,check=True)
+baseline=subprocess.run(argv,cwd=root,capture_output=True,text=True)
+(root/'baseline-validation.txt').write_text(baseline.stdout+baseline.stderr)
+print(json.dumps({'project':str(root),'baseline_exit':baseline.returncode}),flush=True)
+assert baseline.returncode != 0
+seed_hash=hashlib.sha256(acceptance.encode()).hexdigest()
+config=load_user_config()
+selected=config.providers[config.active_provider].effective().model_copy(update={
+    'max_output_tokens':4096,'timeout_seconds':45.0,'models':{},'active_model':None,
+})
+user_config=Path(tempfile.mkdtemp(prefix='613-e2e-user-config-'))/'config.toml'
+save_user_config(UserConfig(active_provider=config.active_provider,providers={config.active_provider:selected}),user_config)
+delegate=_build_provider(selected,KeyringCredentialStore(),None,None)
+calls=[]
+report={'project':str(root),'provider':config.active_provider,'model':selected.model,'api':selected.api,
+        'single_user_prompt':True,'max_model_calls':12,'max_output_tokens':4096,
+        'baseline_exit_code':baseline.returncode,'calls':calls}
+report_path=Path('/tmp/613-project-e2e-result.json')
+def save():
+    report_path.write_text(json.dumps(report,indent=2)+'\n')
+class ObservedProvider:
+    streaming_enabled=True
+    def complete(self,context,tools):
+        return self._invoke(context,tools,None,None)
+    def complete_stream(self,context,tools,on_text_delta,cancelled):
+        return self._invoke(context,tools,on_text_delta,cancelled)
+    def _invoke(self,context,tools,on_text_delta,cancelled):
+        record={'call':len(calls)+1,'context_chars':sum(len(m.content) for m in context.messages),'message_count':len(context.messages)}
+        calls.append(record)
+        start=time.monotonic()
+        try:
+            response=delegate.complete_stream(context,tools,on_text_delta,cancelled) if on_text_delta is not None else delegate.complete(context,tools)
+            record.update(success=True,seconds=round(time.monotonic()-start,3),usage=response.provider_metadata.get('usage',{}),actions=[getattr(a.action,'name','finish') for a in response.actions])
+            return response
+        except Exception as error:
+            record.update(success=False,seconds=round(time.monotonic()-start,3),error_type=type(error).__name__)
+            raise
+        finally:
+            save()
+            print(json.dumps(record),flush=True)
+class Progress:
+    def publish(self,update):
+        if update.kind.value in {'tool_started','tool_finished','validation_started','validation_finished','error'}:
+            print(json.dumps({'progress':update.kind.value,'text':update.text[:120]}),flush=True)
+try:
+    services=build_services(root,provider=ObservedProvider(),user_config_path=user_config)
+    task='Implement the TempConvert project described in README.md in this single conversation. Read the requirements and acceptance tests, create tempconvert.py with the API and CLI, add at least three tests in tests/test_extra.py, and document examples. Do not change tests/test_acceptance.py or harness.toml. Use the declared validation command, fix any failures, and finish only when validation is fresh and passing. Do not ask me questions or merely describe a plan.'
+    run=services.conversation.submit(PromptRequest(project_id=services.run_service.project.id,text=task,permission_mode=PermissionMode.BALANCED,options=RunOptions(disallowed_tools=frozenset({'run_command','run_shell','install_dependency'}),budget_overrides={'total_model_calls':12,'wall_time_seconds':300})))
+    report.update(run_id=str(run.id),session_id=str(run.session_id),task=task)
+    save()
+    summary=services.run_service.resume(run.id,progress=Progress())
+    report['summary']=summary.model_dump(mode='json')
+    report['events']=[{'type':e.event_type,'payload':e.payload} for e in services.list_events(run.id) if e.event_type.startswith(('feedback.','validation.','run.'))]
+    independent=subprocess.run(argv,cwd=root,capture_output=True,text=True,timeout=30)
+    report['independent_validation']={'exit_code':independent.returncode,'output':independent.stdout+independent.stderr}
+    report['acceptance_unchanged']=hashlib.sha256((root/'tests/test_acceptance.py').read_bytes()).hexdigest()==seed_hash
+    report['files']=subprocess.run(['git','status','--short'],cwd=root,capture_output=True,text=True,check=True).stdout
+    save()
+    print(json.dumps({'summary':report['summary'],'independent_exit':independent.returncode,'acceptance_unchanged':report['acceptance_unchanged']}),flush=True)
+except Exception as error:
+    report['harness_error_type']=type(error).__name__
+    save()
+    print(json.dumps({'harness_error_type':type(error).__name__}),flush=True)
+finally:
+    delegate.close()

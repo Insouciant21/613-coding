@@ -1247,3 +1247,11 @@ Every task must end with a focused test result and commit hash. `DELIVERY_STATUS
 - RED: adapter/context cases 4 failures, configuration and cache-write regressions separately failed before implementation. GREEN: focused 59 passed, full 709 passed (478 existing warnings); Ruff, mypy across 110 files, diff check passed.
 - Offline prefix evidence: 2,760 -> 19,370 shared characters in the 15-to-16 read-event scenario. Live explicit payload accepted; fresh-prefix ABBA comparison reported zero hits for both variants. No demonstrated live hit-rate improvement; option stays default-off and active user configuration is unchanged.
 - Evidence: AGENT_LOG.md LOOP-CACHE-02; docs/evidence/2026-09-22-cache-optimization-v2.json; corresponding context/config/Responses tests. Commit: none; remote CI not run.
+
+## PROJECT-E2E-01 — real project validation and resulting repairs (2026-09-22)
+
+- Local implementation and verification complete; uncommitted. User requires realistic single-conversation project tests for agent behavior.
+- Three fresh real-API TempConvert projects, identical single prompt and limits. Before: 12 calls, budget exhausted before finish despite eventual passing tests. Multi-file patch fix: 6 calls, COMPLETED. Patch plus explicit selected-budget guidance: 5 calls, COMPLETED, no repeated budget call.
+- TDD: two multi-file patch regressions failed before per-file parsing; selected-profile prompt regression failed before tail guidance. Focused 121 passed; full 711 passed with 478 pre-existing warnings; Ruff, mypy and diff checks passed.
+- Final application acceptance: 14 tests passed twice, 45 independent conversion-matrix checks, CLI 212.00 F; original acceptance and harness config unchanged. Real cached/input ratios: 60.8%, 80.2%, 32.8%, respectively; no causal cache-hit improvement claim.
+- Evidence: docs/evidence/2026-09-22-project-e2e/README.md and linked reports/project archive/runner; AGENT_LOG.md PROJECT-E2E-01. Commit none; remote CI not run.
