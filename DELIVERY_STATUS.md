@@ -1213,3 +1213,10 @@ Every completed plan task must link a commit and fresh verification output here.
 - Source evidence: AGENT_LOG.md BUGFIX-01; tests/application/test_context.py, tests/adapters/tools/test_patch.py; src/coding613/application/context.py, src/coding613/adapters/tools/patch.py, pyproject.toml.
 - CI/CD: no pipeline or job started; historical results do not cover these changes. No commit, push, credential access, real LLM, or release build. Low-severity review observations (anthropic ledger sniffing, MemoryQuery tag validation, BLOCKED dead state, id()-keyed replay set, workspace changed_files reporting) remain open by user decision.
 - Follow-up (2026-10-24): user directed submissions/ to stay untracked (added to .gitignore) and the uncommitted batch to be split into per-task commits; intermediate commit states re-verified at 691/709/711 passing via stash. See AGENT_LOG.md REVIEW-COMMIT-01 and `git log` for hashes.
+
+### WEATHER-E2E-01 — interactive CLI weather-calendar validation — 2026-10-24
+
+- Responsible actor: ZCode session as operator; implementation by the product agent through the installed CLI. Two-turn interactive run (`-p` + `--continue`) on a fresh seeded repository using the active ai2 profile.
+- Outcome: turn 1 budget-exhausted on an operator-authored over-constrained acceptance assertion (agent implementation was 7/8 correct on first patch); turn 2 completed in 3 iterations after the documented operator amendment. Independent checks: 8/8 tests, calendar alignment verified cell-by-cell, CLI exit codes 0/2 as specified. Usage: 23 calls, 34.8% cached input.
+- Open defects surfaced by real use: bare `providers` / `credentials status` NoArgsIsHelpError tracebacks; generic repository-escape denial messages that did not steer the agent to run_validation during the repair loop. Recorded for follow-up; no source change in this task.
+- Source evidence: [weather calendar E2E](docs/evidence/2026-10-24-weather-calendar-e2e/README.md), AGENT_LOG.md WEATHER-E2E-01. No CI pipeline started, no commit of harness source, no push.
