@@ -1220,3 +1220,10 @@ Every completed plan task must link a commit and fresh verification output here.
 - Outcome: turn 1 budget-exhausted on an operator-authored over-constrained acceptance assertion (agent implementation was 7/8 correct on first patch); turn 2 completed in 3 iterations after the documented operator amendment. Independent checks: 8/8 tests, calendar alignment verified cell-by-cell, CLI exit codes 0/2 as specified. Usage: 23 calls, 34.8% cached input.
 - Open defects surfaced by real use: bare `providers` / `credentials status` NoArgsIsHelpError tracebacks; generic repository-escape denial messages that did not steer the agent to run_validation during the repair loop. Recorded for follow-up; no source change in this task.
 - Source evidence: [weather calendar E2E](docs/evidence/2026-10-24-weather-calendar-e2e/README.md), AGENT_LOG.md WEATHER-E2E-01. No CI pipeline started, no commit of harness source, no push.
+
+### WEATHER-E2E-02 — TUI validation on gpt-6.1-sol — 2026-10-24
+
+- Responsible actor: ZCode session as operator driving the real Textual TUI via tmux; provider model switched to gpt-6.1-sol (alias sol, legacy retained).
+- Outcome: single-turn romannum task completed in 8 turns / 128.9 s; validation passed on first attempt (5/5, also verified independently with CLI exit-code checks). Relative validation argv produced zero repository_escape denials versus 4 in the prior absolute-path run.
+- New open defect: TUI Enter-submit soft-lock after a completed run (typing/Ctrl+J/keypad-Enter still work; Ctrl+Q healthy; suspect stuck `_executing` guard with summary rendered by the progress channel). Recorded with reproduction detail; no fix in this task.
+- Source evidence: [TUI romannum E2E](docs/evidence/2026-10-24-tui-romannum-e2e/README.md), AGENT_LOG.md WEATHER-E2E-02. No CI pipeline, no push, no harness source change.

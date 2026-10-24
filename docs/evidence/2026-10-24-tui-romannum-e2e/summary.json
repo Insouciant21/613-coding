@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-24",
+  "surface": "TUI (tmux 220x50)",
+  "provider": "ai2/gpt-6.1-sol (alias sol)",
+  "repo": "/tmp/tui-demo",
+  "task": "romannum converter, 5 pre-written acceptance tests",
+  "validation_command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q"
+  ],
+  "runs": [
+    {
+      "state": "completed",
+      "stop_reason": "success",
+      "iterations": 9,
+      "agent_turns": 8,
+      "model_calls": 8,
+      "wall_seconds": 128.89
+    }
+  ],
+  "usage": {
+    "model_calls_with_usage": 9,
+    "input_tokens": 58894,
+    "cached_input_tokens": 15724,
+    "output_tokens": 1679
+  },
+  "policy_denials": {
+    "repository_escape": 0
+  },
+  "independent_verification": {
+    "tests": "5 passed",
+    "cli_2026": "MMXXVI",
+    "cli_3999": "MMMCMXCIX",
+    "cli_invalid_exit": 2
+  },
+  "defects": [
+    {
+      "title": "TUI Enter submit soft-lock after completed run",
+      "symptom": "Enter no-ops for submit and slash palette after run completes; Ctrl+J and keypad Enter still insert newlines; typing works; Ctrl+Q exit healthy",
+      "suspect": "stuck _executing guard in action_submit_task / _submit_message finally not reached",
+      "reproduced": 2
+    }
+  ],
+  "target_repo_commits": [
+    "a6ac919 seed",
+    "7315757 agent implementation"
+  ]
+}
